@@ -385,3 +385,14 @@ These are decisions to make during the phases above, not now.
 3. **Fixed screens in Loom or in the host framework.** The store plan uses Loom for all screens to prove the engine. A real merchant might keep checkout in their existing framework.
 4. **Server-side rendering.** Search engines can't read a canvas. Options: generate HTML for crawlers from the same tree, or keep indexable pages (catalog, product) outside Loom.
 5. **Native renderer timing.** Only worth it once screens are heavy enough for the browser to be the bottleneck, which the speed measurements say is not yet the case.
+6. **A DOM render target.** A second renderer that builds plain DOM elements (no React or Angular) from the same parsed tree, state and actions. The language, parser, expressions, actions and model guide would be unchanged; only the drawing step would differ. This is not planned: rendering stays on the canvas ([`CLAUDE.md`](../CLAUDE.md), rule 7). It is recorded here so the tradeoff can be measured rather than argued.
+
+   | Gains | Costs |
+   |---|---|
+   | Accessibility, text input, IME, autofill, text selection, copy and browser find come from the browser almost for free | A second implementation (`dom` alongside `layout` and `paint`) for every component, kept in step forever |
+   | Search engines can read the page (see question 4) | Browser layout won't exactly match the canvas layout, so the same spec can look different in each target |
+   | Scrolling, overlays and focus handling are native | The debugging tools (layout boxes, hit regions, inspect mode, frame capture) are built on canvas boxes and don't carry over |
+
+   Updates would also need care. Today the engine doesn't track which expressions read which state: any state change re-lays out the whole tree (`src/engine.ts`, the `state.subscribe` handler calls `invalidate("layout")`). `identifiers()` in `src/expr.ts` can list the names an expression reads, but nothing uses it for dependency tracking yet. A DOM target that updates only changed elements would need that tracking built first. (The canvas engine could use the same tracking to skip re-layout.)
+
+   **Candidate spike after Phase 1:** on a branch, build DOM versions of three components (`text`, `button`, `check`) and record the effort and the code each needs. Compare that with the estimated effort of the accessibility mirror (Phase 3.1) for the same components, then decide whether to go further, stop, or revisit after the mirror exists.
