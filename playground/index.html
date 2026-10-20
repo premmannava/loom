@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Loom Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Instrument+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="./playground.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Loom<span>.</span> playground</h1>
+      <p>Write or stream a spec on the left. Loom parses it, lays it out and paints it on a canvas on the right.</p>
+    </div>
+    <dl class="metrics" aria-label="Pipeline metrics">
+      <div><dt>Nodes</dt><dd id="mNodes">0</dd></div>
+      <div><dt>Parse</dt><dd id="mParse">0.00 ms</dd></div>
+      <div><dt>Layout</dt><dd id="mLayout">0.00 ms</dd></div>
+      <div><dt>Paint</dt><dd id="mPaint">0.00 ms</dd></div>
+      <div><dt>Canvas</dt><dd id="mPix">0 × 0</dd></div>
+    </dl>
+  </header>
+
+  <nav class="samples" id="samples" aria-label="Samples"></nav>
+
+  <main class="bench">
+    <section class="pane editor-pane" aria-label="Spec">
+      <div class="pane-head">
+        <h2>Spec</h2>
+        <span class="status" id="status"><i></i><span id="statusText">Idle</span></span>
+        <button class="btn" id="stream">Stream again</button>
+      </div>
+      <p class="prompt">Prompt: <q id="promptText"></q></p>
+      <div class="editor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <textarea id="spec" spellcheck="false" aria-label="Loom spec" wrap="off"></textarea>
+      </div>
+    </section>
+
+    <section class="pane" aria-label="Output">
+      <div class="pane-head">
+        <h2>Canvas</h2>
+        <div class="tools" role="group" aria-label="Debug tools">
+          <label class="tog"><input type="checkbox" id="tBoxes"> Layout boxes</label>
+          <label class="tog"><input type="checkbox" id="tHits"> Hit regions</label>
+          <label class="tog"><input type="checkbox" id="tInspect"> Inspect</label>
+        </div>
+      </div>
+      <div class="stage"><div class="stage-inner"><canvas id="cv"></canvas></div></div>
+    </section>
+  </main>
+
+  <section class="panels">
+    <div class="pane">
+      <div class="pane-head"><h2>Problems</h2><span class="count" id="diagCount">0</span></div>
+      <ul class="diags" id="diags"></ul>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><h2>Inspector</h2><button class="btn" id="capture">Capture frame</button></div>
+      <pre class="mono" id="inspect">Turn on Inspect and click anything on the canvas, or put the cursor on a spec line.</pre>
+    </div>
+    <div class="pane">
+      <div class="pane-head"><h2>State</h2><span class="hint">window.loom in the console</span></div>
+      <table class="state" id="state"><tbody></tbody></table>
+      <ol class="events" id="events" aria-label="Emitted actions"></ol>
+    </div>
+  </section>
+
+  <details class="guide">
+    <summary>Model guide (generated from the component registry)</summary>
+    <pre class="mono" id="guide"></pre>
+  </details>
+</div>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

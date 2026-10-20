@@ -1,0 +1,41 @@
+{
+  "name": "loom-ui",
+  "version": "0.1.0",
+  "description": "A canvas UI engine and a UI language designed for AI models to write.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/loom.js",
+  "module": "./dist/loom.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/loom.js"
+    },
+    "./map": {
+      "types": "./dist/types/components/map/index.d.ts",
+      "import": "./dist/map.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "build:playground": "vite build --config vite.playground.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:world": "node scripts/build-world.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "d3-geo": "^3.1.1",
+    "topojson-client": "^3.1.0",
+    "typescript": "5.6.3",
+    "vite": "5.4.10",
+    "vitest": "2.1.4",
+    "world-atlas": "^2.0.2"
+  }
+}

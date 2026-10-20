@@ -1,0 +1,15 @@
+export { Loom, roundRectPath, type LoomOptions, type LoomEvents, type Metrics } from "./engine";
+export { parse, tokenizeLine, type ParseOptions, type ParseResult } from "./parser";
+export { evaluate, interpolate, formatValue, checkSyntax, identifiers, type EvalResult, type Scope } from "./expr";
+export { parseActions, runActions, type Action } from "./actions";
+export { Registry } from "./registry";
+export { Store } from "./state";
+export { layoutTree, boxAt, walkBoxes, isVisible } from "./layout";
+export { Inspector, type DrawCall } from "./inspector";
+export { languageGuide } from "./prompt";
+export { lightTheme, darkTheme, extendTheme, themeFromCSS, type Theme } from "./theme";
+export { CanvasMeasurer, MonoMeasurer, wrapText, type TextMeasurer } from "./text";
+export { PropReader, COMMON_PROPS, type ComponentDef, type PropDef, type LayoutContext, type PaintContext, type PressContext } from "./component";
+export { coreComponents } from "./components";
+export * as components from "./components";
+export type { LoomNode, Box, Diagnostic, Value, HitTarget, Rect } from "./types";
