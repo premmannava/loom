@@ -1,4 +1,4 @@
-import type { LayoutContext, PropDef } from "../component";
+import type { LayoutContext, PressContext, PropDef } from "../component";
 import type { Theme } from "../theme";
 import type { Box } from "../types";
 
@@ -62,3 +62,53 @@ export function textMetrics(theme: Theme, style: TextStyle, weight?: (typeof WEI
   const numeric = { regular: 400, semibold: 600, bold: 700 }[w];
   return { size, weight: numeric, lineHeight: Math.round(size * 1.35 * 10) / 10 };
 }
+
+/** A CSS font string from the theme's family. */
+export function themeFont(theme: Theme, weight: number, size: number, family: "family" | "mono" = "family"): string {
+  return `${weight} ${size}px ${theme.font[family]}`;
+}
+
+/** A box covering one pressable part of an element, for ctx.addHit with a detail. */
+export function partBox(box: Box, x: number, y: number, w: number, h: number): Box {
+  return { node: box.node, x, y, w, h, children: [] };
+}
+
+/** Fill the current path with a color at reduced opacity (tints, hover washes). */
+export function fillTint(g: CanvasRenderingContext2D, color: string, alpha: number): void {
+  g.save();
+  g.globalAlpha *= alpha;
+  g.fillStyle = color;
+  g.fill();
+  g.restore();
+}
+
+/** A small chevron centred on (x, y), pointing right, down, left or up. */
+export function chevron(g: CanvasRenderingContext2D, x: number, y: number, size: number, dir: "right" | "down" | "left" | "up", color: string): void {
+  const s = size / 2;
+  const pts: Record<typeof dir, [number, number][]> = {
+    right: [[-s / 2, -s], [s / 2, 0], [-s / 2, s]],
+    left: [[s / 2, -s], [-s / 2, 0], [s / 2, s]],
+    down: [[-s, -s / 2], [0, s / 2], [s, -s / 2]],
+    up: [[-s, s / 2], [0, -s / 2], [s, s / 2]],
+  };
+  g.save();
+  g.strokeStyle = color;
+  g.lineWidth = 1.8;
+  g.lineCap = "round";
+  g.lineJoin = "round";
+  g.beginPath();
+  pts[dir].forEach(([dx, dy], i) => (i ? g.lineTo(x + dx, y + dy) : g.moveTo(x + dx, y + dy)));
+  g.stroke();
+  g.restore();
+}
+
+/** Run an element's on= actions, if any (used after a component writes its bind= state). */
+export function runOn(ctx: PressContext): void {
+  const on = ctx.props(ctx.target.node).raw("on");
+  if (on) ctx.run(on);
+}
+
+export const onProp = (what: string): PropDef => ({
+  type: "action",
+  description: `Actions to run ${what}, e.g. emit:changed. Separate several with ;`,
+});

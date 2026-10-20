@@ -13,9 +13,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { coreComponents } from "../src/components";
-import type { Category } from "../src/component";
+import { CATEGORIES, type Category } from "../src/component";
 
-const CATEGORIES: Category[] = ["layout", "content", "input", "data", "feedback"];
 const root = resolve(__dirname, "..");
 
 function fail(message: string): never {
@@ -95,13 +94,16 @@ writeFileSync(testFile, test);
 
 const indexPath = resolve(root, "src/components/index.ts");
 let index = readFileSync(indexPath, "utf8");
-const listMatch = /export const coreComponents: ComponentDef\[\] = \[([^\]]*)\];/.exec(index);
-if (!listMatch) fail("Couldn't find the coreComponents list in src/components/index.ts; register the component by hand.");
+const exportsRe = /export \{([^}]*)\};/;
+const listRe = /(export const coreComponents: ComponentDef\[\] = \[)([^\]]*)\];/;
+if (!exportsRe.test(index) || !listRe.test(index)) fail("Couldn't find the exports and coreComponents list in src/components/index.ts; register the component by hand.");
 const lastImport = index.lastIndexOf("\nimport ");
 const lineEnd = index.indexOf("\n", lastImport + 1);
 index = index.slice(0, lineEnd + 1) + `import { ${ident} } from "./${name}";\n` + index.slice(lineEnd + 1);
-index = index.replace(/export \{ ([^}]*) \};/, (_m, names: string) => `export { ${names.trim()}, ${ident} };`);
-index = index.replace(listMatch[0], `export const coreComponents: ComponentDef[] = [${listMatch[1]!.trim()}, ${ident}];`);
+// Append to both lists, whether they're written on one line or several.
+const append = (names: string) => (names.includes("\n") ? `${names.replace(/,?\s*$/, "")},\n  ${ident},\n` : ` ${names.trim().replace(/,$/, "")}, ${ident} `);
+index = index.replace(exportsRe, (_m, names: string) => `export {${append(names)}};`);
+index = index.replace(listRe, (_m, head: string, names: string) => `${head}${append(names).replace(/^ | $/g, "")}];`);
 writeFileSync(indexPath, index);
 
 console.log(`Created src/components/${name}.ts and test/components/${name}.test.ts, and registered "${name}".

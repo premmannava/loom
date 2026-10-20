@@ -1,4 +1,7 @@
+import { literal } from "../actions";
 import type { ComponentDef } from "../component";
+import type { Value } from "../types";
+import { fillTint, onProp, partBox, runOn } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
 
@@ -100,5 +103,280 @@ check "I agree to the terms" bind=agreed`,
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
     if (key) ctx.set(key, !ctx.scope(key));
+  },
+};
+
+export const switchToggle: ComponentDef = {
+  type: "switch",
+  category: "input",
+  description: "An on/off switch with a label, for settings that take effect right away.",
+  text: { description: "The label for the setting.", required: true },
+  props: {
+    bind: { type: "state", required: true, description: "The true/false state name this switch reads and writes." },
+    on: onProp("after it is switched"),
+  },
+  example: `state updates=true
+switch "Email me order updates" bind=updates`,
+  layout(box) {
+    box.h = 28;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const on = !!ctx.scope(p.raw("bind") ?? "");
+    const tw = 40, th = 24, tx = box.x + box.w - tw, ty = box.y + (box.h - th) / 2;
+    g.font = ctx.font(400, theme.text.body);
+    g.fillStyle = c.ink;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    g.fillText(p.text(), box.x, box.y + box.h / 2 + 1, Math.max(0, box.w - tw - 12));
+    ctx.roundRect(tx, ty, tw, th, th / 2);
+    g.fillStyle = on ? c.accent : c.line;
+    g.fill();
+    if (ctx.isHovered(box.node)) fillTint(g, c.ink, 0.08);
+    g.beginPath();
+    g.arc(on ? tx + tw - th / 2 : tx + th / 2, ty + th / 2, th / 2 - 3, 0, Math.PI * 2);
+    g.fillStyle = on ? c.onAccent : c.surface;
+    g.fill();
+    ctx.addHit(box);
+  },
+  press(ctx) {
+    const key = ctx.props(ctx.target.node).raw("bind");
+    if (!key) return;
+    ctx.set(key, !ctx.scope(key));
+    runOn(ctx);
+  },
+};
+
+export const radio: ComponentDef = {
+  type: "radio",
+  category: "input",
+  description: "One choice among several. Give each radio in a group the same bind= and its own value=.",
+  text: { description: "The label for this choice.", required: true },
+  props: {
+    bind: { type: "state", required: true, description: "The state name the group shares; it holds the chosen value." },
+    value: { type: "string", required: true, description: "What bind= is set to when this radio is chosen." },
+    on: onProp("after it is chosen"),
+  },
+  example: `state size=m
+radio "Small" bind=size value=s
+radio "Medium" bind=size value=m
+radio "Large" bind=size value=l`,
+  layout(box) {
+    box.h = 26;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const chosen = ctx.scope(p.raw("bind") ?? "") === literal(p.raw("value") ?? "");
+    const cx = box.x + 9.5, cy = box.y + box.h / 2;
+    g.beginPath();
+    g.arc(cx, cy, 9, 0, Math.PI * 2);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = chosen || ctx.isHovered(box.node) ? c.accent : c.muted;
+    g.lineWidth = chosen ? 2 : 1.4;
+    g.stroke();
+    if (chosen) {
+      g.beginPath();
+      g.arc(cx, cy, 4.5, 0, Math.PI * 2);
+      g.fillStyle = c.accent;
+      g.fill();
+    }
+    g.font = ctx.font(400, theme.text.body);
+    g.fillStyle = c.ink;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    g.fillText(p.text(), box.x + 30, cy + 1, Math.max(0, box.w - 30));
+    ctx.addHit(box);
+  },
+  press(ctx) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return;
+    ctx.set(key, literal(p.raw("value") ?? ""));
+    runOn(ctx);
+  },
+};
+
+const STEP_W = 42, VALUE_W = 52;
+
+/** A stepper's limits and current value, read the same way when painting and pressing. */
+function stepperState(p: { num(n: string, f: number): number; has(n: string): boolean; raw(n: string): string | undefined }, scope: (k: string) => Value | undefined) {
+  const min = p.num("min", 0);
+  const max = p.has("max") ? p.num("max", Infinity) : Infinity;
+  const step = Math.abs(p.num("step", 1)) || 1;
+  const raw = Number(scope(p.raw("bind") ?? ""));
+  const value = Number.isFinite(raw) ? raw : min;
+  return { min, max, step, value };
+}
+
+export const stepper: ComponentDef = {
+  type: "stepper",
+  category: "input",
+  description: "A number with minus and plus buttons, for small counts like a quantity.",
+  text: { description: "An optional label on the left." },
+  props: {
+    bind: { type: "state", required: true, description: "The number state this stepper reads and writes." },
+    min: { type: "number", default: 0, description: "Smallest value (default 0)." },
+    max: { type: "number", description: "Largest value (no limit if left out)." },
+    step: { type: "number", default: 1, description: "How much each press changes the value (default 1)." },
+    on: onProp("after the value changes"),
+  },
+  example: `state qty=2
+stepper "Quantity" bind=qty min=1 max=10`,
+  layout(box, ctx) {
+    box.h = ctx.theme.control.height;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const { min, max, value } = stepperState(p, ctx.scope);
+    const total = STEP_W * 2 + VALUE_W;
+    const label = p.text();
+    const x0 = label ? box.x + Math.max(0, box.w - total) : box.x;
+    if (label) {
+      g.font = ctx.font(400, theme.text.body);
+      g.fillStyle = c.ink;
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      g.fillText(label, box.x, box.y + box.h / 2 + 1, Math.max(0, box.w - total - 12));
+    }
+    ctx.roundRect(x0 + 0.5, box.y + 0.5, total - 1, box.h - 1, theme.radius.md);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = c.line;
+    g.lineWidth = 1;
+    g.stroke();
+    g.fillStyle = c.line;
+    g.fillRect(x0 + STEP_W, box.y + 8, 1, box.h - 16);
+    g.fillRect(x0 + STEP_W + VALUE_W, box.y + 8, 1, box.h - 16);
+    const parts = [
+      { name: "dec", x: x0, enabled: value - 1e-9 > min, sign: "−" },
+      { name: "inc", x: x0 + STEP_W + VALUE_W, enabled: value + 1e-9 < max, sign: "+" },
+    ];
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    for (const part of parts) {
+      const pb = partBox(box, part.x, box.y, STEP_W, box.h);
+      if (part.enabled && ctx.isHovered(box.node, part.name)) {
+        ctx.roundRect(pb.x + 3, pb.y + 3, pb.w - 6, pb.h - 6, theme.radius.sm);
+        fillTint(g, c.accent, 0.1);
+      }
+      g.save();
+      if (!part.enabled) g.globalAlpha *= 0.35;
+      g.font = ctx.font(600, 20);
+      g.fillStyle = c.accent;
+      g.fillText(part.sign, pb.x + STEP_W / 2, box.y + box.h / 2 + 1);
+      g.restore();
+      if (part.enabled) ctx.addHit(pb, { detail: part.name });
+    }
+    g.font = ctx.font(600, theme.text.body);
+    g.fillStyle = c.ink;
+    g.fillText(String(Math.round(value * 1000) / 1000), x0 + STEP_W + VALUE_W / 2, box.y + box.h / 2 + 1, VALUE_W - 6);
+  },
+  press(ctx) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return;
+    const { min, max, step, value } = stepperState(p, ctx.scope);
+    const next = ctx.target.detail === "inc" ? value + step : value - step;
+    ctx.set(key, Math.round(Math.min(max, Math.max(min, next)) * 1e6) / 1e6);
+    runOn(ctx);
+  },
+};
+
+const STAR = 20, STAR_GAP = 4;
+
+function starPath(g: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 ? r * 0.45 : r;
+    const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+    if (i) g.lineTo(x, y); else g.moveTo(x, y);
+  }
+  g.closePath();
+}
+
+export const rating: ComponentDef = {
+  type: "rating",
+  category: "data",
+  description: "A star rating. Shows value= as stars, or with bind= lets the user pick a rating.",
+  props: {
+    value: { type: "number", description: "The rating to show, e.g. 4.5. Ignored when bind= is set." },
+    max: { type: "number", default: 5, description: "How many stars (default 5)." },
+    bind: { type: "state", description: "A number state the user sets by pressing a star." },
+    on: onProp("after the user picks a rating"),
+  },
+  example: `state stars=4
+rating value=4.5
+rating bind=stars`,
+  layout(box) {
+    box.h = STAR + 4;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const max = Math.max(1, Math.min(10, Math.round(p.num("max", 5))));
+    const bind = p.raw("bind");
+    let value = bind ? Number(ctx.scope(bind)) || 0 : p.num("value", 0);
+    if (bind && ctx.hover && ctx.hover.node.id === box.node.id && typeof ctx.hover.detail === "number") value = ctx.hover.detail;
+    for (let i = 0; i < max; i++) {
+      const x = box.x + i * (STAR + STAR_GAP);
+      const cy = box.y + box.h / 2;
+      starPath(g, x + STAR / 2, cy, STAR / 2);
+      // Muted rather than the line color, which almost vanishes on dark surfaces.
+      fillTint(g, c.muted, 0.35);
+      const fill = Math.max(0, Math.min(1, value - i));
+      if (fill > 0) {
+        g.save();
+        g.beginPath();
+        g.rect(x, box.y, STAR * fill, box.h);
+        g.clip();
+        starPath(g, x + STAR / 2, cy, STAR / 2);
+        g.fillStyle = c.warn;
+        g.fill();
+        g.restore();
+      }
+      if (bind) ctx.addHit(partBox(box, x - STAR_GAP / 2, box.y, STAR + STAR_GAP, box.h), { detail: i + 1 });
+    }
+  },
+  press(ctx) {
+    const key = ctx.props(ctx.target.node).raw("bind");
+    if (!key || typeof ctx.target.detail !== "number") return;
+    ctx.set(key, ctx.target.detail);
+    runOn(ctx);
+  },
+};
+
+export const link: ComponentDef = {
+  type: "link",
+  category: "input",
+  description: "Pressable text for a secondary action, lighter than a button.",
+  text: { description: "The link text.", required: true },
+  props: {
+    on: { type: "action", required: true, description: "What happens when pressed, e.g. emit:size_guide." },
+  },
+  example: `link "Size guide" on=emit:size_guide`,
+  layout(box, ctx) {
+    box.h = Math.round(ctx.theme.text.body * 1.35);
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    g.font = ctx.font(600, theme.text.body);
+    const label = p.text();
+    const w = Math.min(box.w, g.measureText(label).width);
+    g.fillStyle = theme.colors.accent;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    g.fillText(label, box.x, box.y + box.h / 2 + 1, box.w);
+    if (ctx.isHovered(box.node)) g.fillRect(box.x, box.y + box.h - 3, w, 1.5);
+    ctx.addHit(partBox(box, box.x, box.y, w, box.h));
   },
 };

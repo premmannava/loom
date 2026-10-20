@@ -1,9 +1,25 @@
 import type { ComponentDef } from "../component";
-import { stat, text, progress } from "./content";
-import { button, check } from "./input";
-import { card, column, divider, row, spacer } from "./layout";
+import { avatar, badge, code, progress, stat, text } from "./content";
+import { empty, skeleton } from "./feedback";
+import { button, check, link, radio, rating, stepper, switchToggle } from "./input";
+import { accordion, card, column, divider, grid, list, listItem, row, spacer } from "./layout";
+import { breadcrumb, pagination, tab, tabs } from "./navigation";
 
-export { card, column, divider, row, spacer, text, stat, progress, button, check };
+export {
+  column, row, grid, card, list, listItem, accordion, divider, spacer,
+  text, code, badge, avatar,
+  stat, rating,
+  button, link, check, switchToggle, radio, stepper,
+  tabs, tab, breadcrumb, pagination,
+  progress, skeleton, empty,
+};
 
 /** The built-in components (everything except the map, which is a separate entry). */
-export const coreComponents: ComponentDef[] = [column, row, card, divider, spacer, text, stat, progress, button, check];
+export const coreComponents: ComponentDef[] = [
+  column, row, grid, card, list, listItem, accordion, divider, spacer,
+  text, code, badge, avatar,
+  stat, rating,
+  button, link, check, switchToggle, radio, stepper,
+  tabs, tab, breadcrumb, pagination,
+  progress, skeleton, empty,
+];

@@ -19,7 +19,10 @@ export interface PropDef {
   required?: boolean;
 }
 
-export type Category = "layout" | "content" | "input" | "data" | "feedback";
+export type Category = "layout" | "content" | "data" | "input" | "navigation" | "feedback";
+
+/** Categories in the order docs list them. */
+export const CATEGORIES: readonly Category[] = ["layout", "content", "data", "input", "navigation", "feedback"];
 
 export interface LayoutContext {
   theme: Theme;

@@ -13,6 +13,7 @@ import { render } from "../src/testing";
 import { darkTheme, lightTheme, type Theme } from "../src/theme";
 import { walkBoxes } from "../src/layout";
 import type { Box } from "../src/types";
+import { exampleSpec as exampleOf } from "./examples";
 
 const ALL: ComponentDef[] = [...coreComponents, ...mapComponents];
 const registry = new Registry(ALL);
@@ -28,19 +29,7 @@ const NOT_KEYBOARD_REACHABLE_YET: Record<string, string> = {
   map: "Countries can be clicked but not reached by keyboard. Planned with the accessibility work in Phase 3.",
 };
 
-/** The component's example as a full spec. Components that only go inside a parent are wrapped in it. */
-function exampleSpec(def: ComponentDef): string {
-  const example = def.example ?? "";
-  const parent = def.parents?.[0];
-  if (!parent || parent === "root") return example + "\n";
-  const [stateLines, body] = splitState(example);
-  return [...stateLines, parent, ...body.map((l) => "  " + l)].join("\n") + "\n";
-}
-
-function splitState(src: string): [string[], string[]] {
-  const lines = src.split("\n");
-  return [lines.filter((l) => /^state\s/.test(l)), lines.filter((l) => !/^state\s/.test(l))];
-}
+const exampleSpec = (def: ComponentDef) => exampleOf(def, ALL);
 
 /** Components that can be interactive: they take an action or a state to write. */
 const canInteract = (def: ComponentDef) => Object.values(def.props).some((p) => p.type === "action" || p.type === "state");

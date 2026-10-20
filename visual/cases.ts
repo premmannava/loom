@@ -7,6 +7,7 @@
  */
 import { coreComponents } from "../src/components";
 import { samples } from "../playground/samples";
+import { exampleSpec } from "../test/examples";
 
 export interface VisualCase {
   name: string;
@@ -14,7 +15,7 @@ export interface VisualCase {
 }
 
 export const cases: VisualCase[] = [
-  ...coreComponents.filter((c) => c.example).map((c) => ({ name: `component-${c.type}`, spec: c.example! + "\n" })),
+  ...coreComponents.filter((c) => c.example).map((c) => ({ name: `component-${c.type}`, spec: exampleSpec(c, coreComponents) })),
   ...Object.entries(samples).map(([k, s]) => ({ name: `sample-${k}`, spec: s.spec })),
 ];
 

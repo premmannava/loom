@@ -185,8 +185,17 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
       if (!found.box) throw new Error(`${name} is hidden, so it can't be pressed`);
       const region = loom.hitRegions.find((h) => h.box.node.id === found.node.id);
       if (!region) throw new Error(`${name} isn't pressable right now (it may be disabled or not interactive)`);
+      // Click the centre, or the first point in the region that this element
+      // receives itself (a button inside a pressable card covers its centre).
       const b = region.box;
-      ui.click(b.x + b.w / 2, b.y + b.h / 2);
+      const ours = (x: number, y: number) => {
+        const t = loom.targetAt(x, y);
+        return !!t && t.node.id === found.node.id && t.detail === region.detail;
+      };
+      const points = [[0.5, 0.5], ...[0.1, 0.3, 0.5, 0.7, 0.9].flatMap((fy) => [0.05, 0.25, 0.5, 0.75, 0.95].map((fx) => [fx, fy]))];
+      const at = points.map(([fx, fy]) => [b.x + b.w * fx!, b.y + b.h * fy!] as const).find(([x, y]) => ours(x, y));
+      if (!at) throw new Error(`${name} is covered by other pressable elements, so it can't be pressed`);
+      ui.click(at[0], at[1]);
     },
 
     click(x, y) {

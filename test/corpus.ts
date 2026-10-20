@@ -5,6 +5,7 @@ import { mapComponents } from "../src/components/map";
 import { languageGuide } from "../src/prompt";
 import { Registry } from "../src/registry";
 import { samples } from "../playground/samples";
+import { exampleSpec } from "./examples";
 
 export const ALL_COMPONENTS: ComponentDef[] = [...coreComponents, ...mapComponents];
 export const registry = new Registry(ALL_COMPONENTS);
@@ -13,5 +14,5 @@ export const registry = new Registry(ALL_COMPONENTS);
 export const corpus: Array<[name: string, spec: string]> = [
   ...Object.entries(samples).map(([k, s]) => [`sample ${k}`, s.spec] as [string, string]),
   ["guide example", languageGuide(new Registry(coreComponents)).split("EXAMPLE\n")[1]!],
-  ...coreComponents.filter((c) => c.example).map((c) => [`example ${c.type}`, c.example! + "\n"] as [string, string]),
+  ...ALL_COMPONENTS.filter((c) => c.example).map((c) => [`example ${c.type}`, exampleSpec(c, ALL_COMPONENTS)] as [string, string]),
 ];
