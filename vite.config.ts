@@ -10,6 +10,7 @@ export default defineConfig({
       entry: {
         loom: resolve(__dirname, "src/index.ts"),
         map: resolve(__dirname, "src/components/map/index.ts"),
+        testing: resolve(__dirname, "src/testing/index.ts"),
       },
       formats: ["es"],
     },

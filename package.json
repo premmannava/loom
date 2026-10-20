@@ -15,6 +15,10 @@
     "./map": {
       "types": "./dist/types/components/map/index.d.ts",
       "import": "./dist/map.js"
+    },
+    "./testing": {
+      "types": "./dist/types/testing/index.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -31,8 +35,10 @@
     "docs:components": "vite-node scripts/gen-component-docs.ts"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "22.9.0",
     "d3-geo": "^3.1.1",
+    "fast-check": "4.3.0",
     "topojson-client": "^3.1.0",
     "typescript": "5.6.3",
     "vite": "5.4.10",

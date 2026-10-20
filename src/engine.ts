@@ -163,6 +163,11 @@ export class Loom {
     return this.parsed?.diagnostics ?? [];
   }
 
+  /** The interactive regions registered while painting the last frame, in paint order. */
+  get hitRegions(): readonly HitRegion[] {
+    return this.hits;
+  }
+
   on<K extends keyof LoomEvents>(name: K, fn: (p: LoomEvents[K]) => void): () => void {
     return this.events.on(name, fn);
   }
