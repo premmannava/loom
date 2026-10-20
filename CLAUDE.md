@@ -1,0 +1,122 @@
+# Loom: brief for AI assistants
+
+Read this before changing anything in this repository. It explains what Loom is, the rules that keep it working, and how to make changes safely. The phase plan is in [`docs/PLAN.md`](docs/PLAN.md); user-facing documentation is in [`README.md`](README.md).
+
+## What Loom is
+
+Loom is two things that are designed together:
+
+1. **A UI language for AI models to write.** It is line-based (one element per line, indentation for nesting), so a model's streamed output renders line by line. It can't run code, and it never contains colors, fonts or pixel sizes.
+2. **An engine that renders that language entirely on its own.** It has its own parser, layout, painter and input handling, and draws onto a single `<canvas>`. It does not use HTML elements, CSS layout, React or any UI framework.
+
+The goal is **generative UI**: a model produces an interface at runtime, in response to a user, and the engine renders it safely, consistently and fast. Loom is not trying to replace React for human-built apps. It is trying to be the layer the model speaks.
+
+```
+state days=2 hikers=3
+card
+  text "Yosemite weekend" style=title
+  row
+    stat label="Days" value={days}
+    stat label="Water (L)" value={days * hikers * 3}
+  button "Add day" on=inc:days
+```
+
+## How it works
+
+```
+spec text → parse → tree → layout → boxes → paint → canvas pixels
+                               ↑                       │
+             state ←── actions ←── pointer / keyboard ─┘
+```
+
+| Stage | File | Notes |
+|---|---|---|
+| Parse | `src/parser.ts` | Text → `LoomNode` tree plus line-numbered `Diagnostic`s. Validates against component definitions. |
+| Expressions | `src/expr.ts` | Own tokenizer, parser and evaluator for `{…}`. Whitelisted functions only. |
+| Actions | `src/actions.ts` | `on=` strings: `inc`, `dec`, `toggle`, `set`, `emit`, chained with `;`. |
+| Layout | `src/layout.ts` | Headless: needs only a `TextMeasurer`. Produces `Box` trees. |
+| Engine | `src/engine.ts` | `Loom` class: dirty-stage pipeline, canvas sizing, paint, hit testing, pointer and keyboard. |
+| Components | `src/components/` | One `ComponentDef` per component. `map/` is a separate entry point. |
+| Contract | `src/component.ts` | `ComponentDef`, `PropDef`, contexts, and `PropReader` for typed prop access. |
+| Debugging | `src/inspector.ts` | Layout/hit overlays, inspect mode, frame capture. |
+| Model guide | `src/prompt.ts` | `languageGuide(registry)` builds the system prompt from component definitions. |
+| Theme | `src/theme.ts` | Design tokens; light and dark; `--loom-*` CSS overrides. |
+
+Each stage reruns only when its inputs change: `invalidate("parse" | "layout" | "paint")`. A spec edit re-parses, a state change re-lays out, and hover only repaints.
+
+## Rules that must not be broken
+
+These are the project's core guarantees. A change that breaks one is wrong even if the tests pass.
+
+1. **Specs can never run code.** Expressions go through `src/expr.ts` only. Never use `eval`, `new Function`, `with`, dynamic `import`, or property access on host objects. New expression features must keep the "no route to JavaScript" property, and `test/expr.test.ts` must keep testing escape attempts.
+2. **The parser never throws.** Every problem becomes a `Diagnostic` with a line number. Errors skip the line and its children; warnings keep the element and ignore the bad part.
+3. **Streaming must keep working.** Any prefix of a valid spec, cut at a line boundary, must parse into a valid, smaller tree. Never add syntax that needs a closing line (no `end` blocks or multi-line values).
+4. **Components never hard-code design.** Colors, fonts, radii, spacing and type sizes come from `ctx.theme`. Specs choose roles (`tone=`, `variant=`, `style=`), never values.
+5. **The model guide is generated, never hand-written.** Describe a component's props, text, children and example in its `ComponentDef`; `languageGuide()` and the docs read from there. Don't duplicate component documentation by hand anywhere else.
+6. **Layout stays headless.** `layout()` must not touch the canvas or the DOM; it only uses `ctx.measure`. That is what makes it testable in Node.
+7. **Rendering stays on the canvas.** The only planned DOM use is a hidden accessibility mirror and a temporary native `<input>` while typing (see the plan). Do not render visible UI with HTML.
+8. **Models generate specs, never components.** Components are reviewed TypeScript code. Nothing a model outputs at runtime may register a component or run code.
+9. **No new runtime dependencies** without a strong reason. The library currently has none. Dev dependencies are fine.
+
+## Commands
+
+```bash
+npm install
+npm run dev                # playground at /playground/index.html
+npm test                   # Vitest unit tests
+npm run typecheck          # tsc --noEmit
+npm run build              # library → dist/
+npm run build:playground   # static playground → dist-playground/
+npm run docs:components    # regenerate the README component reference
+npm run build:world        # regenerate map outlines (rarely needed)
+```
+
+## Before you say a change is done
+
+1. `npm run typecheck` passes.
+2. `npm test` passes, with new tests for new behavior.
+3. `npm run build` passes.
+4. If a component's definition changed, `npm run docs:components` has been run.
+5. For anything visual, the change has been looked at in the playground in light and dark mode. Use the inspector's layout boxes to check sizes.
+6. Spec examples you add anywhere (component `example`, README, docs) parse with no diagnostics. `test/prompt.test.ts` checks component examples automatically.
+
+## How to add a component
+
+1. Create the `ComponentDef` in `src/components/` (or a new subfolder for large ones, with its own entry point if it carries heavy data, like `map/`).
+2. Fill in everything a model needs: `description` (one or two plain sentences on when to use it), `text` if it takes quoted text, every prop with `type`, `description` and `default` or `required`, `children`/`parents` if relevant, and a short `example`.
+3. Implement `layout(box, ctx)` (set `box.h`; containers lay out `box.children` through `ctx.layout`). Implement `paint` and/or `paintOver` using theme tokens. Interactive components call `ctx.addHit(box)` while painting and define `press` if pressing does more than run `on=`.
+4. Export it and add it to `coreComponents` in `src/components/index.ts` (unless it's a separate entry point).
+5. Add tests: parsing with good and bad props, layout at narrow and wide widths, and interaction (state after a press).
+6. Add or update a playground sample if it helps show the component.
+7. Run `npm run docs:components`.
+
+Read `src/components/input.ts` (button, check) and `src/components/map/index.ts` (custom hit testing) as references.
+
+## How to change the language
+
+Language changes touch several places. Do them together, in this order:
+
+1. `src/parser.ts` (and `tokenizeLine` if the line syntax changes), `src/expr.ts` or `src/actions.ts`.
+2. Validation and diagnostics for the new syntax, with clear messages that say how to fix the problem.
+3. `src/prompt.ts` so the model guide explains it.
+4. Tests, including streaming (every prefix parses) and, for expressions, sandbox escape attempts.
+5. The language section of `README.md`.
+6. Keep old specs working, or document the breaking change in the README.
+
+## Code style
+
+- TypeScript strict mode, including `noUncheckedIndexedAccess`. No `any`; prefer narrow types.
+- Small, plain functions. Comments explain why, not what.
+- User-facing messages (diagnostics, docs) use plain words and say how to fix the problem: `"button" has no prop "colour". Known props: on, variant, disabled, if`.
+- Commit messages: a short summary line, then a body listing what changed.
+
+## Current status
+
+Version 0.1, the foundation. Working: the engine, parser, expressions, actions, keyboard focus, inspector, 12 components (`column`, `row`, `card`, `divider`, `spacer`, `text`, `stat`, `progress`, `button`, `check`, `map`, `pin`), 36 tests and the playground.
+
+Not built yet (see `docs/PLAN.md`): lists and structured data, data sources and host commands, navigation between screens, text input, images, scrolling regions, overlays, the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
+
+## Where to look next
+
+- [`docs/PLAN.md`](docs/PLAN.md): phases, the component pipeline, the testing strategy and the on-the-fly generation architecture.
+- [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md): the target the plan builds toward, written in the proposed syntax.

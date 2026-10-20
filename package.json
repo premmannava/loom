@@ -27,7 +27,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:world": "node scripts/build-world.mjs"
+    "build:world": "node scripts/build-world.mjs",
+    "docs:components": "vite-node scripts/gen-component-docs.ts"
   },
   "devDependencies": {
     "@types/node": "22.9.0",
@@ -35,6 +36,7 @@
     "topojson-client": "^3.1.0",
     "typescript": "5.6.3",
     "vite": "5.4.10",
+    "vite-node": "^2.1.4",
     "vitest": "2.1.4",
     "world-atlas": "^2.0.2"
   }

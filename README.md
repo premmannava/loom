@@ -78,6 +78,7 @@ npm run dev        # opens the playground
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
+| `npm run docs:components` | Regenerates the component reference in this README |
 | `npm run build:world` | Regenerates the map's country outlines |
 
 The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels.
@@ -633,7 +634,9 @@ src/
   components/       Built-in components; map/ is a separate entry point
 playground/         The development playground
 test/               Unit tests (Vitest)
-scripts/            Data build scripts (map outlines)
+scripts/            Build scripts (map outlines, component docs)
+docs/               Plan, examples and images
+CLAUDE.md           Brief for AI assistants working on this repo
 docs/images/        README images
 ```
 
@@ -654,6 +657,8 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 ---
 
 ## Roadmap
+
+The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
 2. **Components**: text input (a real input positioned over the canvas while typing), select, tabs, table, list, chart, dialog and toast, plus the accessibility layer.
