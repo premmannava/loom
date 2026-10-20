@@ -83,7 +83,7 @@ npm run build:world        # regenerate map outlines (rarely needed)
 2. `npm test` passes, with new tests for new behavior.
 3. `npm run build` passes.
 4. If a component's definition changed, `npm run docs:components` has been run.
-5. For anything visual, the change has been looked at in the playground in light and dark mode. Use the inspector's layout boxes to check sizes. If it changes how something looks, update the visual baselines in the same commit (Linux only: `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or the CI workflow's update-baselines run).
+5. For anything visual, the change has been looked at in the playground in light and dark mode. Use the inspector's layout boxes to check sizes. If it changes how something looks, update the visual baselines in the same commit (Linux only: `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or add the `update-visual-baselines` label to the pull request and CI commits them).
 6. Spec examples you add anywhere (component `example`, README, docs) parse with no diagnostics. `test/prompt.test.ts` checks component examples automatically.
 
 ## How to add a component

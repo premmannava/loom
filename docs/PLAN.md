@@ -83,7 +83,7 @@ Phases 4 and 5 can overlap with the end of Phase 3. The order follows the origin
 
 **Exit criteria:** CI is green and required for merging; adding a component automatically gets it contract-tested and screenshotted.
 
-**Status:** built. `loom-ui/testing`, contract, streaming and fuzz tests, visual regression, benchmarks with base comparison, `docs:check`, `new:component` and CI are in place. Two things remain outside the code: making CI required for merging (a branch protection setting on GitHub), and keeping visual baselines current, since they can only be made on Linux.
+**Status:** built. `loom-ui/testing`, contract, streaming and fuzz tests, visual regression, benchmarks with base comparison, `docs:check`, `new:component` and CI are in place. Two things remain outside the code: making CI required for merging (a branch protection setting on GitHub), and keeping visual baselines current. They can only be made on Linux, so CI regenerates and commits them when a pull request gets the `update-visual-baselines` label.
 
 What the new tests found on their first runs:
 

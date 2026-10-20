@@ -566,7 +566,7 @@ In this repository, the test suites are:
 | Visual | `visual/` | Component examples and samples in light and dark at 375 and 1024 px, against baselines in `visual/__screenshots__` |
 | Benchmarks | `bench/` | Timings per commit; pull requests are compared with their base |
 
-CI (`.github/workflows/ci.yml`) runs all of them. Visual baselines are made on Linux in the Playwright image, because fonts render differently on each platform: update them with `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or run the CI workflow by hand with **update-baselines** and commit the files it uploads.
+CI (`.github/workflows/ci.yml`) runs all of them. Visual baselines are made on Linux in the Playwright image, because fonts render differently on each platform: update them with `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or let CI do it: add the `update-visual-baselines` label to a pull request (or run the CI workflow by hand with **update-baselines**), and it commits the regenerated images to the branch for review.
 
 ---
 
