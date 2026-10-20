@@ -144,7 +144,6 @@ function checkEngine(spec: string): void {
   };
   finite(ui.loom.boxes);
   for (const h of [...ui.hits]) {
-    if (h.box.node.type === "map") continue; // map clicks need a real canvas
     ui.click(h.box.x + h.box.w / 2, h.box.y + h.box.h / 2);
   }
   for (let i = 0; i < 4; i++) ui.tab();

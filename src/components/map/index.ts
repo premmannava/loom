@@ -32,6 +32,8 @@ export function project(lon: number, lat: number): [number, number] {
 
 let probe: CanvasRenderingContext2D | null = null;
 function countryAt(mx: number, my: number): string | null {
+  // Outside a browser (tests, server rendering) there's no canvas to test points with.
+  if (!probe && typeof document === "undefined") return null;
   if (!probe) probe = document.createElement("canvas").getContext("2d");
   if (!probe) return null;
   for (const c of countryPaths()) if (probe.isPointInPath(c.path, mx, my)) return c.name;
