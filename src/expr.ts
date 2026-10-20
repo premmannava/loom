@@ -21,7 +21,9 @@ type Tok = { t: "num" | "str" | "id" | "op" | "end"; v: string; pos: number };
 
 export class ExprError extends Error {}
 
-const FUNCTIONS: Record<string, (...a: Value[]) => Value> = {
+type Fn = (...a: Value[]) => Value;
+
+const BUILTINS: Record<string, Fn> = {
   min: (...a) => Math.min(...a.map(Number)),
   max: (...a) => Math.max(...a.map(Number)),
   round: (n, d = 0) => {
@@ -33,6 +35,11 @@ const FUNCTIONS: Record<string, (...a: Value[]) => Value> = {
   abs: (n) => Math.abs(Number(n)),
   fixed: (n, d = 2) => Number(n).toFixed(Number(d)),
 };
+
+// A frozen copy with no prototype, looked up by own property only, so names
+// like `constructor` or `__defineGetter__` can't reach Object.prototype.
+const FUNCTIONS: Readonly<Record<string, Fn>> = Object.freeze(Object.assign(Object.create(null) as Record<string, Fn>, BUILTINS));
+const isFunctionName = (name: string) => Object.hasOwn(FUNCTIONS, name);
 export const EXPRESSION_FUNCTIONS = Object.keys(FUNCTIONS);
 
 const OPS = ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", ","];
@@ -93,7 +100,7 @@ function parseExpr(src: string): Node {
       if (t.v === "false") return { k: "lit", v: false };
       if (t.v === "null") return { k: "lit", v: null };
       if (peek().v === "(") {
-        if (!(t.v in FUNCTIONS)) throw new ExprError(`Unknown function "${t.v}"`);
+        if (!isFunctionName(t.v)) throw new ExprError(`Unknown function "${t.v}"`);
         next();
         const args: Node[] = [];
         if (peek().v !== ")") {
@@ -150,7 +157,11 @@ function run(n: Node, scope: Scope): Value {
       return n.op === "!" ? !a : -Number(a);
     }
     case "cond": return run(n.c, scope) ? run(n.a, scope) : run(n.b, scope);
-    case "call": return FUNCTIONS[n.fn]!(...n.args.map((a) => run(a, scope)));
+    case "call": {
+      // Called detached, so `this` is never the function table.
+      const fn = FUNCTIONS[n.fn]!;
+      return fn(...n.args.map((a) => run(a, scope)));
+    }
     case "bin": {
       if (n.op === "&&") return run(n.a, scope) && run(n.b, scope);
       if (n.op === "||") return run(n.a, scope) || run(n.b, scope);

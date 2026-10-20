@@ -36,6 +36,21 @@ describe("expressions", () => {
     }
   });
 
+  it("doesn't treat inherited object members as functions", () => {
+    const names = Object.getOwnPropertyNames(Object.prototype);
+    expect(names).toContain("__defineGetter__");
+    for (const name of names) {
+      const r = ev(`${name}('x', 1)`);
+      expect(r.ok, name).toBe(false);
+      if (!r.ok) expect(r.error, name).toMatch(/Unknown function/);
+    }
+  });
+
+  it("can't change the whitelisted functions from a spec", () => {
+    ev("__defineGetter__('min', __lookupGetter__('__proto__'))");
+    expect(ev("min(3, 1, 2)")).toEqual({ ok: true, value: 1 });
+  });
+
   it("reports unknown state instead of guessing", () => {
     const r = ev("missing + 1");
     expect(r.ok).toBe(false);
