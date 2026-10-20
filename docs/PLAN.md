@@ -203,6 +203,16 @@ screen name=product title="{product.data.name}"
 
 **Tier C, later:** `date-picker`, `autocomplete`, `file-upload`, virtualized `data-table`, `rich-text`.
 
+**Built so far** (with contract tests, behavior tests, visual baselines and docs), using only what the engine already does: `grid`, `badge`, `stepper`, `radio`, `switch`, `tabs` and `tab`, `list` and `list-item`, `rating`, `skeleton`, `empty`, `link`, pressable `card`, `text strike=` (Tier A), and `accordion`, `avatar`, `pagination`, `breadcrumb`, `code` (Tier B). Where they differ from the sketches above:
+
+- `grid` was pulled forward from Phase 2.3 because it needs no language changes.
+- Inputs write state through `bind=` and then run `on=`, instead of passing `$value` (Phase 2.1). `stepper bind=qty` and `rating bind=stars` work today; `$value` can be added later without breaking them.
+- `radio` is one element per choice sharing a `bind=`, not a group with `option` children, so each choice stays one line.
+- `tabs` holds `tab` children, and only the selected tab's content is laid out.
+- `avatar` shows initials only; photos wait for `image`.
+
+Still waiting on engine capabilities: `input`, `image`, `select`/`option`, `slider` (needs drag), `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 
 ---

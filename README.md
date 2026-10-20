@@ -189,13 +189,16 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 
 ## Components
 
+<!-- CATEGORIES:START (generated from src/components) -->
 | Category | Components |
 |---|---|
-| Layout | [`column`](#column), [`row`](#row), [`card`](#card), [`divider`](#divider), [`spacer`](#spacer) |
-| Content | [`text`](#text) |
-| Data | [`stat`](#stat), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`check`](#check) |
-| Feedback | [`progress`](#progress) |
+| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer) |
+| Content | [`text`](#text), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
+| Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper) |
+| Navigation | [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
+| Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
+<!-- CATEGORIES:END -->
 
 All components also accept `if=` ([Conditions](#conditions)). `map` and `pin` ship in a separate entry point, `loom-ui/map`, because the country outlines add about 76 KB.
 
@@ -235,14 +238,33 @@ row gap=10
   button "Save"
 ```
 
+### `grid`
+
+Places children in as many equal columns as fit, so the same screen works on a phone and a desktop.
+
+| Prop | Type | Description |
+|---|---|---|
+| `min` | number | Narrowest a column may be, in pixels (default 200). |
+| `gap` | number | Space between children in pixels (default 14). |
+
+Children: any elements.
+
+```
+grid min=140 gap=10
+  stat label="Orders" value=12
+  stat label="Returns" value=1
+  stat label="Rating" value=4.8
+```
+
 ### `card`
 
-A surface that groups related content, stacked vertically.
+A surface that groups related content, stacked vertically. Give it on= to make the whole card pressable.
 
 | Prop | Type | Description |
 |---|---|---|
 | `gap` | number | Space between children in pixels (default 14). |
 | `pad` | number | Inner padding in pixels (default 22). |
+| `on` | action | Actions to run when the card is pressed, e.g. emit:changed. Separate several with ; |
 
 Children: any elements.
 
@@ -250,6 +272,59 @@ Children: any elements.
 card
   text "Order summary" style=title
   text "2 items" tone=muted
+card on=emit:open_order
+  text "Trail runner socks" weight=semibold
+  text "Arrives Thursday" tone=muted
+```
+
+### `list`
+
+A bordered list of rows, separated by lines. Use list-item children.
+
+Children: `list-item`.
+
+```
+list
+  list-item "Trail runner socks" detail="Merino blend" trailing="$24"
+  list-item "Rain shell" detail="Packs into its pocket" trailing="$129" on=emit:open_shell
+```
+
+### `list-item`
+
+One row of a list: a title, an optional detail line and an optional value on the right. Give it on= to make it pressable.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The row's title. |
+| `detail` | string | A second, quieter line under the title. |
+| `trailing` | string | A short value on the right, like a price or a count. |
+| `on` | action | Actions to run when the row is pressed, e.g. emit:changed. Separate several with ; |
+
+Only inside: `list`.
+
+```
+list-item "Rain shell" detail="Packs into its pocket" trailing="$129" on=emit:open_shell
+```
+
+### `accordion`
+
+A heading that shows or hides the content under it when pressed. Stack several for an FAQ.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The heading. |
+| `bind` | state, required | A true/false state name: true while open. |
+| `gap` | number | Space between children in pixels (default 10). |
+| `on` | action | Actions to run after it opens or closes, e.g. emit:changed. Separate several with ; |
+
+Children: any elements.
+
+```
+state returns=true
+accordion "Returns" bind=returns
+  text "Free returns within 30 days, unworn."
+accordion "Shipping" bind=shipping
+  text "Ships in two business days."
 ```
 
 ### `divider`
@@ -283,10 +358,53 @@ A paragraph or heading that wraps to the available width. Use {expressions} to s
 | `weight` | `regular` / `semibold` / `bold` | regular, semibold or bold. Titles default to bold. |
 | `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
 | `align` | `left` / `center` / `right` | left, center or right. |
+| `strike` | boolean | Draw a line through the text, e.g. for an old price. |
 
 ```
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
+text "$160" tone=muted strike=true
+```
+
+### `code`
+
+A short piece of code or a command, in a monospaced font on a tinted block.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The code. Long lines wrap. |
+
+```
+code "npm install loom-ui"
+```
+
+### `badge`
+
+A small rounded label for a status or a short tag, like Shipped or New.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The label, one or two words. |
+| `tone` | `accent` / `good` / `warn` / `bad` / `muted` | Color role: accent, good, warn, bad or muted. |
+
+```
+badge "Shipped" tone=good
+```
+
+### `avatar`
+
+A person's initials in a circle, with their name and an optional detail line beside it.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The person's name. The initials come from it. |
+| `detail` | string | A second line under the name, like a role. |
+| `size` | `sm` / `md` / `lg` | sm, md or lg. |
+| `tone` | `accent` / `good` / `warn` / `bad` / `muted` | Circle color role: accent, good, warn, bad or muted. |
+| `name` | boolean | Show the name beside the circle (default true). |
+
+```
+avatar "Ada Lovelace" detail="Trip organizer"
 ```
 
 ### `stat`
@@ -304,19 +422,21 @@ A labelled number, for key figures like totals or counts.
 stat label="Total" value="${price*qty}"
 ```
 
-### `progress`
+### `rating`
 
-A horizontal bar showing how far a value is toward a maximum.
+A star rating. Shows value= as stars, or with bind= lets the user pick a rating.
 
 | Prop | Type | Description |
 |---|---|---|
-| `value` | number, required | Current amount, usually an {expression}. |
-| `max` | number | The full amount (default 100). |
-| `label` | string | Optional caption above the bar. |
-| `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
+| `value` | number | The rating to show, e.g. 4.5. Ignored when bind= is set. |
+| `max` | number | How many stars (default 5). |
+| `bind` | state | A number state the user sets by pressing a star. |
+| `on` | action | Actions to run after the user picks a rating, e.g. emit:changed. Separate several with ; |
 
 ```
-progress value={done} max=5 label="{done} of 5 steps"
+state stars=4
+rating value=4.5
+rating bind=stars
 ```
 
 ### `button`
@@ -335,6 +455,19 @@ button "Book now" on=emit:book
 button "Back" variant=secondary on=dec:step
 ```
 
+### `link`
+
+Pressable text for a secondary action, lighter than a button.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The link text. |
+| `on` | action, required | What happens when pressed, e.g. emit:size_guide. |
+
+```
+link "Size guide" on=emit:size_guide
+```
+
 ### `check`
 
 A checkbox that toggles a true/false state value.
@@ -347,6 +480,171 @@ A checkbox that toggles a true/false state value.
 ```
 state agreed=false
 check "I agree to the terms" bind=agreed
+```
+
+### `switch`
+
+An on/off switch with a label, for settings that take effect right away.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The label for the setting. |
+| `bind` | state, required | The true/false state name this switch reads and writes. |
+| `on` | action | Actions to run after it is switched, e.g. emit:changed. Separate several with ; |
+
+```
+state updates=true
+switch "Email me order updates" bind=updates
+```
+
+### `radio`
+
+One choice among several. Give each radio in a group the same bind= and its own value=.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The label for this choice. |
+| `bind` | state, required | The state name the group shares; it holds the chosen value. |
+| `value` | string, required | What bind= is set to when this radio is chosen. |
+| `on` | action | Actions to run after it is chosen, e.g. emit:changed. Separate several with ; |
+
+```
+state size=m
+radio "Small" bind=size value=s
+radio "Medium" bind=size value=m
+radio "Large" bind=size value=l
+```
+
+### `stepper`
+
+A number with minus and plus buttons, for small counts like a quantity.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | An optional label on the left. |
+| `bind` | state, required | The number state this stepper reads and writes. |
+| `min` | number | Smallest value (default 0). |
+| `max` | number | Largest value (no limit if left out). |
+| `step` | number | How much each press changes the value (default 1). |
+| `on` | action | Actions to run after the value changes, e.g. emit:changed. Separate several with ; |
+
+```
+state qty=2
+stepper "Quantity" bind=qty min=1 max=10
+```
+
+### `tabs`
+
+A row of tabs that switches between sections. Only the selected tab's content is shown.
+
+| Prop | Type | Description |
+|---|---|---|
+| `bind` | state, required | The state name holding the selected tab's value. |
+| `on` | action | Actions to run after the user switches tabs, e.g. emit:changed. Separate several with ; |
+
+Children: `tab`.
+
+```
+state view=overview
+tabs bind=view
+  tab "Overview" value=overview
+    text "Light, quick-drying trail runners."
+  tab "Specs" value=specs
+    text "280 g, 6 mm drop."
+```
+
+### `tab`
+
+One tab inside tabs: its label, and the content shown while it is selected.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The tab's label. |
+| `value` | string | What the tabs' bind= holds while this tab is selected (default: the label). |
+| `gap` | number | Space between children in pixels (default 12). |
+
+Children: any elements.
+
+Only inside: `tabs`.
+
+```
+tab "Reviews" value=reviews
+  text "4.8 out of 5 from 212 hikers."
+```
+
+### `breadcrumb`
+
+Where the user is, as a path like Shop / Shoes / Trail runners. Earlier steps can be pressed to go back.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The steps, separated by slashes. The last one is the current page. |
+| `bind` | state | State that receives the pressed step's text. |
+| `on` | action | Actions to run after a step is pressed, e.g. emit:changed. Separate several with ; |
+
+```
+state at="Trail runners"
+breadcrumb "Shop / Shoes / Trail runners" bind=at
+```
+
+### `pagination`
+
+Previous, next and page-number buttons for moving through pages of results.
+
+| Prop | Type | Description |
+|---|---|---|
+| `bind` | state, required | The number state holding the current page, starting at 1. |
+| `pages` | number, required | How many pages there are. |
+| `on` | action | Actions to run after the page changes, e.g. emit:changed. Separate several with ; |
+
+```
+state page=3
+pagination bind=page pages=12
+```
+
+### `progress`
+
+A horizontal bar showing how far a value is toward a maximum.
+
+| Prop | Type | Description |
+|---|---|---|
+| `value` | number, required | Current amount, usually an {expression}. |
+| `max` | number | The full amount (default 100). |
+| `label` | string | Optional caption above the bar. |
+| `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
+
+```
+progress value={done} max=5 label="{done} of 5 steps"
+```
+
+### `skeleton`
+
+A grey placeholder shown while content loads: lines of text, a block or a circle.
+
+| Prop | Type | Description |
+|---|---|---|
+| `shape` | `text` / `block` / `circle` | text (lines), block or circle. |
+| `lines` | number | How many lines, for shape=text (default 3). |
+| `height` | number | Height of a block, or diameter of a circle (default 120 and 48). |
+
+```
+skeleton lines=2
+skeleton shape=block height=80
+```
+
+### `empty`
+
+A friendly message for when there is nothing to show, with an optional button to move on.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The message, e.g. No orders yet. |
+| `detail` | string | A line explaining what to do next. |
+| `action` | string | Label for a button under the message. |
+| `on` | action | Actions to run when the button is pressed, e.g. emit:changed. Separate several with ; |
+
+```
+empty "No results" detail="Try a wider price range." action="Clear filters" on=emit:clear_filters
 ```
 
 ### `map`
@@ -574,16 +872,16 @@ CI (`.github/workflows/ci.yml`) runs all of them. Visual baselines are made on L
 
 A component is one `ComponentDef` object. Registering it is all it takes: the parser validates its props, the model guide describes it, and the engine lays it out and paints it.
 
-In this repository, `npm run new:component -- badge` creates the file and its test from a template and registers it. The contract tests then fail until every placeholder is filled in, so `npm test` tells you what's left.
+In this repository, `npm run new:component -- ribbon` creates the file and its test from a template and registers it. The contract tests then fail until every placeholder is filled in, so `npm test` tells you what's left.
 
 ```ts
 import type { ComponentDef } from "loom-ui";
 
-export const badge: ComponentDef = {
-  type: "badge",
+export const ribbon: ComponentDef = {
+  type: "ribbon",
   category: "content",
-  description: "A small rounded label for a status.",
-  text: { description: "The badge label.", required: true },
+  description: "A full-width colored strip with a short notice.",
+  text: { description: "The notice.", required: true },
   props: {
     tone: {
       type: "enum",
@@ -592,30 +890,28 @@ export const badge: ComponentDef = {
       description: "Color role.",
     },
   },
-  example: `badge "Shipped" tone=good`,
+  example: `ribbon "Free shipping this week" tone=good`,
 
   layout(box) {
-    box.h = 24;
+    box.h = 32;
   },
 
   paint(box, ctx) {
     const p = ctx.props(box.node);
-    const label = p.text();
     const color = ctx.theme.colors[p.oneOf("tone", ["accent", "good", "warn", "bad"] as const, "accent")];
     const { g } = ctx;
-    g.font = ctx.font(600, 12);
-    const w = g.measureText(label).width + 20;
-    ctx.roundRect(box.x, box.y, w, box.h, 12);
+    ctx.roundRect(box.x, box.y, box.w, box.h, ctx.theme.radius.sm);
     g.fillStyle = color;
     g.fill();
+    g.font = ctx.font(600, 13);
     g.fillStyle = ctx.theme.colors.onAccent;
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillText(label, box.x + w / 2, box.y + box.h / 2 + 1);
+    g.fillText(p.text(), box.x + box.w / 2, box.y + box.h / 2 + 1, box.w - 16);
   },
 };
 
-const loom = new Loom(canvas, { components: [...coreComponents, badge] });
+const loom = new Loom(canvas, { components: [...coreComponents, ribbon] });
 ```
 
 What a `ComponentDef` can define:
@@ -714,7 +1010,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components**: text input (a real input positioned over the canvas while typing), select, tabs, table, list, chart, dialog and toast, plus the accessibility layer.
+2. **Components**: 18 components that work with the current engine are done (grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, plus pressable cards and struck-through text). Next: text input (a real input positioned over the canvas while typing), images, scrolling, select, slider, table, chart, dialog and toast, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: a server-side streaming endpoint and a measured comparison against other generative UI formats (token count, validity, time to first pixel).
 5. **An app** built on top.

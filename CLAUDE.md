@@ -90,13 +90,13 @@ npm run build:world        # regenerate map outlines (rarely needed)
 
 1. Run `npm run new:component -- <name>`, which creates the `ComponentDef` in `src/components/` and a test file, and registers it. (For large components, use a subfolder with its own entry point if it carries heavy data, like `map/`.) The contract tests in `test/contract.test.ts` now run on it and fail until it meets the rules below.
 2. Fill in everything a model needs: `description` (one or two plain sentences on when to use it), `text` if it takes quoted text, every prop with `type`, `description` and `default` or `required`, `children`/`parents` if relevant, and a short `example`.
-3. Implement `layout(box, ctx)` (set `box.h`; containers lay out `box.children` through `ctx.layout`). Implement `paint` and/or `paintOver` using theme tokens. Interactive components call `ctx.addHit(box)` while painting and define `press` if pressing does more than run `on=`.
+3. Implement `layout(box, ctx)` (set `box.h`; containers lay out `box.children` through `ctx.layout`). Implement `paint` and/or `paintOver` using theme tokens. Interactive components call `ctx.addHit(box)` while painting and define `press` if pressing does more than run `on=`. For several pressable parts in one element (stepper buttons, stars, tabs, page numbers), call `ctx.addHit(partBox(...), { detail })` once per part: each part becomes its own Tab stop and `press` reads `ctx.target.detail`. Components that write a `bind=` state should then call `runOn(ctx)`, so `on=` runs with the new value.
 4. Make sure it's exported and in `coreComponents` in `src/components/index.ts` (the scaffold does this). A separate entry point exports its own list instead, like `mapComponents`; add that list to `ALL` in `test/contract.test.ts` so the contract tests cover it.
 5. Add tests: parsing with good and bad props, layout at narrow and wide widths, and interaction (state after a press). Use `render()` from `src/testing` for interaction. The contract tests already cover documentation, layout bounds, theme-only colors and keyboard reach.
 6. Add or update a playground sample if it helps show the component.
 7. Run `npm run docs:components`.
 
-Read `src/components/input.ts` (button, check) and `src/components/map/index.ts` (custom hit testing) as references.
+Read `src/components/input.ts` (button, check, stepper), `src/components/navigation.ts` (tabs, pagination: pressable parts) and `src/components/map/index.ts` (custom hit testing) as references. Shared helpers are in `src/components/util.ts`.
 
 ## How to change the language
 
@@ -118,11 +118,11 @@ Language changes touch several places. Do them together, in this order:
 
 ## Current status
 
-Version 0.1, the foundation, plus the Phase 1 testing and tooling. Working: the engine, parser, expressions, actions, keyboard focus, inspector, 12 components (`column`, `row`, `card`, `divider`, `spacer`, `text`, `stat`, `progress`, `button`, `check`, `map`, `pin`), the playground, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
+Version 0.1, the foundation, plus the Phase 1 testing and tooling. Working: the engine, parser, expressions, actions, keyboard focus (including parts of elements), inspector, 30 components (layout: `column`, `row`, `grid`, `card`, `list`, `list-item`, `accordion`, `divider`, `spacer`; content: `text`, `code`, `badge`, `avatar`; data: `stat`, `rating`, `map`, `pin`; input: `button`, `link`, `check`, `switch`, `radio`, `stepper`; navigation: `tabs`, `tab`, `breadcrumb`, `pagination`; feedback: `progress`, `skeleton`, `empty`), the playground, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
 
 Known gaps: the map can't be reached by keyboard (recorded in `test/contract.test.ts`), and specs nested hundreds of levels deep overflow the engine's recursion (see Phase 7 in the plan).
 
-Not built yet (see `docs/PLAN.md`): lists and structured data, data sources and host commands, navigation between screens, text input, images, scrolling regions, overlays, the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
+Not built yet (see `docs/PLAN.md`): lists and structured data (`each`), data sources and host commands, navigation between screens, text input, images, scrolling regions, overlays, drag gestures and the components that need them (`input`, `image`, `select`, `slider`, `table`, `chart`, `dialog`, `menu`, `tooltip`), the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
 
 ## Where to look next
 
