@@ -55,6 +55,12 @@ const EPS = 0.01;
 
 describe.each(ALL.map((d) => [d.type, d] as const))("%s", (_type, def) => {
   describe("definition", () => {
+    it("has no placeholders left from the scaffold", () => {
+      const texts = [def.description, def.text?.description, def.example, ...Object.values(def.props).map((p) => p.description)];
+      const left = texts.filter((t) => t && /\bTODO\b/.test(t));
+      expect(left, "fill in the TODOs from npm run new:component").toEqual([]);
+    });
+
     it("has a one or two sentence description", () => {
       expect(def.description.trim()).not.toBe("");
       const sentences = def.description.split(/[.!?](\s|$)/).filter((s) => s.trim().length > 1);
