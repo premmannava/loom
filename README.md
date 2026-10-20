@@ -268,7 +268,7 @@ spacer size=16
 
 ### `text`
 
-A paragraph or heading. Wraps to the available width. Use {expressions} to show state.
+A paragraph or heading that wraps to the available width. Use {expressions} to show state.
 
 | Prop | Type | Description |
 |---|---|---|

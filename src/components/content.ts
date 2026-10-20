@@ -7,7 +7,7 @@ const ALIGN = ["left", "center", "right"] as const;
 export const text: ComponentDef = {
   type: "text",
   category: "content",
-  description: "A paragraph or heading. Wraps to the available width. Use {expressions} to show state.",
+  description: "A paragraph or heading that wraps to the available width. Use {expressions} to show state.",
   text: { description: "The words to show. May include {expressions}.", required: true },
   props: {
     style: { type: "enum", values: TEXT_STYLES, default: "body", description: "display, title, lead, body or caption." },
