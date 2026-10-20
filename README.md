@@ -30,6 +30,7 @@ card
 - [Connecting a model](#connecting-a-model)
 - [How it works](#how-it-works)
 - [Debugging](#debugging)
+- [Testing](#testing)
 - [Writing a component](#writing-a-component)
 - [Theming](#theming)
 - [Project structure](#project-structure)
@@ -74,11 +75,16 @@ npm run dev        # opens the playground
 | Command | What it does |
 |---|---|
 | `npm run dev` | Starts the playground with live reload |
-| `npm test` | Runs the unit tests |
+| `npm test` | Runs the unit, contract, streaming, fuzz and interaction tests |
+| `npm run test:visual` | Runs the visual regression tests (Playwright) |
+| `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
+| `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
 | `npm run docs:components` | Regenerates the component reference in this README |
+| `npm run docs:check` | Fails if the component reference is out of date |
+| `npm run new:component -- <name>` | Scaffolds a component and its test file, and registers it |
 | `npm run build:world` | Regenerates the map's country outlines |
 
 The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels.
@@ -523,9 +529,52 @@ To find a bug, first decide which stage it's in:
 
 ---
 
+## Testing
+
+`loom-ui/testing` runs the real engine (parsing, layout, painting, hit testing, pointer and keyboard handling) in Node against a stand-in canvas that records what is drawn. It works with any test runner.
+
+```ts
+import { render } from "loom-ui/testing";
+
+const ui = render(`state n=0
+button "Add" on=inc:n
+text "Clicked {n} times"`);
+
+ui.press({ type: "button", text: "Add" });
+expect(ui.state.n).toBe(1);
+expect(ui.text()).toContain("Clicked 1 times");
+```
+
+| Helper | What it does |
+|---|---|
+| `find`, `findAll`, `isShown` | Look elements up by `type`, `text` (as written or as shown) and `line` |
+| `press`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
+| `set`, `setSpec`, `stream` | Change state, replace the spec, or stream one in chunks |
+| `state`, `emitted`, `focused`, `diagnostics` | Read the results |
+| `text`, `drawOps`, `hits` | What the last frame drew, and what is clickable |
+
+Map clicks need a real canvas to tell countries apart, so they're covered by the visual tests rather than in Node.
+
+In this repository, the test suites are:
+
+| Suite | Where | What it checks |
+|---|---|---|
+| Unit | `test/*.test.ts` | Parser, expressions, actions, layout, the model guide |
+| Contract | `test/contract.test.ts` | Every registered component against the project rules: docs, layout bounds at three widths, theme-only colors and fonts, hit regions and keyboard reach |
+| Streaming | `test/streaming.test.ts` | Every prefix of every sample renders a valid, smaller screen, however the stream is chunked |
+| Fuzz | `test/fuzz.test.ts` | Random and damaged specs, expressions and actions never make anything throw (`FUZZ_RUNS=5000 npm test` for a longer run) |
+| Visual | `visual/` | Component examples and samples in light and dark at 375 and 1024 px, against baselines in `visual/__screenshots__` |
+| Benchmarks | `bench/` | Timings per commit; pull requests are compared with their base |
+
+CI (`.github/workflows/ci.yml`) runs all of them. Visual baselines are made on Linux in the Playwright image, because fonts render differently on each platform: update them with `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or run the CI workflow by hand with **update-baselines** and commit the files it uploads.
+
+---
+
 ## Writing a component
 
 A component is one `ComponentDef` object. Registering it is all it takes: the parser validates its props, the model guide describes it, and the engine lays it out and paints it.
+
+In this repository, `npm run new:component -- badge` creates the file and its test from a template and registers it. The contract tests then fail until every placeholder is filled in, so `npm test` tells you what's left.
 
 ```ts
 import type { ComponentDef } from "loom-ui";
@@ -632,9 +681,13 @@ src/
   text.ts           Text measuring and wrapping
   state.ts          The state store
   components/       Built-in components; map/ is a separate entry point
+  testing/          loom-ui/testing: render() and the recording canvas
 playground/         The development playground
-test/               Unit tests (Vitest)
-scripts/            Build scripts (map outlines, component docs)
+test/               Unit, contract, streaming, fuzz and interaction tests (Vitest)
+visual/             Visual regression page, cases and baselines (Playwright)
+bench/              Benchmarks
+scripts/            Map outlines, component docs, component scaffold, benchmark comparison
+.github/workflows/  CI
 docs/               Plan, examples and images
 CLAUDE.md           Brief for AI assistants working on this repo
 docs/images/        README images

@@ -25,6 +25,8 @@ Time estimates are rough, for one developer working with AI assistance, and will
 
 **Done in 0.1:** the engine pipeline, parser with diagnostics, safe expressions, actions, keyboard focus, inspector, 12 components, 36 unit tests, the playground and the generated model guide.
 
+**Done in Phase 1:** see [its status](#phase-1-testing-and-tooling).
+
 **Missing for real apps:**
 
 | Gap | Why it matters |
@@ -80,6 +82,16 @@ Phases 4 and 5 can overlap with the end of Phase 3. The order follows the origin
 7. **Benchmarks**: a 1,000-node and a 5,000-node spec, with timings recorded per commit.
 
 **Exit criteria:** CI is green and required for merging; adding a component automatically gets it contract-tested and screenshotted.
+
+**Status:** built. `loom-ui/testing`, contract, streaming and fuzz tests, visual regression, benchmarks with base comparison, `docs:check`, `new:component` and CI are in place. Two things remain outside the code: making CI required for merging (a branch protection setting on GitHub), and keeping visual baselines current, since they can only be made on Linux.
+
+What the new tests found on their first runs:
+
+- The expression sandbox let `constructor`, `__lookupGetter__` and other `Object.prototype` names through as functions. A spec could get a native function as a value and redefine `min()` for every Loom instance on the page. Fixed, with regression tests.
+- `evaluate()` accepted non-plain values from object-backed scopes (e.g. `{__proto__}`). It now treats them as unknown state.
+- The `text` component's description had three sentences, against the one-or-two rule.
+- The map can't be reached by keyboard. Recorded as a known gap in the contract tests until Phase 3.
+- Specs nested hundreds of levels deep overflow the engine's recursion. Recorded under Phase 7.
 
 ---
 

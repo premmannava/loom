@@ -41,6 +41,7 @@ spec text → parse → tree → layout → boxes → paint → canvas pixels
 | Debugging | `src/inspector.ts` | Layout/hit overlays, inspect mode, frame capture. |
 | Model guide | `src/prompt.ts` | `languageGuide(registry)` builds the system prompt from component definitions. |
 | Theme | `src/theme.ts` | Design tokens; light and dark; `--loom-*` CSS overrides. |
+| Testing | `src/testing/` | `loom-ui/testing`: `render()` runs the real engine in Node against a recording canvas. |
 
 Each stage reruns only when its inputs change: `invalidate("parse" | "layout" | "paint")`. A spec edit re-parses, a state change re-lays out, and hover only repaints.
 
@@ -63,11 +64,16 @@ These are the project's core guarantees. A change that breaks one is wrong even 
 ```bash
 npm install
 npm run dev                # playground at /playground/index.html
-npm test                   # Vitest unit tests
+npm test                   # unit, contract, streaming, fuzz and interaction tests
+npm run test:visual        # visual regression (Playwright); baselines come from Linux:
+npm run test:visual:docker #   VISUAL_ARGS=--update-snapshots npm run test:visual:docker
+npm run bench              # benchmarks
 npm run typecheck          # tsc --noEmit
 npm run build              # library → dist/
 npm run build:playground   # static playground → dist-playground/
 npm run docs:components    # regenerate the README component reference
+npm run docs:check         # fail if it's out of date
+npm run new:component -- <name>   # scaffold and register a component
 npm run build:world        # regenerate map outlines (rarely needed)
 ```
 
@@ -77,16 +83,16 @@ npm run build:world        # regenerate map outlines (rarely needed)
 2. `npm test` passes, with new tests for new behavior.
 3. `npm run build` passes.
 4. If a component's definition changed, `npm run docs:components` has been run.
-5. For anything visual, the change has been looked at in the playground in light and dark mode. Use the inspector's layout boxes to check sizes.
+5. For anything visual, the change has been looked at in the playground in light and dark mode. Use the inspector's layout boxes to check sizes. If it changes how something looks, update the visual baselines in the same commit (Linux only: `VISUAL_ARGS=--update-snapshots npm run test:visual:docker`, or the CI workflow's update-baselines run).
 6. Spec examples you add anywhere (component `example`, README, docs) parse with no diagnostics. `test/prompt.test.ts` checks component examples automatically.
 
 ## How to add a component
 
-1. Create the `ComponentDef` in `src/components/` (or a new subfolder for large ones, with its own entry point if it carries heavy data, like `map/`).
+1. Run `npm run new:component -- <name>`, which creates the `ComponentDef` in `src/components/` and a test file, and registers it. (For large components, use a subfolder with its own entry point if it carries heavy data, like `map/`.) The contract tests in `test/contract.test.ts` now run on it and fail until it meets the rules below.
 2. Fill in everything a model needs: `description` (one or two plain sentences on when to use it), `text` if it takes quoted text, every prop with `type`, `description` and `default` or `required`, `children`/`parents` if relevant, and a short `example`.
 3. Implement `layout(box, ctx)` (set `box.h`; containers lay out `box.children` through `ctx.layout`). Implement `paint` and/or `paintOver` using theme tokens. Interactive components call `ctx.addHit(box)` while painting and define `press` if pressing does more than run `on=`.
-4. Export it and add it to `coreComponents` in `src/components/index.ts` (unless it's a separate entry point).
-5. Add tests: parsing with good and bad props, layout at narrow and wide widths, and interaction (state after a press).
+4. Make sure it's exported and in `coreComponents` in `src/components/index.ts` (the scaffold does this). A separate entry point exports its own list instead, like `mapComponents`; add that list to `ALL` in `test/contract.test.ts` so the contract tests cover it.
+5. Add tests: parsing with good and bad props, layout at narrow and wide widths, and interaction (state after a press). Use `render()` from `src/testing` for interaction. The contract tests already cover documentation, layout bounds, theme-only colors and keyboard reach.
 6. Add or update a playground sample if it helps show the component.
 7. Run `npm run docs:components`.
 
@@ -112,7 +118,9 @@ Language changes touch several places. Do them together, in this order:
 
 ## Current status
 
-Version 0.1, the foundation. Working: the engine, parser, expressions, actions, keyboard focus, inspector, 12 components (`column`, `row`, `card`, `divider`, `spacer`, `text`, `stat`, `progress`, `button`, `check`, `map`, `pin`), 36 tests and the playground.
+Version 0.1, the foundation, plus the Phase 1 testing and tooling. Working: the engine, parser, expressions, actions, keyboard focus, inspector, 12 components (`column`, `row`, `card`, `divider`, `spacer`, `text`, `stat`, `progress`, `button`, `check`, `map`, `pin`), the playground, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
+
+Known gaps: the map can't be reached by keyboard (recorded in `test/contract.test.ts`), and specs nested hundreds of levels deep overflow the engine's recursion (see Phase 7 in the plan).
 
 Not built yet (see `docs/PLAN.md`): lists and structured data, data sources and host commands, navigation between screens, text input, images, scrolling regions, overlays, the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
 
