@@ -42,8 +42,14 @@ function splitState(src: string): [string[], string[]] {
   return [lines.filter((l) => /^state\s/.test(l)), lines.filter((l) => !/^state\s/.test(l))];
 }
 
-const isInteractive = (def: ComponentDef) =>
-  !!def.press || Object.values(def.props).some((p) => p.type === "action" || p.type === "state");
+/** Components that can be interactive: they take an action or a state to write. */
+const canInteract = (def: ComponentDef) => Object.values(def.props).some((p) => p.type === "action" || p.type === "state");
+
+/** Instances that set an action or state prop must be pressable (a card is only pressable with on=). */
+const interactiveBoxes = (root: Box, def: ComponentDef) =>
+  boxesOf(root, def.type).filter((b) =>
+    Object.entries(def.props).some(([name, p]) => (p.type === "action" || p.type === "state") && name in b.node.props),
+  );
 
 const boxesOf = (root: Box, type: string) => {
   const out: Box[] = [];
@@ -129,18 +135,21 @@ describe.each(ALL.map((d) => [d.type, d] as const))("%s", (_type, def) => {
       for (const op of ops) {
         const color = op.fillStyle || op.strokeStyle;
         expect(palette.has(color), `${op.op} used "${color}", which isn't a theme color`).toBe(true);
-        if (op.font) expect(op.font, `${op.op} used a font outside the theme`).toContain(theme.font.family);
+        if (op.font) {
+          const themed = op.font.includes(theme.font.family) || op.font.includes(theme.font.mono);
+          expect(themed, `${op.op} used the font "${op.font}", which isn't a theme font`).toBe(true);
+        }
       }
       ui.destroy();
     });
   });
 
-  if (isInteractive(def)) {
+  if (canInteract(def)) {
     describe("interaction", () => {
-      it("registers a hit region for every visible instance", () => {
+      it("registers a hit region for every instance that uses an action or state", () => {
         const ui = render(exampleSpec(def), { components: ALL });
-        const boxes = boxesOf(ui.loom.boxes!, def.type);
-        expect(boxes.length).toBeGreaterThan(0);
+        const boxes = interactiveBoxes(ui.loom.boxes!, def);
+        expect(boxes.length, "the example should show the component being interactive").toBeGreaterThan(0);
         for (const b of boxes) expect(ui.hits.some((h) => h.box.node.id === b.node.id), `line ${b.node.line}`).toBe(true);
         ui.destroy();
       });
@@ -148,7 +157,7 @@ describe.each(ALL.map((d) => [d.type, d] as const))("%s", (_type, def) => {
       const gap = NOT_KEYBOARD_REACHABLE_YET[def.type];
       it(gap ? `can't be reached with Tab yet (known gap: ${gap})` : "can be reached with Tab", () => {
         const ui = render(exampleSpec(def), { components: ALL });
-        const want = new Set(boxesOf(ui.loom.boxes!, def.type).map((b) => b.node.id));
+        const want = new Set(interactiveBoxes(ui.loom.boxes!, def).map((b) => b.node.id));
         const reached = new Set<string>();
         for (let i = 0; i < ui.hits.length + 1; i++) {
           ui.tab();

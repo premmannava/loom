@@ -42,16 +42,25 @@ export interface PaintContext {
   props(node: LoomNode): PropReader;
   font(weight: number | string, size: number): string;
   roundRect(x: number, y: number, w: number, h: number, r: number): void;
-  /** Register a region the pointer and keyboard can target. */
+  /**
+   * Register a region the pointer and keyboard can target. To make a part of
+   * an element pressable on its own (a star, a page number), pass a box
+   * covering just that part, with the element's node, and a `detail` naming it.
+   * Each part is then a separate Tab stop, and press() sees the detail.
+   */
   addHit(box: Box, opts?: { detail?: unknown; focusable?: boolean }): void;
   hover: HitTarget | null;
   /** Pointer position in canvas CSS pixels, or null when outside. */
   pointer: { x: number; y: number } | null;
   focus: HitTarget | null;
   pressed: HitTarget | null;
-  isHovered(node: LoomNode): boolean;
-  isFocused(node: LoomNode): boolean;
-  isPressed(node: LoomNode): boolean;
+  /** Pass `detail` to ask about one part of an element (the one given to addHit). */
+  isHovered(node: LoomNode, detail?: unknown): boolean;
+  /** True only while the keyboard is in use, when a focus style should show. */
+  isFocused(node: LoomNode, detail?: unknown): boolean;
+  isPressed(node: LoomNode, detail?: unknown): boolean;
+  /** False when animation is off (option or reduced motion): draw a still frame. */
+  motion: boolean;
   /** Fade-in opacity for a node that just appeared (0..1). */
   appear(node: LoomNode): number;
   /** Ask for another frame (for animation). */
