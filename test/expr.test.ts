@@ -51,6 +51,14 @@ describe("expressions", () => {
     expect(ev("min(3, 1, 2)")).toEqual({ ok: true, value: 1 });
   });
 
+  it("ignores anything a scope returns that isn't a plain value", () => {
+    for (const name of ["__proto__", "constructor", "toString"]) {
+      const r = evaluate(name, (k) => ({} as Record<string, never>)[k]);
+      expect(r.ok, name).toBe(false);
+    }
+    expect(ev("obj", { obj: { a: 1 } }).ok).toBe(false);
+  });
+
   it("reports unknown state instead of guessing", () => {
     const r = ev("missing + 1");
     expect(r.ok).toBe(false);

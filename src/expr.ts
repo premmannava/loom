@@ -144,12 +144,17 @@ function parseExpr(src: string): Node {
 
 export type Scope = (name: string) => Value | undefined;
 
+const isPlainValue = (v: unknown): v is Value =>
+  v === null || typeof v === "number" || typeof v === "string" || typeof v === "boolean";
+
 function run(n: Node, scope: Scope): Value {
   switch (n.k) {
     case "lit": return n.v;
     case "id": {
       const v = scope(n.name);
-      if (v === undefined) throw new ExprError(`Unknown state "${n.name}"`);
+      // Only plain values count: a scope backed by an object could otherwise
+      // hand back things like Object.prototype for `__proto__`.
+      if (!isPlainValue(v)) throw new ExprError(`Unknown state "${n.name}"`);
       return v;
     }
     case "un": {
