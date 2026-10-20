@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      update-baselines:
+        description: "Regenerate the visual baselines and upload them as an artifact"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, test and build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run docs:check
+      - run: npm run build:playground
+
+  fuzz:
+    name: Long fuzz run
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run test/fuzz.test.ts
+        env:
+          FUZZ_RUNS: "5000"
+
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run bench -- --outputJson bench.json
+      - name: Benchmark the base branch on the same machine
+        if: github.event_name == 'pull_request'
+        run: |
+          git worktree add ../base "${{ github.event.pull_request.base.sha }}"
+          if [ -f ../base/bench/engine.bench.ts ]; then
+            (cd ../base && npm ci && npm run bench -- --outputJson "$GITHUB_WORKSPACE/bench-base.json")
+          fi
+      - name: Compare
+        if: github.event_name == 'pull_request'
+        run: npx vite-node scripts/compare-bench.ts bench-base.json bench.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ github.sha }}
+          path: bench.json
+          retention-days: 90
+
+  visual:
+    name: Visual regression
+    runs-on: ubuntu-latest
+    # Baselines are made in this same image (npm run test:visual:docker), so fonts render identically.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - name: Compare with baselines
+        if: ${{ !inputs.update-baselines }}
+        run: npx playwright test
+        env:
+          HOME: /root
+      - name: Regenerate baselines
+        if: ${{ inputs.update-baselines }}
+        run: npx playwright test --update-snapshots
+        env:
+          HOME: /root
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.update-baselines }}
+        with:
+          name: visual-baselines
+          path: visual/__screenshots__/
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diffs
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
