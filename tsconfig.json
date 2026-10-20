@@ -23,6 +23,7 @@
     "src",
     "test",
     "playground",
+    "visual",
     "scripts/**/*.ts",
     "*.config.ts"
   ]
