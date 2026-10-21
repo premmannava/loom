@@ -183,4 +183,50 @@ card
   button "Log today" on="inc:streak;set:read:false;set:walk:false;set:drink:false" disabled={!(read && walk && drink)}
 `,
   },
+  packing: {
+    label: "Packing list",
+    prompt: "A packing list for a weekend hike where I can tick things off, hide what's packed, and add or remove items.",
+    spec: `state hide=false gear=[{id: 1, text: "Water, 3 L", kg: 3, done: true}, {id: 2, text: "Headlamp", kg: 0.1, done: false}, {id: 3, text: "Rain shell", kg: 0.4, done: false}, {id: 4, text: "First aid kit", kg: 0.3, done: true}, {id: 5, text: "Trail snacks", kg: 0.6, done: false}]
+card
+  text "Weekend packing list" style=title
+  text "{count(gear, 'done')} of {len(gear)} packed · {round(sum(gear, 'kg'), 1)} kg in total" tone=muted
+  progress value={count(gear, 'done')} max={len(gear)}
+  switch "Hide packed items" bind=hide
+  each items=gear as=g key={g.id}
+    row if={!(hide && g.done)}
+      check "{g.text}" bind=g.done
+      text "{g.kg} kg" tone=muted
+      button "Remove" variant=secondary on="remove:g;notify:'Removed {g.text}'"
+  text "Everything's packed. Have a great hike!" tone=good if={len(gear) > 0 && count(gear, 'done') == len(gear)}
+  row
+    button "Add map" variant=secondary on="add:gear:{id: len(gear) + 100, text: 'Paper map', kg: 0.1, done: false}"
+    button "Clear list" variant=danger on=clear:gear
+`,
+  },
+  cart: {
+    label: "Cart",
+    prompt: "A shopping cart with quantities I can change, a way to remove items, and totals that update.",
+    spec: `state cart=[{sku: "SOCK", name: "Trail socks", detail: "Merino, size M", price: 24, qty: 2}, {sku: "SHELL", name: "Rain shell", detail: "Packs into its pocket", price: 129, qty: 1}, {sku: "LAMP", name: "Headlamp", detail: "400 lumens", price: 45, qty: 1}]
+card
+  text "Your cart" style=title
+  text "{sum(cart, 'qty')} items" tone=muted
+  each items=cart as=item key={item.sku}
+    row align=top
+      column gap=2
+        text "{item.name}" weight=semibold
+        text "{item.detail}" tone=muted
+        link "Remove" on=remove:item
+      stepper bind=item.qty min=1 max=9
+      text "\${item.price * item.qty}" weight=semibold align=right
+  empty "Your cart is empty" detail="Add something to see it here." if={len(cart) == 0}
+  divider
+  row
+    text "Shipping" tone=muted
+    text "{sum(cart, 'price', 'qty') >= 100 ? 'Free' : '$8'}" align=right
+  row
+    text "Total" style=title
+    text "\${sum(cart, 'price', 'qty') + (sum(cart, 'price', 'qty') >= 100 ? 0 : 8)}" style=title align=right
+  button "Check out" on="emit:checkout:{cart}" disabled={len(cart) == 0}
+`,
+  },
 };

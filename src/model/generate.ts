@@ -50,6 +50,11 @@ export interface GenerateOptions {
   history?: ChatMessage[];
   /** Appended to the user's request, e.g. "/no_think" to turn off Qwen3's thinking. */
   userSuffix?: string;
+  /**
+   * Names of state the app supplies itself (loom.state.set), so a spec that
+   * reads them isn't sent back for repair as using unknown names.
+   */
+  stateNames?: readonly string[];
   /** Repair when the first spec has: any diagnostic (default), only errors, or never. */
   repairOn?: "any" | "errors" | "never";
   /** Clean Loom text as it streams. */
@@ -105,7 +110,7 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
       if (filter.thinkingChars > before && phase === "waiting") setPhase("thinking");
     }
     emit(filter.end());
-    const diagnostics = parse(spec, o.registry).diagnostics;
+    const diagnostics = parse(spec, o.registry, { knownNames: o.stateNames }).diagnostics;
     return { spec, diagnostics, raw, usage, thinkingChars: reasoning + filter.thinkingChars };
   };
 

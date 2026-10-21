@@ -16,6 +16,7 @@ import { actionExpressions, parseActions } from "./actions";
 import { COMMON_PROPS, type PropDef } from "./component";
 import { looksLikeData, parseData } from "./data";
 import { checkSyntax, identifiers, splitTemplate } from "./expr";
+import { actionTargets } from "./actions";
 import { loopNames } from "./each";
 import { PATH } from "./paths";
 import { literal } from "./actions";
@@ -47,6 +48,11 @@ export interface ParseOptions {
   partial?: boolean;
   /** Props given to the invisible root column. */
   rootProps?: Record<string, string>;
+  /**
+   * State the app supplies itself (loom.state.set), so reading it isn't
+   * reported as an unknown name.
+   */
+  knownNames?: readonly string[];
 }
 
 export interface ParseResult {
@@ -255,6 +261,8 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
   // Names each line reads that it isn't inside the each for, checked once every each is known.
   const outsideUses: Array<{ line: number; names: string[] }> = [];
   const eaches: LoomNode[] = [];
+  // State that bind= and actions write, so reading it before the first write isn't a mistake.
+  const written = new Set<string>(opts.knownNames ?? []);
 
   const lines = src.split("\n");
   if (lines.at(-1) === "") lines.pop();
@@ -374,6 +382,11 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       : expressionsOf(tok.text, tok.props, def.props);
     const names = [...new Set(exprs.flatMap(identifiers))].filter((n) => !inScope.has(n));
     if (names.length) outsideUses.push({ line: lineNo, names });
+    for (const [name, raw] of Object.entries(tok.props)) {
+      const pdef = def.props[name] ?? COMMON_PROPS[name];
+      if (pdef?.type === "state" && PATH.test(raw)) written.add(raw.split(".")[0]!);
+      if (pdef?.type === "action") { const r = parseActions(raw); if ("actions" in r) actionTargets(r.actions).forEach((t) => written.add(t)); }
+    }
 
     const node: LoomNode = {
       id: `${lineNo}:${tok.type}`,
@@ -391,19 +404,21 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     if (def.children) stack.push(node);
   });
 
-  checkLoopNames(outsideUses, eaches, new Set(state.map((s) => s.key)), diagnostics);
+  checkNames(outsideUses, eaches, new Set(state.map((s) => s.key)), written, diagnostics);
   // Stable sort keeps each line's diagnostics in the order they were found.
   diagnostics.sort((a, b) => a.line - b.line);
   return { root, state, diagnostics, nodeCount, lines: lines.length };
 }
 
+/** State the engine sets itself: the visible screen's name. */
+const ENGINE_STATE = ["screen"];
+
 /**
- * Warn when a line reads a loop variable outside the each that defines it, a
- * common slip that would otherwise just show a dash. State of the same name
- * makes the read fine.
+ * Warn about names a line reads that nothing defines, slips that would
+ * otherwise just show a dash: a loop variable outside its each, or a word
+ * meant as text but left unquoted ({done ? Yes : No}).
  */
-function checkLoopNames(uses: Array<{ line: number; names: string[] }>, eaches: LoomNode[], stateKeys: Set<string>, diags: Diagnostic[]): void {
-  if (!eaches.length) return;
+function checkNames(uses: Array<{ line: number; names: string[] }>, eaches: LoomNode[], stateKeys: Set<string>, written: Set<string>, diags: Diagnostic[]): void {
   const defined = new Map<string, { each: LoomNode; prop: string }>();
   for (const e of eaches) {
     const as = e.props.as ?? "item";
@@ -412,9 +427,13 @@ function checkLoopNames(uses: Array<{ line: number; names: string[] }>, eaches: 
   }
   for (const { line, names } of uses) {
     for (const name of names) {
+      if (stateKeys.has(name) || ENGINE_STATE.includes(name)) continue;
       const d = defined.get(name);
-      if (!d || stateKeys.has(name)) continue;
-      diags.push({ line, severity: "warning", message: `"${name}" only exists inside the each on line ${d.each.line} (${d.prop}). Indent this line under it, or use a state name` });
+      // Writing t.done outside its each doesn't make t exist there, so loop variables are checked first.
+      if (!d && written.has(name)) continue;
+      diags.push(d
+        ? { line, severity: "warning", message: `"${name}" only exists inside the each on line ${d.each.line} (${d.prop}). Indent this line under it, or use a state name` }
+        : { line, severity: "warning", message: `"${name}" isn't state or a loop variable, so it shows as nothing. To show it as text, quote it: '${name}'. To use state, declare it: state ${name}=…` });
     }
   }
 }

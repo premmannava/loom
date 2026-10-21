@@ -407,6 +407,7 @@ A paragraph or heading that wraps to the available width. Use {expressions} to s
 | `strike` | boolean | Draw a line through the text, e.g. for an old price. |
 
 ```
+state guests=2 nights=3
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
 text "$160" tone=muted strike=true
@@ -480,6 +481,7 @@ A labelled number, for key figures like totals or counts.
 | `align` | `left` / `center` | left or center. |
 
 ```
+state price=24 qty=2
 stat label="Total" value="${price*qty}"
 ```
 
@@ -716,6 +718,7 @@ A horizontal bar showing how far a value is toward a maximum.
 | `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
 
 ```
+state done=3
 progress value={done} max=5 label="{done} of 5 steps"
 ```
 

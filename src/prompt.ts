@@ -78,6 +78,52 @@ function appActions(actions: readonly AppAction[]): string {
     .join("\n");
 }
 
+/**
+ * Complete specs the DATA section shows, exported so tests can check they
+ * parse cleanly and behave as described.
+ */
+export const DATA_EXAMPLES = {
+  todo: `state todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}, {text: "Snacks", done: false}]
+card
+  text "Packing list" style=title
+  text "{count(todos, 'done')} of {len(todos)} packed" tone=muted
+  each items=todos as=t
+    row
+      check "{t.text}" bind=t.done
+      button "Remove" variant=secondary on=remove:t
+  button "Add trail mix" on="add:todos:{text: 'Trail mix', done: false}"`,
+  cart: `state cart=[{name: "Trail socks", price: 24, qty: 2}, {name: "Rain shell", price: 129, qty: 1}]
+card
+  text "Your cart" style=title
+  each items=cart as=item
+    row
+      text "{item.name}"
+      stepper bind=item.qty min=1 max=9
+      text "\${item.price * item.qty}"
+  divider
+  text "Total \${sum(cart, 'price', 'qty')}" style=title`,
+};
+
+function dataSection(): string {
+  const indent = (spec: string) => spec.split("\n").map((l) => "  " + l).join("\n");
+  return `DATA AND LISTS
+- Keep data in state as lists and records, on one line: state todos=[{text: "Pack water", done: false}, {text: "Snacks", done: true}]
+- Repeat elements with each, once per item. Never copy an element by hand for every item:
+  each items=todos as=t
+- Inside each, the current item is t (from as=t; item if as= is left out). index=i gives its position from 0. t only exists inside its each.
+- Read fields: {t.text}, {cart[0].price}, {todos.length}
+- Compute numbers from the list instead of writing them yourself: len(list), count(list, 'done') counts items whose field is true, sum(list, 'price'), sum(list, 'price', 'qty') multiplies two fields per item, avg(list, 'field'), join(list, 'name'), includes(list, value)
+- Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"
+- Change the list: on="add:todos:{text: 'Map', done: false}", on=remove:t (inside each), on=clear:todos
+- Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}
+
+A to-do list:
+${indent(DATA_EXAMPLES.todo)}
+
+A cart whose total follows the quantities:
+${indent(DATA_EXAMPLES.cart)}`;
+}
+
 export function languageGuide(registry: Registry, opts: GuideOptions = {}): string {
   const comps = registry.all();
   const has = (type: string) => registry.has(type);
@@ -95,18 +141,18 @@ export function languageGuide(registry: Registry, opts: GuideOptions = {}): stri
 - Lines starting with # are comments.`);
 
   sections.push(`EXPRESSIONS
-- {…} reads state: {count}, {price*qty}, {done ? "Yes" : "No"}, {round(total, 2)}
+- {…} reads state: {count}, {price*qty}, {done ? 'Yes' : 'No'}, {round(total, 2)}
 - Text can mix words and expressions: "Total: \${price*qty}"
 - Operators: + - * / % == != < <= > >= && || ! and a ? b : c
 - Functions: ${EXPRESSION_FUNCTIONS.join(", ")}
-- Read fields and items of lists and records: {item.name}, {cart[0].price}, {todos.length}
-- List functions: len(list), count(list, 'done') counts items whose field is true, sum(list, 'price') or sum(list, 'price', 'qty') adds a field or two fields multiplied, avg(list, 'field'), join(list) or join(list, 'name'), includes(list, value)`);
+- Words inside {…} are state names. Quote text: {done ? 'Packed' : 'To pack'}, tone={late ? 'bad' : 'good'}`);
 
   sections.push(`ACTIONS (on=…)
 - ${ACTION_OPS.map((o) => ACTION_SYNTAX[o]).join("\n- ")}
-- Inside each, bind= and action targets can be paths into the item: check "{t.text}" bind=t.done, on=toggle:t.done, on=inc:item.qty, on=remove:t
 - Run several with ; e.g. on="set:step:2;emit:next"
 - Quote on= when it has spaces: on="inc:n;notify:'Saved {n}'"`);
+
+  if (has("each")) sections.push(dataSection());
 
   if (opts.actions?.length) {
     sections.push(`APP ACTIONS

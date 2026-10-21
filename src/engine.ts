@@ -240,6 +240,8 @@ export class Loom {
     this.parsed = parse(this.source, this.registry, {
       partial: this.streaming,
       rootProps: { pad: String(this.opts.padding ?? 20), gap: String(s.md) },
+      // State the app set itself counts as known, so reading it isn't flagged.
+      knownNames: Object.keys(this.state.snapshot()),
     });
     for (const { key, value } of this.parsed.state) this.state.declare(key, value);
     this.warned.clear();

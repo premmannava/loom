@@ -148,6 +148,11 @@ export function actionExpressions(actions: readonly Action[]): string[] {
   return out;
 }
 
+/** The state names an action list writes: the first name of each target (todos for add:todos, t for toggle:t.done). */
+export function actionTargets(actions: readonly Action[]): string[] {
+  return actions.flatMap((a) => ("key" in a ? [a.key.split(".")[0]!] : []));
+}
+
 /** Resolve an action argument: `{expr}` is evaluated, anything else is a literal. */
 export function resolveArg(arg: string, scope: Scope): Value {
   const m = /^\{(.*)\}$/.exec(arg);

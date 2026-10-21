@@ -100,3 +100,25 @@ describe("parse", () => {
     expect(r.root.children[0]!.children[0]!.id).toBe("2:text");
   });
 });
+
+describe("names nothing defines", () => {
+  const reg = new Registry(coreComponents);
+  const warnings = (spec: string, knownNames?: string[]) => parse(spec, reg, { knownNames }).diagnostics.map((d) => d.message);
+
+  it("warns about a word meant as text but left unquoted", () => {
+    expect(warnings(`state late=true\nbadge "Late" tone={late ? bad : 'good'}\n`)).toEqual([
+      `"bad" isn't state or a loop variable, so it shows as nothing. To show it as text, quote it: 'bad'. To use state, declare it: state bad=…`,
+    ]);
+  });
+
+  it("accepts state that is declared, written by bind= or an action, set by the engine, or supplied by the app", () => {
+    expect(warnings(`text "Picked: {picked}" if=picked
+button "Pick" on="set:picked:'x'"
+accordion "More" bind=open
+  text "{open}"
+text "{screen}"
+`)).toEqual([]);
+    expect(warnings(`text "{products}"\n`)).toHaveLength(1);
+    expect(warnings(`text "{products}"\n`, ["products"])).toEqual([]);
+  });
+});

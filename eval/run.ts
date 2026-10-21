@@ -6,6 +6,7 @@ import { generateSpec, type GenerateResult, type ModelConfig } from "../src/mode
 import type { GuideOptions } from "../src/prompt";
 import { parse } from "../src/parser";
 import type { Registry } from "../src/registry";
+import { render } from "../src/testing";
 import type { LoomNode } from "../src/types";
 import type { EvalCase } from "./cases";
 
@@ -26,6 +27,9 @@ export interface CaseResult {
   repaired: boolean;
   /** Expected elements the final spec didn't use. */
   missing: string[];
+  /** How many behavior checks the request has, and the ones the final spec failed (see eval/checks.ts). */
+  checks: number;
+  failedChecks: string[];
   /** Design props the model tried to set in its first answer (color=, font=…). */
   inventedDesign: string[];
   /** Element types the model made up, from the first answer. */
@@ -83,6 +87,12 @@ export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): C
   const inventedElements = [...new Set(firstMsgs.flatMap((m) => /Unknown element "([^"]+)"/.exec(m)?.[1] ?? []))];
   const { tokens, estimated } = tokensOf(r);
   const empty = !r.spec.trim();
+  const failedChecks = (c.checks ?? []).filter((check) => {
+    if (empty) return true;
+    // Each check gets a fresh screen, since checks press things.
+    const ui = render(r.spec, { components: registry.all() });
+    try { return !check.test(r.spec, ui); } catch { return true; } finally { ui.destroy(); }
+  }).map((check) => check.label);
   return {
     id: c.id,
     category: c.category,
@@ -95,6 +105,8 @@ export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): C
     problemsFinal: r.diagnostics.length,
     repaired: !!r.repair,
     missing,
+    checks: c.checks?.length ?? 0,
+    failedChecks,
     inventedDesign,
     inventedElements,
     empty,
@@ -131,7 +143,7 @@ export async function runEval(list: EvalCase[], o: EvalOptions): Promise<CaseRes
       result = {
         id: c.id, category: c.category, request: c.request, note: c.note, ok: false, error,
         validFirst: false, validFinal: false, problemsFirst: 0, problemsFinal: 0, repaired: false,
-        missing: [], inventedDesign: [], inventedElements: [], empty: true, outputTokens: 0, tokensEstimated: true,
+        missing: [], checks: c.checks?.length ?? 0, failedChecks: [], inventedDesign: [], inventedElements: [], empty: true, outputTokens: 0, tokensEstimated: true,
         thinkingTokens: 0, totalMs: 0, elements: 0, firstSpec: "", finalSpec: "", firstProblems: [], finalProblems: [],
       };
     }
@@ -158,6 +170,9 @@ export interface Summary {
   validFirst: number;
   validFinal: number;
   expectedMet: number;
+  /** Requests that have behavior checks, and how many passed all of theirs. */
+  checked: number;
+  checksMet: number;
   inventedDesign: number;
   inventedElements: number;
   empty: number;
@@ -170,12 +185,15 @@ export interface Summary {
 
 export function summarize(results: CaseResult[]): Summary {
   const ran = results.filter((r) => r.ok);
+  const checkedIds = new Set(results.filter((r) => r.checks > 0).map((r) => r.id));
   return {
     cases: results.length,
     failed: results.length - ran.length,
     validFirst: ran.filter((r) => r.validFirst).length,
     validFinal: ran.filter((r) => r.validFinal).length,
     expectedMet: ran.filter((r) => !r.missing.length).length,
+    checked: ran.filter((r) => checkedIds.has(r.id)).length,
+    checksMet: ran.filter((r) => checkedIds.has(r.id) && !r.failedChecks.length).length,
     inventedDesign: ran.filter((r) => r.inventedDesign.length).length,
     inventedElements: ran.filter((r) => r.inventedElements.length).length,
     empty: ran.filter((r) => r.empty).length,
@@ -201,6 +219,7 @@ export function report(results: CaseResult[], meta: { model: string; url: string
     `| Valid on the first try | ${s.validFirst}/${ran} (${pct(s.validFirst, ran)}) |`,
     `| Valid after one repair | ${s.validFinal}/${ran} (${pct(s.validFinal, ran)}) |`,
     `| Used the expected elements | ${s.expectedMet}/${ran} (${pct(s.expectedMet, ran)}) |`,
+    ...(s.checked ? [`| Worked when used (behavior checks) | ${s.checksMet}/${s.checked} (${pct(s.checksMet, s.checked)}) |`] : []),
     `| Invented design props (color=, font=…) | ${s.inventedDesign} |`,
     `| Invented elements | ${s.inventedElements} |`,
     `| Empty answers | ${s.empty} |`,
@@ -210,12 +229,12 @@ export function report(results: CaseResult[], meta: { model: string; url: string
     `| Total time per screen (median) | ${secs(s.medianTotalMs)} |`,
     ...(s.failed ? [`| Requests that failed | ${s.failed} |`] : []),
     "",
-    "| Request | First try | Final | Missing | Invented | Tokens | First line | Total |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Request | First try | Final | Missing | Checks | Invented | Tokens | First line | Total |",
+    "|---|---|---|---|---|---|---|---|---|",
     ...results.map((r) =>
       r.ok
-        ? `| ${r.id} | ${r.validFirst ? "valid" : `${r.problemsFirst} problems`} | ${r.validFinal ? "valid" : r.empty ? "empty" : `${r.problemsFinal} problems`} | ${r.missing.join(", ") || "—"} | ${[...r.inventedDesign.map((p) => p + "="), ...r.inventedElements].join(", ") || "—"} | ${r.outputTokens} | ${secs(r.firstLineMs)} | ${secs(r.totalMs)} |`
-        : `| ${r.id} | failed: ${r.error?.slice(0, 80)} | | | | | | |`,
+        ? `| ${r.id} | ${r.validFirst ? "valid" : `${r.problemsFirst} problems`} | ${r.validFinal ? "valid" : r.empty ? "empty" : `${r.problemsFinal} problems`} | ${r.missing.join(", ") || "—"} | ${!r.checks ? "—" : r.failedChecks.length ? `failed: ${r.failedChecks.join("; ")}` : "pass"} | ${[...r.inventedDesign.map((p) => p + "="), ...r.inventedElements].join(", ") || "—"} | ${r.outputTokens} | ${secs(r.firstLineMs)} | ${secs(r.totalMs)} |`
+        : `| ${r.id} | failed: ${r.error?.slice(0, 80)} | | | | | | | |`,
     ),
     "",
     "Each request's first and final spec are saved next to this report; paste one into the playground to see it.",

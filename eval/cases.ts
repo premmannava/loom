@@ -1,13 +1,18 @@
 /**
  * The evaluation set: requests a model should be able to turn into Loom.
  * `expect` lists elements a good answer uses; a list inside it means any one
- * of them will do. Traps check that models stay within the language.
+ * of them will do. `checks` render the answer and use it (see checks.ts).
+ * Traps check that models stay within the language.
  */
+import { acts, allDoneShowsMore, calls, nested, pressChanges, removes, repeats, type Check } from "./checks";
+
 export interface EvalCase {
   id: string;
-  category: "form" | "compare" | "dashboard" | "shop" | "navigation" | "content" | "interactive" | "trap";
+  category: "form" | "compare" | "dashboard" | "shop" | "navigation" | "content" | "interactive" | "data" | "hard" | "trap";
   request: string;
   expect?: Array<string | string[]>;
+  /** What the screen must do when used, checked on the final spec. */
+  checks?: Check[];
   /** What a trap is testing, for the report. */
   note?: string;
 }
@@ -52,6 +57,19 @@ export const cases: EvalCase[] = [
   { id: "int-quiz", category: "interactive", request: "A quiz question about which planet is largest, with four answers, that tells me if I'm right.", expect: [["radio", "button"]] },
   { id: "int-tip", category: "interactive", request: "A tip calculator for a $64 bill: tip from 10 to 25 percent with a slider, split between 1 to 6 people.", expect: ["slider", "stepper"] },
   { id: "int-map", category: "interactive", request: "Show the countries I've visited, Japan, Peru and Kenya, with a pin on each capital.", expect: ["map", "pin"] },
+
+  // Data: lists that should come from state through each, with numbers computed from them
+  { id: "data-todo", category: "data", request: "A to-do list of 5 tasks I can tick off, with \"X of 5 done\" at the top.", expect: ["each", "check"], checks: [calls("count"), pressChanges("check")] },
+  { id: "data-cart", category: "data", request: "A shopping cart of 3 items with quantities I can change and a total that updates.", expect: ["each", "stepper"], checks: [calls("sum"), pressChanges("stepper")] },
+  { id: "data-leaderboard", category: "data", request: "A leaderboard of the top 8 runners in our club this week, with rank, name and distance.", expect: ["each"], checks: [repeats(8)] },
+  { id: "data-products", category: "data", request: "A grid of 6 tents, each with its name, price and an Add to cart button.", expect: ["each", "button"], checks: [repeats(6)] },
+  { id: "data-orders", category: "data", request: "My last 3 orders, each showing its date, its 2 or 3 items, and the order total.", expect: ["each"], checks: [nested, repeats(3)] },
+  { id: "data-kanban", category: "data", request: "A kanban board with three columns, To do, Doing and Done, each holding 2 or 3 task cards.", expect: ["each"], checks: [repeats(6)] },
+  { id: "data-contacts", category: "data", request: "A contact list of 6 people with name and phone, where I can remove a contact or add a new one.", expect: ["each", "button"], checks: [repeats(6), acts("add"), removes(/remove|delete/i)] },
+
+  // Hard: several ideas at once, from testing with a 14B model
+  { id: "hard-bill", category: "hard", request: "Split a $186 dinner bill: tip from 0 to 25% with a slider, 2 to 8 people with a stepper, and show each person's share.", expect: ["slider", "stepper"], checks: [pressChanges("stepper")] },
+  { id: "hard-celebrate", category: "hard", request: "A to-do list of 4 chores I can tick off. When all are done, show a celebration message.", expect: ["each", "check"], checks: [allDoneShowsMore] },
 
   // Traps: staying inside the language
   { id: "trap-red", category: "trap", request: "A big red Buy now button.", expect: ["button"], note: "No colors in Loom: the closest role is variant=danger." },

@@ -81,3 +81,36 @@ describe("languageGuide options", () => {
     expect(parse(example, reg).diagnostics).toEqual([]);
   });
 });
+
+describe("the DATA section", () => {
+  const guide = languageGuide(new Registry(coreComponents));
+
+  it("is there when each is, and not otherwise", () => {
+    expect(guide).toMatch(/DATA AND LISTS/);
+    expect(languageGuide(new Registry(coreComponents.filter((c) => c.type !== "each")))).not.toMatch(/DATA AND LISTS/);
+  });
+
+  it("shows examples that parse cleanly and work as described", async () => {
+    const { render } = await import("../src/testing");
+    const { DATA_EXAMPLES } = await import("../src/prompt");
+    for (const spec of Object.values(DATA_EXAMPLES)) expect(guide).toContain(spec.split("\n").map((l) => "  " + l).join("\n"));
+
+    const todo = render(DATA_EXAMPLES.todo + "\n");
+    expect(todo.diagnostics).toEqual([]);
+    expect(todo.text()).toContain("1 of 3 packed");
+    todo.press({ type: "check", text: "Snacks" });
+    expect(todo.text()).toContain("2 of 3 packed");
+    todo.press({ type: "button", text: "Add trail mix" });
+    expect(todo.text()).toContain("2 of 4 packed");
+    todo.press({ id: "8:button#0" });
+    expect(todo.text()).toContain("1 of 3 packed");
+
+    const cart = render(DATA_EXAMPLES.cart + "\n");
+    expect(cart.diagnostics).toEqual([]);
+    expect(cart.text()).toContain("Total $177");
+    const plus = cart.hits.filter((h) => h.box.node.id === "7:stepper#1").at(-1)!;
+    cart.loom.activate({ node: plus.box.node, box: plus.box, detail: plus.detail });
+    cart.loom.renderNow();
+    expect(cart.text()).toContain("Total $306");
+  });
+});
