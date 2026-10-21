@@ -140,6 +140,9 @@ export class FakeCanvas {
     return prevented;
   }
 
+  setPointerCapture(_id: number): void {}
+  releasePointerCapture(_id: number): void {}
+
   getBoundingClientRect() {
     return { left: 0, top: 0, x: 0, y: 0, right: this.width, bottom: this.height, width: this.width, height: this.height };
   }

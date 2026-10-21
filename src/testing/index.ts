@@ -90,6 +90,12 @@ export interface Rendered {
   press(query: Query): void;
   /** Click at a point, in CSS pixels from the canvas's top-left corner. */
   click(x: number, y: number): void;
+  /**
+   * Press an element, move the pointer to a point in a few steps, and let go,
+   * through the real pointer path. Points are CSS pixels from the canvas's
+   * top-left corner; y defaults to where the drag started.
+   */
+  drag(query: Query, toX: number, toY?: number): void;
   /** Send a key press to the canvas, e.g. key("Tab"), key("Enter"), key("Tab", { shift: true }). */
   key(key: string, opts?: { shift?: boolean }): void;
   /** Move keyboard focus with Tab (or Shift+Tab when `back` is true). */
@@ -169,6 +175,26 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
 
   const pointer = (type: string, x: number, y: number) => canvas.dispatch(type, { clientX: x, clientY: y, pointerId: 1 });
 
+  /** A point inside the element's first pressable region that the element itself receives. */
+  const pressPoint = (query: Query): readonly [number, number] => {
+      const found = find(query);
+      const name = `"${found.node.type}" on line ${found.node.line}`;
+      if (!found.box) throw new Error(`${name} is hidden, so it can't be pressed`);
+      const region = loom.hitRegions.find((h) => h.box.node.id === found.node.id);
+      if (!region) throw new Error(`${name} isn't pressable right now (it may be disabled or not interactive)`);
+      // Click the centre, or the first point in the region that this element
+      // receives itself (a button inside a pressable card covers its centre).
+      const b = region.box;
+      const ours = (x: number, y: number) => {
+        const t = loom.targetAt(x, y);
+        return !!t && t.node.id === found.node.id && t.detail === region.detail;
+      };
+      const points = [[0.5, 0.5], ...[0.1, 0.3, 0.5, 0.7, 0.9].flatMap((fy) => [0.05, 0.25, 0.5, 0.75, 0.95].map((fx) => [fx, fy]))];
+      const at = points.map(([fx, fy]) => [b.x + b.w * fx!, b.y + b.h * fy!] as const).find(([x, y]) => ours(x, y));
+      if (!at) throw new Error(`${name} is covered by other pressable elements, so it can't be pressed`);
+      return at;
+  };
+
   const ui: Rendered = {
     loom,
     canvas,
@@ -185,22 +211,22 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     text: () => drawOps.filter((d) => d.op === "fillText").map((d) => String(d.args[0])),
 
     press(query) {
-      const found = find(query);
-      const name = `"${found.node.type}" on line ${found.node.line}`;
-      if (!found.box) throw new Error(`${name} is hidden, so it can't be pressed`);
-      const region = loom.hitRegions.find((h) => h.box.node.id === found.node.id);
-      if (!region) throw new Error(`${name} isn't pressable right now (it may be disabled or not interactive)`);
-      // Click the centre, or the first point in the region that this element
-      // receives itself (a button inside a pressable card covers its centre).
-      const b = region.box;
-      const ours = (x: number, y: number) => {
-        const t = loom.targetAt(x, y);
-        return !!t && t.node.id === found.node.id && t.detail === region.detail;
-      };
-      const points = [[0.5, 0.5], ...[0.1, 0.3, 0.5, 0.7, 0.9].flatMap((fy) => [0.05, 0.25, 0.5, 0.75, 0.95].map((fx) => [fx, fy]))];
-      const at = points.map(([fx, fy]) => [b.x + b.w * fx!, b.y + b.h * fy!] as const).find(([x, y]) => ours(x, y));
-      if (!at) throw new Error(`${name} is covered by other pressable elements, so it can't be pressed`);
+      const at = pressPoint(query);
       ui.click(at[0], at[1]);
+    },
+
+    drag(query, toX, toY) {
+      const [x0, y0] = pressPoint(query);
+      const y1 = toY ?? y0;
+      pointer("pointermove", x0, y0);
+      pointer("pointerdown", x0, y0);
+      flush();
+      for (const f of [0.25, 0.5, 0.75, 1]) {
+        pointer("pointermove", x0 + (toX - x0) * f, y0 + (y1 - y0) * f);
+        flush();
+      }
+      pointer("pointerup", toX, y1);
+      flush();
     },
 
     click(x, y) {

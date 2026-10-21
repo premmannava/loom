@@ -9,7 +9,7 @@
  * changing state re-lays out, hovering only repaints.
  */
 import { parseActions, runActions } from "./actions";
-import { PropReader, type ComponentDef, type PaintContext, type PressContext } from "./component";
+import { PropReader, type ComponentDef, type DragContext, type PaintContext, type PressContext } from "./component";
 import { Emitter } from "./emitter";
 import { createLayoutContext, isVisible } from "./layout";
 import { parse, type ParseResult } from "./parser";
@@ -101,6 +101,8 @@ export class Loom {
   private cleanup: Array<() => void> = [];
 
   hover: HitTarget | null = null;
+  /** The element being dragged, while the pointer is held on one that defines drag. */
+  private dragging: HitTarget | null = null;
   focus: HitTarget | null = null;
   pressed: HitTarget | null = null;
   pointer: { x: number; y: number } | null = null;
@@ -122,7 +124,9 @@ export class Loom {
 
     canvas.tabIndex = 0;
     canvas.style.outline = "none";
-    canvas.style.touchAction = "manipulation";
+    // Vertical swipes scroll the page and pinches zoom; horizontal drags reach
+    // the canvas (sliders). Also removes the tap delay, like "manipulation".
+    canvas.style.touchAction = "pan-y pinch-zoom";
     if (!canvas.getAttribute("aria-label")) canvas.setAttribute("aria-label", "Generated interface");
 
     this.state.subscribe((key, value) => {
@@ -447,11 +451,9 @@ export class Loom {
     return null;
   }
 
-  /** Press a target as if clicked. */
-  activate(target: HitTarget): void {
-    const def = this.registry.get(target.node.type);
+  private pressContext(target: HitTarget): PressContext {
     const readers = new WeakMap<LoomNode, PropReader>();
-    const pctx: PressContext = {
+    return {
       target,
       scope: this.state.scope,
       props: (node) => {
@@ -462,8 +464,34 @@ export class Loom {
       set: (k, v) => this.state.set(k, v),
       run: (actions) => this.runActionString(actions, target.node),
     };
-    if (def?.press) def.press(pctx);
+  }
+
+  /** Press a target as if clicked. */
+  activate(target: HitTarget): void {
+    const def = this.registry.get(target.node.type);
+    if (def?.press) def.press(this.pressContext(target));
+    // Draggable elements act through drag and key; Enter shouldn't fire their on=.
+    else if (def?.drag) return;
     else if (target.node.props.on) this.runActionString(target.node.props.on, target.node);
+  }
+
+  /** Send a drag phase to the dragged element, using its region from the latest frame. */
+  private dragTo(phase: DragContext["phase"], x: number, y: number): void {
+    const t = this.dragging;
+    if (!t) return;
+    const region = this.hits.find((h) => sameRegion(h, t));
+    const target = region ? { node: region.box.node, box: region.box, detail: region.detail } : t;
+    this.dragging = phase === "end" ? null : target;
+    const def = this.registry.get(target.node.type);
+    def?.drag?.({ ...this.pressContext(target), x, y, phase });
+    this.invalidate("paint");
+  }
+
+  /** Let the focused element handle a key. Returns true if it did. */
+  private keyToFocus(key: string): boolean {
+    if (!this.focus) return false;
+    const def = this.registry.get(this.focus.node.type);
+    return !!def?.key?.(this.pressContext(this.focus), key);
   }
 
   private resetState(): void {
@@ -565,6 +593,7 @@ export class Loom {
 
     const onMove = (e: PointerEvent) => {
       this.pointer = local(e);
+      if (this.dragging) { c.style.cursor = "grabbing"; this.dragTo("move", this.pointer.x, this.pointer.y); return; }
       if (this.inspector.inspecting) { this.inspector.pointerMove(this.pointer.x, this.pointer.y); return; }
       const t = this.targetAt(this.pointer.x, this.pointer.y);
       const def = t ? this.registry.get(t.node.type) : undefined;
@@ -573,6 +602,7 @@ export class Loom {
       else if (t?.detail !== undefined) this.invalidate("paint");
     };
     const onLeave = () => {
+      if (this.dragging) return; // the pointer is captured; the drag ends on release
       this.pointer = null;
       if (this.hover || this.pressed) { this.hover = null; this.pressed = null; this.invalidate("paint"); }
       this.inspector.pointerLeave();
@@ -583,9 +613,21 @@ export class Loom {
       if (this.inspector.inspecting) return;
       this.pressed = this.targetAt(p.x, p.y);
       if (this.pressed) { this.focus = this.pressed; this.invalidate("paint"); }
+      if (this.pressed && this.registry.get(this.pressed.node.type)?.drag) {
+        // Keep receiving moves when the pointer leaves the canvas mid-drag.
+        try { c.setPointerCapture?.(e.pointerId); } catch { /* not capturable; moves outside are missed */ }
+        this.dragging = this.pressed;
+        this.dragTo("start", p.x, p.y);
+      }
     };
     const onUp = (e: PointerEvent) => {
       const p = local(e);
+      if (this.dragging) {
+        this.pressed = null;
+        this.dragTo("end", p.x, p.y);
+        c.style.cursor = "default";
+        return;
+      }
       if (this.inspector.inspecting) { this.inspector.select(p.x, p.y); return; }
       const t = this.targetAt(p.x, p.y);
       const was = this.pressed;
@@ -613,6 +655,11 @@ export class Loom {
         this.invalidate("paint");
         return;
       }
+      if (this.focus && this.keyToFocus(e.key)) {
+        e.preventDefault();
+        this.keyboardMode = true;
+        return;
+      }
       if ((e.key === "Enter" || e.key === " ") && this.focus) {
         e.preventDefault();
         this.keyboardMode = true;
@@ -627,11 +674,17 @@ export class Loom {
       this.invalidate("paint");
     };
     const onBlur = () => { this.keyboardMode = false; this.invalidate("paint"); };
+    // The browser took over the gesture (a scroll, say): finish the drag where it was.
+    const onCancel = () => {
+      this.pressed = null;
+      if (this.dragging) this.dragTo("end", this.pointer?.x ?? 0, this.pointer?.y ?? 0);
+    };
 
     c.addEventListener("pointermove", onMove);
     c.addEventListener("pointerleave", onLeave);
     c.addEventListener("pointerdown", onDown);
     c.addEventListener("pointerup", onUp);
+    c.addEventListener("pointercancel", onCancel);
     c.addEventListener("keydown", onKey);
     c.addEventListener("focus", onFocus);
     c.addEventListener("blur", onBlur);
@@ -640,6 +693,7 @@ export class Loom {
       c.removeEventListener("pointerleave", onLeave);
       c.removeEventListener("pointerdown", onDown);
       c.removeEventListener("pointerup", onUp);
+      c.removeEventListener("pointercancel", onCancel);
       c.removeEventListener("keydown", onKey);
       c.removeEventListener("focus", onFocus);
       c.removeEventListener("blur", onBlur);

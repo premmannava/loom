@@ -220,7 +220,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
@@ -573,6 +573,24 @@ state qty=2
 stepper "Quantity" bind=qty min=1 max=10
 ```
 
+### `slider`
+
+Picks a number in a range by dragging a handle, or with the arrow keys. Good for prices, distances and amounts.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | An optional label above the slider. Show the value with an {expression}. |
+| `bind` | state, required | The number state this slider reads and writes. |
+| `min` | number | Smallest value (default 0). |
+| `max` | number | Largest value (default 100). |
+| `step` | number | The value moves in steps of this size (default 1). |
+| `on` | action | Actions to run after the user lets go, or after each arrow key, e.g. emit:changed. Separate several with ; |
+
+```
+state maxPrice=120
+slider "Up to ${maxPrice}" bind=maxPrice min=20 max=300 step=10
+```
+
 ### `screen`
 
 One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.
@@ -834,7 +852,9 @@ Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Ac
 
 ### Keyboard
 
-The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas.
+The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End.
+
+On touch screens, vertical swipes still scroll the page and pinches still zoom, while horizontal drags go to the canvas, so sliders can be dragged.
 
 ---
 
@@ -1010,6 +1030,9 @@ What a `ComponentDef` can define:
 | `layout(box, ctx)` | Required. Set `box.h`; containers also lay out `box.children` |
 | `paint(box, ctx)` / `paintOver(box, ctx)` | Draw before or after children |
 | `hitTest(box, x, y)` | Refine clicks inside the box (the map uses this per country) |
+| `drag(ctx)` | Follow the pointer while it's held down (`start`, `move`, `end`); the slider uses this |
+| `key(ctx, key)` | Handle a key while focused; return true if handled |
+| `visible(node, scope)` | Hide the element beyond `if=` (only the active `screen` shows) |
 | `press(ctx)` | What happens on activation; by default it runs the `on` prop |
 | `cursor(target)` | Mouse cursor over it |
 

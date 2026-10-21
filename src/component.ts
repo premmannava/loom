@@ -86,6 +86,14 @@ export interface PressContext {
   run(actions: string): void;
 }
 
+export interface DragContext extends PressContext {
+  /** Pointer position in canvas CSS pixels. */
+  x: number;
+  y: number;
+  /** start on press, move while held, end on release (or when the browser cancels). */
+  phase: "start" | "move" | "end";
+}
+
 export interface ComponentDef {
   type: string;
   category: Category;
@@ -111,6 +119,17 @@ export interface ComponentDef {
   hitTest?(box: Box, x: number, y: number): { detail?: unknown } | null;
   /** Default: run the `on` prop. */
   press?(ctx: PressContext): void;
+  /**
+   * Follow the pointer while it's held down on this element (a slider's
+   * thumb). An element with drag isn't pressed on release: drag gets an end
+   * phase instead.
+   */
+  drag?(ctx: DragContext): void;
+  /**
+   * A key pressed while this element has focus, other than Tab. Return true
+   * if it was handled. Enter and Space still press the element when not handled.
+   */
+  key?(ctx: PressContext, key: string): boolean;
   /**
    * Whether an element is shown, beyond its `if=` prop. Hidden elements aren't
    * laid out or painted (only the active screen is, for example).

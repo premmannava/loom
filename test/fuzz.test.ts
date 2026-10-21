@@ -147,8 +147,20 @@ function checkEngine(spec: string): void {
   for (const h of [...ui.hits]) {
     ui.click(h.box.x + h.box.w / 2, h.box.y + h.box.h / 2);
   }
-  for (let i = 0; i < 4; i++) ui.tab();
+  for (let i = 0; i < 4; i++) {
+    ui.tab();
+    for (const k of ["ArrowRight", "End", "PageDown", "Home"]) ui.key(k);
+  }
   ui.key("Enter");
+  const first = ui.hits[0];
+  if (first) {
+    const b = first.box;
+    // A drag that wanders off the canvas, over whatever is pressable first.
+    ui.canvas.dispatch("pointerdown", { clientX: b.x + 1, clientY: b.y + 1, pointerId: 1 });
+    ui.canvas.dispatch("pointermove", { clientX: b.x + b.w * 3, clientY: -50 });
+    ui.canvas.dispatch("pointerup", { clientX: -20, clientY: b.y });
+    ui.loom.renderNow();
+  }
   ui.setSpec(spec);
   finite(ui.loom.boxes);
   for (const v of Object.values(ui.state)) expect(isValue(v)).toBe(true);

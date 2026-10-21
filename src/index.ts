@@ -9,7 +9,7 @@ export { Inspector, type DrawCall } from "./inspector";
 export { languageGuide } from "./prompt";
 export { lightTheme, darkTheme, extendTheme, themeFromCSS, type Theme } from "./theme";
 export { CanvasMeasurer, MonoMeasurer, wrapText, type TextMeasurer } from "./text";
-export { PropReader, COMMON_PROPS, type ComponentDef, type PropDef, type LayoutContext, type PaintContext, type PressContext } from "./component";
+export { PropReader, COMMON_PROPS, CATEGORIES, type ComponentDef, type PropDef, type LayoutContext, type PaintContext, type PressContext, type DragContext, type Category } from "./component";
 export { coreComponents } from "./components";
 export * as components from "./components";
 export type { LoomNode, Box, Diagnostic, Value, HitTarget, Rect } from "./types";

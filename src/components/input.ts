@@ -1,6 +1,6 @@
 import { literal } from "../actions";
 import type { ComponentDef } from "../component";
-import type { Value } from "../types";
+import type { Box, Value } from "../types";
 import { fillTint, onProp, partBox, runOn } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
@@ -378,5 +378,116 @@ export const link: ComponentDef = {
     g.fillText(label, box.x, box.y + box.h / 2 + 1, box.w);
     if (ctx.isHovered(box.node)) g.fillRect(box.x, box.y + box.h - 3, w, 1.5);
     ctx.addHit(partBox(box, box.x, box.y, w, box.h));
+  },
+};
+
+const THUMB_R = 10, TRACK_H = 6, SLIDER_AREA = 32;
+
+/** A slider's range and current value, read the same way when painting, dragging and on keys. */
+function sliderState(p: { num(n: string, f: number): number; raw(n: string): string | undefined }, scope: (k: string) => Value | undefined) {
+  const min = p.num("min", 0);
+  const max = Math.max(min, p.num("max", 100));
+  const step = Math.abs(p.num("step", 1)) || 1;
+  const raw = Number(scope(p.raw("bind") ?? ""));
+  const value = Number.isFinite(raw) ? Math.min(max, Math.max(min, raw)) : min;
+  return { min, max, step, value };
+}
+
+/** Snap to the nearest step from min, keep within range, and drop float noise. */
+function snap(v: number, min: number, max: number, step: number): number {
+  const stepped = min + Math.round((v - min) / step) * step;
+  return Math.round(Math.min(max, Math.max(min, stepped)) * 1e6) / 1e6;
+}
+
+/** Where the thumb's centre may travel: inset by its radius so it never pokes out. */
+function travel(box: Box) {
+  return { left: box.x + THUMB_R, width: Math.max(1, box.w - THUMB_R * 2) };
+}
+
+export const slider: ComponentDef = {
+  type: "slider",
+  category: "input",
+  description: "Picks a number in a range by dragging a handle, or with the arrow keys. Good for prices, distances and amounts.",
+  text: { description: "An optional label above the slider. Show the value with an {expression}." },
+  props: {
+    bind: { type: "state", required: true, description: "The number state this slider reads and writes." },
+    min: { type: "number", default: 0, description: "Smallest value (default 0)." },
+    max: { type: "number", default: 100, description: "Largest value (default 100)." },
+    step: { type: "number", default: 1, description: "The value moves in steps of this size (default 1)." },
+    on: onProp("after the user lets go, or after each arrow key"),
+  },
+  example: `state maxPrice=120
+slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
+  layout(box, ctx) {
+    const label = ctx.props(box.node).text();
+    box.h = (label ? Math.round(ctx.theme.text.body * 1.35) + 4 : 0) + SLIDER_AREA;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const { min, max, value } = sliderState(p, ctx.scope);
+    const label = p.text();
+    let y = box.y;
+    if (label) {
+      const lh = Math.round(theme.text.body * 1.35);
+      g.font = ctx.font(400, theme.text.body);
+      g.fillStyle = c.ink;
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      g.fillText(label, box.x, y + lh / 2 + 1, box.w);
+      y += lh + 4;
+    }
+    const area = partBox(box, box.x, y, box.w, SLIDER_AREA);
+    const { left, width } = travel(area);
+    const frac = max > min ? (value - min) / (max - min) : 0;
+    const cx = left + frac * width, cy = y + SLIDER_AREA / 2;
+    ctx.roundRect(box.x, cy - TRACK_H / 2, box.w, TRACK_H, TRACK_H / 2);
+    g.fillStyle = c.line;
+    g.fill();
+    ctx.roundRect(box.x, cy - TRACK_H / 2, Math.max(TRACK_H, cx - box.x), TRACK_H, TRACK_H / 2);
+    g.fillStyle = c.accent;
+    g.fill();
+    const active = ctx.isPressed(box.node) || ctx.isHovered(box.node);
+    if (active) {
+      g.beginPath();
+      g.arc(cx, cy, THUMB_R + 6, 0, Math.PI * 2);
+      fillTint(g, c.accent, 0.14);
+    }
+    g.beginPath();
+    g.arc(cx, cy, THUMB_R, 0, Math.PI * 2);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = c.accent;
+    g.lineWidth = 2;
+    g.stroke();
+    ctx.addHit(area, { detail: "track" });
+  },
+  cursor: () => "grab",
+  drag(ctx) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return;
+    const { min, max, step, value } = sliderState(p, ctx.scope);
+    const { left, width } = travel(ctx.target.box);
+    const frac = Math.min(1, Math.max(0, (ctx.x - left) / width));
+    const next = snap(min + frac * (max - min), min, max, step);
+    if (next !== value) ctx.set(key, next);
+    if (ctx.phase === "end") runOn(ctx);
+  },
+  key(ctx, k) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return false;
+    const { min, max, step, value } = sliderState(p, ctx.scope);
+    const big = Math.max(step, snap((max - min) / 10, 0, Infinity, step));
+    const moves: Record<string, number> = {
+      ArrowRight: value + step, ArrowUp: value + step, ArrowLeft: value - step, ArrowDown: value - step,
+      PageUp: value + big, PageDown: value - big, Home: min, End: max,
+    };
+    if (!(k in moves)) return false;
+    ctx.set(key, snap(moves[k]!, min, max, step));
+    runOn(ctx);
+    return true;
   },
 };
