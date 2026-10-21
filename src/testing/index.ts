@@ -13,7 +13,7 @@
  */
 import type { ComponentDef } from "../component";
 import { coreComponents } from "../components";
-import { Loom, type LoomEvents } from "../engine";
+import { Loom, type LoomEvents, type LoomOptions } from "../engine";
 import { interpolate } from "../expr";
 import { walkBoxes } from "../layout";
 import { lightTheme, type Theme } from "../theme";
@@ -31,6 +31,9 @@ export interface RenderOptions {
   theme?: Theme;
   /** Padding around the screen. Default 20, like the engine. */
   padding?: number;
+  /** Passed to the engine, to test images (Node has no image loading of its own). */
+  imageHosts?: string[];
+  loadImage?: LoomOptions["loadImage"];
 }
 
 /** Which element to find. A string is shorthand for `{ type }`. */
@@ -112,6 +115,8 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     width: opts.width ?? 600,
     padding: opts.padding,
     animate: false,
+    imageHosts: opts.imageHosts,
+    loadImage: opts.loadImage,
   });
 
   const emitted: Emitted[] = [];

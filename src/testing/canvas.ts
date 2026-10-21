@@ -16,7 +16,7 @@ export interface DrawOp {
 }
 
 /** Calls that mark pixels. Everything else (paths, transforms, state) only prepares. */
-const DRAWING_OPS = new Set(["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText"]);
+const DRAWING_OPS = new Set(["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText", "drawImage"]);
 const USES_FILL = new Set(["fill", "fillRect", "fillText"]);
 
 interface Style {
@@ -66,11 +66,12 @@ export function createRecordingContext(): { context: CanvasRenderingContext2D; t
       return (...args: unknown[]) => {
         if (!DRAWING_OPS.has(prop)) return undefined;
         const fill = USES_FILL.has(prop);
+        const colored = prop !== "drawImage";
         log.push({
           op: prop,
           args,
-          fillStyle: fill ? style.fillStyle : "",
-          strokeStyle: fill ? "" : style.strokeStyle,
+          fillStyle: colored && fill ? style.fillStyle : "",
+          strokeStyle: colored && !fill ? style.strokeStyle : "",
           font: prop.endsWith("Text") ? style.font : "",
           globalAlpha: style.globalAlpha,
         });

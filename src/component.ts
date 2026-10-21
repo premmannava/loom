@@ -5,6 +5,7 @@
  */
 import { evaluate, interpolate, type Scope } from "./expr";
 import { literal } from "./actions";
+import type { ImageState } from "./images";
 import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
 import type { Box, HitTarget, LoomNode, Value } from "./types";
@@ -69,6 +70,11 @@ export interface PaintContext {
   appear(node: LoomNode): number;
   /** Ask for another frame (for animation). */
   requestFrame(): void;
+  /**
+   * An image by its spec src: loading, ready (with the image), error, or
+   * blocked by the image policy. The engine repaints when a load settles.
+   */
+  image(src: string): ImageState;
 }
 
 export interface PressContext {

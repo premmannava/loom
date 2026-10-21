@@ -218,7 +218,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Category | Components |
 |---|---|
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer) |
-| Content | [`text`](#text), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
+| Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
@@ -389,6 +389,21 @@ A paragraph or heading that wraps to the available width. Use {expressions} to s
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
 text "$160" tone=muted strike=true
+```
+
+### `image`
+
+A picture, such as a product photo. The quoted text says what it shows, and is displayed if the image can't load.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | What the image shows, e.g. Blue trail runners from the side. |
+| `src` | string, required | The image URL. Only the app's own site and hosts it allows will load. |
+| `ratio` | `16:9` / `4:3` / `3:2` / `1:1` / `2:3` / `3:4` | Width to height: 16:9, 4:3, 3:2, 1:1, 2:3 or 3:4. The space is kept while the image loads. |
+| `fit` | `cover` / `contain` | cover fills the space and crops the edges; contain shows the whole image. |
+
+```
+image "Ridgeline trail runners, side view" src="/images/ridgeline.jpg" ratio=4:3
 ```
 
 ### `code`
@@ -764,6 +779,8 @@ The canvas fills its parent's width and grows to fit its content.
 | `minHeight` | `0` | Minimum canvas height |
 | `padding` | `20` | Space around the whole screen |
 | `animate` | `true` | Fade new elements in (off when the user prefers reduced motion) |
+| `imageHosts` | `[]` | Hosts images may load from besides your own site ([Images](#images)) |
+| `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
 
 ### Methods
 
@@ -778,6 +795,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `go(screen)` / `back()` | Show another screen, or the previous one |
 | `screens` / `currentScreen` / `canGoBack` | The spec's screen names, the visible one, and whether `back()` can move |
 | `notify(text)` | Show a short message, as `notify:` does |
+| `imagesLoaded()` | A promise that resolves once every requested image has loaded or failed |
 | `setTheme(theme)` | Switch themes |
 | `find(type)` | All nodes of a type, e.g. `loom.find("button")` |
 | `expose(name?)` | Put the instance on `window` for the console (default `window.loom`) |
@@ -800,6 +818,19 @@ loom.on("action", ({ name, value }) => {
   if (name === "order") submitOrder(value);
 });
 ```
+
+### Images
+
+A spec can name any image URL, and a model writes specs, so Loom only loads images from your own site (the page's origin) and from hosts you list. Anything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and the console says which host to allow.
+
+```ts
+const loom = new Loom(canvas, {
+  components: coreComponents,
+  imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
+});
+```
+
+Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Access-Control-Allow-Origin`. The space for each image is kept from its `ratio=` while it loads, so the screen doesn't jump.
 
 ### Keyboard
 

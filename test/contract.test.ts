@@ -122,6 +122,7 @@ describe.each(ALL.map((d) => [d.type, d] as const))("%s", (_type, def) => {
       const ops = ui.drawOps;
       if (def.paint || def.paintOver) expect(ops.length, "painting the example should draw something").toBeGreaterThan(0);
       for (const op of ops) {
+        if (op.op === "drawImage") continue; // pictures carry their own colors
         const color = op.fillStyle || op.strokeStyle;
         expect(palette.has(color), `${op.op} used "${color}", which isn't a theme color`).toBe(true);
         if (op.font) {

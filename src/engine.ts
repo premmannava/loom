@@ -18,6 +18,7 @@ import { Store } from "./state";
 import { CanvasMeasurer, font as fontString, wrapText } from "./text";
 import { darkTheme, lightTheme, themeFromCSS, type Theme } from "./theme";
 import { Inspector } from "./inspector";
+import { browserImageLoader, ImageCache, type ImageLoader, type ImagePolicy } from "./images";
 import type { Box, Diagnostic, HitRegion, HitTarget, LoomNode, Value } from "./types";
 
 export interface Metrics {
@@ -59,6 +60,14 @@ export interface LoomOptions {
   padding?: number;
   /** Fade new elements in. Default true, off when the user prefers reduced motion. */
   animate?: boolean;
+  /**
+   * Hosts images may load from, besides the page's own origin, e.g.
+   * ["cdn.example.com", "*.images.example.com"]. Other images are blocked and
+   * show their description instead. Default: none.
+   */
+  imageHosts?: string[];
+  /** Custom image loading (server rendering, tests, a CDN signer). Default: an <img> with CORS. */
+  loadImage?: ImageLoader;
 }
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -68,6 +77,7 @@ export class Loom {
   readonly registry: Registry;
   readonly state = new Store();
   readonly inspector: Inspector;
+  private images: ImageCache;
   private events = new Emitter<LoomEvents>();
   private g: CanvasRenderingContext2D;
   private measurer: CanvasMeasurer;
@@ -108,6 +118,7 @@ export class Loom {
     this.measurer = new CanvasMeasurer(g);
     this.theme = this.resolveTheme();
     this.inspector = new Inspector(this);
+    this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now);
 
     canvas.tabIndex = 0;
     canvas.style.outline = "none";
@@ -315,6 +326,7 @@ export class Loom {
         return a;
       },
       requestFrame: () => this.invalidate("paint"),
+      image: (src) => this.images.get(src),
     };
   }
 
@@ -332,6 +344,21 @@ export class Loom {
       def.paintOver(box, ctx);
       ctx.g.restore();
     }
+  }
+
+  // ---------------------------------------------------------------- images
+
+  private imagePolicy(): ImagePolicy {
+    const hasLocation = typeof location !== "undefined" && /^https?:$/.test(location.protocol);
+    const origin = hasLocation ? location.origin : "http://localhost";
+    const base = typeof document !== "undefined" && document.baseURI ? document.baseURI : origin + "/";
+    return { origin, base, hosts: this.opts.imageHosts ?? [] };
+  }
+
+  /** Resolves once every image requested so far has loaded or failed (then repaints). */
+  async imagesLoaded(): Promise<void> {
+    await this.images.settled();
+    this.renderNow();
   }
 
   // ---------------------------------------------------------------- notifications
