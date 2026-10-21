@@ -1,7 +1,8 @@
 import { toNumber } from "../data";
 import type { ComponentDef, PropReader } from "../component";
 import type { Box } from "../types";
-import { fillTint, onProp, partBox, runOn } from "./util";
+import { INPUT_KINDS } from "../editor";
+import { fillTint, onProp, partBox, runOn, themeFont } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
 
@@ -489,4 +490,108 @@ slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
     runOn(ctx);
     return true;
   },
+};
+
+/** Field text size: at least 16 px, or phones zoom the page when the field is focused. */
+const FIELD_TEXT = 16;
+const FIELD_PAD = 12;
+const LABEL_SIZE = 13;
+const LABEL_GAP = 6;
+
+/** The field's box, under its label if it has one. */
+function fieldBox(box: Box, p: PropReader, controlHeight: number): Box {
+  const top = p.text() ? LABEL_SIZE + 4 + LABEL_GAP : 0;
+  return partBox(box, box.x, box.y + top, box.w, controlHeight);
+}
+
+/** The bound value as text for editing: numbers plainly, nothing for null. */
+function fieldValue(p: PropReader): string {
+  const v = p.bound();
+  return v === undefined || v === null ? "" : typeof v === "object" ? "" : String(v);
+}
+
+/** Cut text to fit a width, ending with an ellipsis. */
+function fitText(g: CanvasRenderingContext2D, text: string, width: number): string {
+  if (g.measureText(text).width <= width) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (g.measureText(text.slice(0, mid) + "…").width <= width) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo) + "…";
+}
+
+export const input: ComponentDef = {
+  type: "input",
+  category: "input",
+  description: "A text field people type into, such as a name, an email, a search or a new item. Each keystroke writes its bind= state.",
+  text: { description: "The label above the field. Leave it out only when the screen makes the purpose obvious." },
+  props: {
+    bind: { type: "state", required: true, description: "The state name or path it reads and writes, like task or t.title." },
+    placeholder: { type: "string", description: "A hint shown while the field is empty, like e.g. Sunscreen." },
+    kind: { type: "enum", values: INPUT_KINDS, default: "text", description: "text, email, number, password or search. Picks the phone keyboard and autofill; number writes a number, or null while empty." },
+    on: onProp("when Enter is pressed, after the value is written"),
+    disabled: { type: "condition", description: "Expression; when true the field is greyed out and can't be typed in." },
+    max: { type: "number", default: 500, description: "Longest value in characters (at most 10000)." },
+  },
+  example: `state task="" todos=[]
+input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
+text "{plural(len(todos), 'item')}" tone=muted`,
+  layout(box, ctx) {
+    const p = ctx.props(box.node);
+    box.h = fieldBox(box, p, ctx.theme.control.height).y - box.y + ctx.theme.control.height;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const disabled = p.cond("disabled");
+    const field = fieldBox(box, p, theme.control.height);
+    const editing = ctx.isEditing(box.node);
+    const hot = !disabled && ctx.isHovered(box.node);
+    g.save();
+    if (disabled) g.globalAlpha *= 0.45;
+    const label = p.text();
+    if (label) {
+      g.font = ctx.font(600, LABEL_SIZE);
+      g.textAlign = "left";
+      g.textBaseline = "top";
+      g.fillStyle = c.ink;
+      g.fillText(label, box.x, box.y, box.w);
+    }
+    ctx.roundRect(field.x + 0.5, field.y + 0.5, field.w - 1, field.h - 1, theme.radius.md);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = editing ? c.accent : hot ? c.muted : c.line;
+    g.lineWidth = editing ? 1.5 : 1;
+    g.stroke();
+    if (!editing) {
+      const value = fieldValue(p);
+      const kind = p.oneOf("kind", INPUT_KINDS, "text");
+      const shown = value ? (kind === "password" ? "•".repeat(value.length) : value) : p.str("placeholder");
+      g.font = ctx.font(400, FIELD_TEXT);
+      g.textBaseline = "middle";
+      g.fillStyle = value ? c.ink : c.muted;
+      g.fillText(fitText(g, shown, field.w - FIELD_PAD * 2), field.x + FIELD_PAD, field.y + field.h / 2 + 1);
+    }
+    g.restore();
+    if (!disabled) ctx.addHit(field);
+  },
+  editor(box, p, theme) {
+    const field = fieldBox(box, p, theme.control.height);
+    const max = Math.min(10_000, Math.max(1, Math.round(p.num("max", 500))));
+    return {
+      rect: { x: field.x + FIELD_PAD, y: field.y + 1, w: Math.max(0, field.w - FIELD_PAD * 2), h: field.h - 2 },
+      font: themeFont(theme, 400, FIELD_TEXT),
+      color: theme.colors.ink,
+      accent: theme.colors.accent,
+      kind: p.oneOf("kind", INPUT_KINDS, "text"),
+      value: fieldValue(p).slice(0, max),
+      placeholder: p.str("placeholder"),
+      label: p.text() || p.str("placeholder"),
+      max,
+    };
+  },
+  cursor: () => "text",
 };

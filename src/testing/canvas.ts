@@ -141,6 +141,11 @@ export class FakeCanvas {
   }
 
   setPointerCapture(_id: number): void {}
+
+  /** Whether the canvas itself has keyboard focus (rather than a text box over a field). */
+  focused = false;
+  focus(): void { this.focused = true; }
+  blur(): void { this.focused = false; }
   releasePointerCapture(_id: number): void {}
 
   getBoundingClientRect() {

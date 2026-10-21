@@ -37,13 +37,13 @@ describe("scoring", () => {
   it("scores valid answers, invented design props and elements, and missing elements", async () => {
     const fetch = fakeModel((req, attempt) => {
       if (req.startsWith("A big red")) return attempt === 0 ? `button "Buy now" color=red\n` : `button "Buy now" variant=danger\n`;
-      if (req.startsWith("A login")) return `card\n  input "Email"\n  input "Password"\n  button "Log in"\n`;
+      if (req.startsWith("A login")) return `card\n  textbox "Email"\n  textbox "Password"\n  button "Log in"\n`;
       return `card\n  text "Cabin"\n  button "Book"\n`;
     });
     const results = await runEval(trap, { config, registry, fetch });
     const by = Object.fromEntries(results.map((r) => [r.id, r]));
     expect(by["trap-red"]).toMatchObject({ validFirst: false, validFinal: true, repaired: true, inventedDesign: ["color"], missing: [] });
-    expect(by["trap-login"]).toMatchObject({ validFirst: false, inventedElements: ["input"] });
+    expect(by["trap-login"]).toMatchObject({ validFirst: false, inventedElements: ["textbox"] });
     expect(by["form-booking"]).toMatchObject({ validFirst: true, validFinal: true, missing: ["stepper"], repaired: false });
     expect(by["form-booking"]!.tokensEstimated).toBe(true);
 

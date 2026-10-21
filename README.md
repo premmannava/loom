@@ -308,7 +308,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
@@ -699,6 +699,26 @@ Picks a number in a range by dragging a handle, or with the arrow keys. Good for
 ```
 state maxPrice=120
 slider "Up to ${maxPrice}" bind=maxPrice min=20 max=300 step=10
+```
+
+### `input`
+
+A text field people type into, such as a name, an email, a search or a new item. Each keystroke writes its bind= state.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. Leave it out only when the screen makes the purpose obvious. |
+| `bind` | state, required | The state name or path it reads and writes, like task or t.title. |
+| `placeholder` | string | A hint shown while the field is empty, like e.g. Sunscreen. |
+| `kind` | `text` / `email` / `number` / `password` / `search` | text, email, number, password or search. Picks the phone keyboard and autofill; number writes a number, or null while empty. |
+| `on` | action | Actions to run when Enter is pressed, after the value is written, e.g. emit:changed. Separate several with ; |
+| `disabled` | condition | Expression; when true the field is greyed out and can't be typed in. |
+| `max` | number | Longest value in characters (at most 10000). |
+
+```
+state task="" todos=[]
+input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
+text "{plural(len(todos), 'item')}" tone=muted
 ```
 
 ### `screen`

@@ -55,7 +55,8 @@ describe("paths", () => {
 
 describe("bind= inside each, for every component that binds", () => {
   /** [component, line inside each, field, start value, how to act on the first copy] */
-  const cases: Array<[string, string, string, Value, "press" | "last" | "key" | "country"]> = [
+  const cases: Array<[string, string, string, Value, "press" | "last" | "key" | "country" | "type"]> = [
+    ["input", `input "Name" bind=r.v`, "v", "", "type"],
     ["check", `check "{r.name}" bind=r.v`, "v", false, "press"],
     ["switch", `switch "{r.name}" bind=r.v`, "v", false, "press"],
     ["radio", `radio "Small" value=S bind=r.v`, "v", "M", "press"],
@@ -79,6 +80,10 @@ describe("bind= inside each, for every component that binds", () => {
     expect(regions.length, `${id} should be pressable`).toBeGreaterThan(0);
     const region = how === "last" ? regions.at(-1)! : regions[0]!;
     const target = { node: region.box.node, box: region.box, detail: how === "country" ? "Japan" : region.detail };
+    if (how === "type") {
+      ui.type({ id }, "Hi");
+      return;
+    }
     if (how === "key") {
       ui.loom.focus = target;
       ui.key("ArrowRight");

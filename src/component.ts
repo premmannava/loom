@@ -6,6 +6,7 @@
 import { toNumber } from "./data";
 import { bareExpression, evaluate, formatValue, interpolate, wholeExpression, type Scope } from "./expr";
 import { literal } from "./actions";
+import type { EditorSpec } from "./editor";
 import type { ImageState } from "./images";
 import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
@@ -68,6 +69,8 @@ export interface PaintContext {
   /** True only while the keyboard is in use, when a focus style should show. */
   isFocused(node: LoomNode, detail?: unknown): boolean;
   isPressed(node: LoomNode, detail?: unknown): boolean;
+  /** Whether a real text box is over this element right now; it then draws the text, so don't. */
+  isEditing(node: LoomNode): boolean;
   /** False when animation is off (option or reduced motion): draw a still frame. */
   motion: boolean;
   /** Fade-in opacity for a node that just appeared (0..1). */
@@ -145,6 +148,12 @@ export interface ComponentDef {
   visible?(node: LoomNode, scope: Scope): boolean;
   /** Keyboard activation; default is the same as press. */
   cursor?(target: HitTarget): string;
+  /**
+   * For elements people type into: where the text sits and how it looks.
+   * Pressing or tabbing to the element then places a real text box over it
+   * (see src/editor.ts), and each change is written to its bind=.
+   */
+  editor?(box: Box, props: PropReader, theme: Theme): EditorSpec;
 }
 
 /** Props every component accepts. */

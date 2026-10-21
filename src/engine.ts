@@ -12,6 +12,8 @@ import { parseActions, runActions } from "./actions";
 import { PropReader, type ComponentDef, type DragContext, type PaintContext, type PressContext } from "./component";
 import { Emitter } from "./emitter";
 import { locateOf, scopeOf } from "./each";
+import { domEditorHost } from "./dom-editor";
+import { noEditor, type EditorHost, type EditorSpec } from "./editor";
 import { isList, makeList } from "./data";
 import { getIn, placeOf, setIn } from "./paths";
 import { createLayoutContext, isVisible } from "./layout";
@@ -73,6 +75,12 @@ export interface LoomOptions {
   loadImage?: ImageLoader;
   /** Problems found while running, like a blocked image. Default: console.warn with a "Loom:" prefix. */
   onWarning?: (message: string) => void;
+  /**
+   * Places a real text box over a field while someone types in it. Default:
+   * an <input> next to the canvas in browsers, nothing elsewhere.
+   * loom-ui/testing passes a fake one.
+   */
+  editor?: EditorHost;
 }
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -113,6 +121,11 @@ export class Loom {
   pointer: { x: number; y: number } | null = null;
   private keyboardMode = false;
   private warn: (message: string) => void;
+  private editorHost: EditorHost;
+  /** The field being typed into, if any. */
+  editing: HitTarget | null = null;
+  /** What was last typed and the value it wrote, so writing "1." (stored as 1) doesn't rewrite the field to "1". */
+  private typed: { text: string; value: Value } | null = null;
   /** Layout warnings already reported for this spec, so a list problem isn't repeated every frame. */
   private warned = new Set<string>();
 
@@ -128,6 +141,7 @@ export class Loom {
     this.measurer = new CanvasMeasurer(g);
     this.theme = this.resolveTheme();
     this.inspector = new Inspector(this);
+    this.editorHost = opts.editor ?? (typeof document !== "undefined" ? domEditorHost(canvas) : noEditor);
     const warn = (this.warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`Loom: ${m}`); }));
     this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now, warn);
 
@@ -335,6 +349,7 @@ export class Loom {
       isHovered: (n, d) => same(this.hover, n, d),
       isFocused: (n, d) => this.keyboardMode && same(this.focus, n, d),
       isPressed: (n, d) => same(this.pressed, n, d),
+      isEditing: (n) => !!this.editing && this.editing.node.id === n.id,
       motion: animate,
       appear: (n) => {
         if (!animate || n.id === "root") return 1;
@@ -484,6 +499,7 @@ export class Loom {
   /** Press a target as if clicked. */
   activate(target: HitTarget): void {
     const def = this.registry.get(target.node.type);
+    if (def?.editor) { this.beginEdit(target); return; }
     if (def?.press) def.press(this.pressContext(target));
     // Draggable elements act through drag and key; Enter shouldn't fire their on=.
     else if (def?.drag) return;
@@ -628,6 +644,123 @@ export class Loom {
     };
     this.focus = find(this.focus);
     this.hover = this.pointer ? find(this.hover) : null;
+    if (this.editing) {
+      const t = find(this.editing);
+      const spec = t && this.editorSpec(t.node);
+      if (!t || !spec) this.endEdit();
+      else { this.editing = t; this.editorHost.update(spec); }
+    }
+  }
+
+  // ---------------------------------------------------------------- typing
+
+  /** The laid-out box of a node, by id (copies inside each have their own). */
+  private boxOf(node: LoomNode): Box | null {
+    let found: Box | null = null;
+    const walk = (b: Box) => { if (found) return; if (b.node.id === node.id) found = b; else b.children.forEach(walk); };
+    if (this.rootBox) walk(this.rootBox);
+    return found;
+  }
+
+  /** How the text box for a field should look, or null if it can't be typed in right now. */
+  private editorSpec(node: LoomNode): EditorSpec | null {
+    const def = this.registry.get(node.type);
+    const box = this.boxOf(node);
+    if (!def?.editor || !box || !node.props.bind) return null;
+    const p = new PropReader(node, scopeOf(node, this.state.scope));
+    if (p.cond("disabled")) return null;
+    const spec = def.editor(box, p, this.theme);
+    // Keep what the person typed while the stored value is still what it wrote.
+    if (this.typed && p.bound() === this.typed.value) spec.value = this.typed.text;
+    return spec;
+  }
+
+  /** Start typing in a field: place the text box over it and focus it, during the press itself. */
+  beginEdit(target: HitTarget): void {
+    if (this.editing && this.editing.node.id === target.node.id) return;
+    this.endEdit();
+    const spec = this.editorSpec(target.node);
+    if (!spec) return;
+    this.editing = target;
+    this.focus = target;
+    this.typed = null;
+    const node = () => this.editing?.node ?? target.node;
+    this.editorHost.open(spec, {
+      input: (text) => this.typeInto(node(), text),
+      key: (key, shift) => this.editorKey(node(), key, shift),
+      blur: () => this.endEdit(),
+    });
+    this.invalidate("paint");
+  }
+
+  /** Stop typing; the canvas draws the field's value again. */
+  endEdit(): void {
+    if (!this.editing) return;
+    this.editing = null;
+    this.typed = null;
+    this.editorHost.close();
+    this.invalidate("paint");
+  }
+
+  /** Write what was typed to the field's bind=. */
+  private typeInto(node: LoomNode, text: string): void {
+    const bind = node.props.bind;
+    const spec = this.editorSpec(node);
+    if (!bind || !spec) return;
+    text = text.slice(0, spec.max);
+    let value: Value = text;
+    if (spec.kind === "number") {
+      const t = text.trim();
+      if (t === "") value = null;
+      else if (isFinite(Number(t))) value = Number(t);
+      else return; // "-" or "1e" on the way to a number: wait for more
+    }
+    this.typed = { text, value };
+    this.writePath(node, bind, value);
+  }
+
+  /** Enter runs on=, Tab moves to the next element, Escape stops typing. */
+  private editorKey(node: LoomNode, key: string, shift: boolean): boolean {
+    if (key === "Enter") {
+      if (node.props.on) this.runActionString(node.props.on, node);
+      return true;
+    }
+    if (key === "Escape") {
+      this.endEdit();
+      this.keyboardMode = true;
+      this.canvas.focus();
+      return true;
+    }
+    if (key === "Tab") return this.tabFrom(shift);
+    return false;
+  }
+
+  /**
+   * Move keyboard focus to the next (or previous) interactive element,
+   * starting to type when it's a field. Returns false when focus should
+   * leave the canvas, so the browser can move it on.
+   */
+  private tabFrom(back: boolean): boolean {
+    const list = this.focusables();
+    if (!list.length) return false;
+    const idx = this.focus ? list.findIndex((h) => sameRegion(h, this.focus!)) : -1;
+    const next = idx < 0 ? (back ? list.length - 1 : 0) : idx + (back ? -1 : 1);
+    if (next < 0 || next >= list.length) {
+      this.focus = null;
+      this.invalidate("paint");
+      return false;
+    }
+    const h = list[next]!;
+    const target = { node: h.box.node, box: h.box, detail: h.detail };
+    this.keyboardMode = true;
+    if (this.registry.get(target.node.type)?.editor) this.beginEdit(target);
+    else {
+      this.endEdit();
+      this.focus = target;
+      this.canvas.focus();
+    }
+    this.invalidate("paint");
+    return true;
   }
 
   private isShown(node: LoomNode): boolean {
@@ -690,21 +823,8 @@ export class Loom {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && this.inspector.inspecting) { this.inspector.setInspecting(false); return; }
       if (e.key === "Tab") {
-        const list = this.focusables();
-        if (!list.length) return;
-        const idx = this.focus ? list.findIndex((h) => sameRegion(h, this.focus!)) : -1;
-        const next = idx < 0 ? (e.shiftKey ? list.length - 1 : 0) : idx + (e.shiftKey ? -1 : 1);
-        if (next < 0 || next >= list.length) {
-          // Let the browser move focus out of the canvas.
-          this.focus = null;
-          this.invalidate("paint");
-          return;
-        }
-        e.preventDefault();
-        const h = list[next]!;
-        this.focus = { node: h.box.node, box: h.box, detail: h.detail };
-        this.keyboardMode = true;
-        this.invalidate("paint");
+        // Past the last element, let the browser move focus out of the canvas.
+        if (this.tabFrom(e.shiftKey)) e.preventDefault();
         return;
       }
       if (this.focus && this.keyToFocus(e.key)) {
@@ -797,6 +917,7 @@ export class Loom {
   }
 
   destroy(): void {
+    this.endEdit();
     if (this.toastTimer !== null) clearTimeout(this.toastTimer);
     if (this.frame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(this.frame);
     this.cleanup.forEach((f) => f());

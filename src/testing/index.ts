@@ -16,6 +16,7 @@ import { coreComponents } from "../components";
 import { Loom, type LoomEvents, type LoomOptions } from "../engine";
 import { interpolate } from "../expr";
 import { eachInstances, scopeOf } from "../each";
+import type { EditorEvents, EditorHost, EditorSpec } from "../editor";
 import { isVisible, walkBoxes } from "../layout";
 import { lightTheme, type Theme } from "../theme";
 import type { Box, Diagnostic, HitRegion, LoomNode, Value } from "../types";
@@ -110,6 +111,14 @@ export interface Rendered {
   tab(back?: boolean): void;
   /** Change a state value, as the host app might. */
   set(key: string, value: Value): void;
+  /**
+   * Type into a field as a person would: press it (unless it's already being
+   * typed in), then enter the text one character at a time. With replace,
+   * the field is cleared first. Keys like Enter then go to the field.
+   */
+  type(query: Query, text: string, opts?: { replace?: boolean }): void;
+  /** The text box over the field being typed in, or null. */
+  readonly editor: FakeEditor | null;
 
   /** Replace the spec. State is kept unless resetState is true. */
   setSpec(spec: string, opts?: { resetState?: boolean }): void;
@@ -123,7 +132,10 @@ export interface Rendered {
 export function render(spec: string, opts: RenderOptions = {}): Rendered {
   ensurePath2D();
   const canvas = new FakeCanvas();
-  const loom = new Loom(canvas as unknown as HTMLCanvasElement, {
+  let editingNode = (): string | null => null;
+  const editor = new FakeEditorHost(() => editingNode());
+  const loom: Loom = new Loom(canvas as unknown as HTMLCanvasElement, {
+    editor,
     components: opts.components ?? coreComponents,
     theme: opts.theme ?? lightTheme,
     width: opts.width ?? 600,
@@ -139,6 +151,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
   let drawOps: DrawOp[] = [];
   loom.on("action", (e: LoomEvents["action"]) => emitted.push({ name: e.name, value: e.value }));
   loom.on("render", () => { drawOps = canvas.takeDrawOps(); });
+  editingNode = () => loom.editing?.node.id ?? null;
 
   const flush = () => loom.renderNow();
   loom.setSpec(spec);
@@ -251,9 +264,31 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     },
 
     key(key, o = {}) {
-      canvas.dispatch("keydown", { key, shiftKey: !!o.shift });
+      // While a field is being typed in, keys go to its text box, as in a browser.
+      const open = editor.current;
+      if (open) {
+        const handled = open.events.key(key, !!o.shift);
+        if (!handled && key === "Tab") open.events.blur();
+      } else canvas.dispatch("keydown", { key, shiftKey: !!o.shift });
       flush();
     },
+
+    type(query, text, o = {}) {
+      const found = find(query);
+      if (editor.current?.node !== found.node.id) ui.press(query);
+      const open = editor.current;
+      if (!open || open.node !== found.node.id) throw new Error(`"${found.node.type}" on line ${found.node.line} can't be typed in`);
+      if (o.replace) { open.spec.value = ""; open.events.input(""); flush(); }
+      for (const ch of text) {
+        // Like a browser's maxlength: characters past the limit aren't added.
+        const now = editor.current ?? open;
+        if (now.spec.value.length >= now.spec.max) break;
+        now.spec.value += ch;
+        now.events.input(now.spec.value);
+        flush();
+      }
+    },
+    get editor() { return editor.current ? editor.current.spec : null; },
 
     tab(back = false) {
       ui.key("Tab", { shift: back });
@@ -285,4 +320,25 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     },
   };
   return ui;
+}
+
+/** The text box a fake editor host shows: what a person would see in it. */
+export type FakeEditor = EditorSpec;
+
+/**
+ * The editor host for tests: no DOM, it keeps what the engine asked for, so
+ * type() and key() can drive it like a person at a keyboard.
+ */
+class FakeEditorHost implements EditorHost {
+  current: { spec: EditorSpec; events: EditorEvents; node: string | null } | null = null;
+  constructor(private editingNode: () => string | null) {}
+  open(spec: EditorSpec, events: EditorEvents): void {
+    this.current = { spec: { ...spec }, events, node: this.editingNode() };
+  }
+  update(spec: EditorSpec): void {
+    if (this.current) this.current = { ...this.current, spec: { ...spec }, node: this.editingNode() };
+  }
+  close(): void {
+    this.current = null;
+  }
 }
