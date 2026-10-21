@@ -9,7 +9,10 @@ import type { TextMeasurer } from "./text";
 import type { Theme } from "./theme";
 import type { Box, LoomNode } from "./types";
 
-export function isVisible(node: LoomNode, scope: Scope): boolean {
+/** Whether a node is shown: its `if=` passes and, given a registry, its component's visible() agrees. */
+export function isVisible(node: LoomNode, scope: Scope, registry?: Registry): boolean {
+  const own = registry?.get(node.type)?.visible;
+  if (own && !own(node, scope)) return false;
   const raw = node.props.if;
   if (raw === undefined) return true;
   const expr = raw.replace(/^\{([\s\S]*)\}$/, "$1");
@@ -41,7 +44,7 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
       return box;
     },
     visibleChildren(node) {
-      return node.children.filter((c) => isVisible(c, scope));
+      return node.children.filter((c) => isVisible(c, scope, registry));
     },
     shift: shiftBox,
   };

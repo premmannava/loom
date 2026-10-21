@@ -20,7 +20,7 @@ const opts = { numRuns: RUNS };
 
 // ---------------------------------------------------------------- generators
 
-const names = ["a", "b", "count", "done", "price", "qty", "x"];
+const names = ["a", "b", "count", "done", "price", "qty", "x", "first", "second", "screen"];
 const types = [...ALL_COMPONENTS.map((c) => c.type), "state", "sparkle", "Button", "row-x"];
 const propNames = [...new Set(ALL_COMPONENTS.flatMap((c) => Object.keys(c.props))), "if", "colour", "on", "x-y"];
 
@@ -47,14 +47,15 @@ const expr: fc.Arbitrary<string> = fc.letrec<{ e: string }>((tie) => ({
 const exprish = fc.oneof(expr, fc.string({ maxLength: 20 }), fc.constantFrom("((((((((((", "a.b", "x = 1", "`t`", "}", "{", "'"));
 
 const action = fc.oneof(
-  fc.tuple(fc.constantFrom("inc", "dec", "toggle", "set", "emit", "jump", ""), fc.constantFrom(...names, "", "1x"), fc.option(fc.oneof(atom, exprish.map((e) => `{${e}}`)))).map(
+  fc.constantFrom("back", "back:x", "go:first", "go:second", "go:nowhere", "notify:'Saved {a}; done'", "notify:", "notify:'{a +}'"),
+  fc.tuple(fc.constantFrom("inc", "dec", "toggle", "set", "emit", "go", "notify", "jump", ""), fc.constantFrom(...names, "", "1x"), fc.option(fc.oneof(atom, exprish.map((e) => `{${e}}`)))).map(
     ([op, key, arg]) => `${op}:${key}${arg === null ? "" : ":" + arg}`,
   ),
   fc.string({ maxLength: 12 }),
 );
 
 const propValue = fc.oneof(
-  fc.constantFrom("primary", "secondary", "danger", "title", "muted", "center", "huge", "true", "false", "Japan,Kenya"),
+  fc.constantFrom("primary", "secondary", "danger", "title", "muted", "center", "huge", "true", "false", "Japan,Kenya", "first", "second"),
   fc.integer({ min: -50, max: 2000 }).map(String),
   exprish.map((e) => `{${e}}`),
   fc.string({ maxLength: 10 }).map((s) => `"${s.replace(/"/g, '\\"')}"`),

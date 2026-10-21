@@ -150,6 +150,9 @@ Interactive elements run actions from their `on=` prop.
 | `toggle:key` | Flip true/false |
 | `set:key:value` | Set a literal, or an expression: `set:total:{a + b}` |
 | `emit:name` or `emit:name:value` | Tell the host app what the user chose |
+| `go:screen` | Show another screen ([Screens](#screens)) |
+| `back` | Return to the previous screen |
+| `notify:'message'` | Show a short message for a few seconds; it can include `{expressions}` |
 
 Run several in order with `;`:
 
@@ -158,6 +161,28 @@ button "Place order" on="set:placed:true;emit:order:{qty}"
 ```
 
 `emit` is how a generated screen talks back to your app, for example to send the user's choice to the model for the next step.
+
+`notify` shows a message at the bottom of the visible area, drawn by the engine in the theme's colors, and fires a `notify` event so your app can also announce it. Quote the message when it has spaces or `;`:
+
+```
+button "Add to cart" on="inc:items;notify:'Added. {items} in your cart'"
+```
+
+### Screens
+
+A spec can hold several screens. Only one shows at a time: the first, until a button moves to another with `go:name`. `back` returns to the previous one, and the visible screen's name is in `{screen}`.
+
+```
+state qty=1
+screen name=product title="Trail socks"
+  stepper "Quantity" bind=qty min=1
+  button "Add to cart" on=go:cart
+screen name=cart title="Your cart"
+  text "{qty} pairs"
+  button "Keep shopping" variant=secondary on=back
+```
+
+State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. Your app can move between screens too, with `loom.go("cart")` and `loom.back()`, and hears every move through the `navigate` event.
 
 ### Conditions
 
@@ -196,7 +221,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Content | [`text`](#text), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper) |
-| Navigation | [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
+| Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
 
@@ -533,6 +558,29 @@ state qty=2
 stepper "Quantity" bind=qty min=1 max=10
 ```
 
+### `screen`
+
+One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.
+
+| Prop | Type | Description |
+|---|---|---|
+| `name` | name, required | The screen's name, used by go:name. The visible screen's name is in {screen}. |
+| `title` | string | A heading shown at the top of the screen. |
+| `gap` | number | Space between children in pixels (default 14). |
+
+Children: any elements.
+
+Only inside: `root`.
+
+```
+screen name=cart title="Your cart"
+  text "2 items"
+  button "Checkout" on=go:checkout
+screen name=checkout title="Checkout"
+  text "Pay with card"
+  button "Back to cart" variant=secondary on=back
+```
+
 ### `tabs`
 
 A row of tabs that switches between sections. Only the selected tab's content is shown.
@@ -727,6 +775,9 @@ The canvas fills its parent's width and grows to fit its content.
 | `endStream()` | Finish the stream and render the last line |
 | `on(event, handler)` | Subscribe to an event; returns an unsubscribe function |
 | `state.get(key)` / `state.set(key, value)` | Read or change state from your app |
+| `go(screen)` / `back()` | Show another screen, or the previous one |
+| `screens` / `currentScreen` / `canGoBack` | The spec's screen names, the visible one, and whether `back()` can move |
+| `notify(text)` | Show a short message, as `notify:` does |
 | `setTheme(theme)` | Switch themes |
 | `find(type)` | All nodes of a type, e.g. `loom.find("button")` |
 | `expose(name?)` | Put the instance on `window` for the console (default `window.loom`) |
@@ -741,6 +792,8 @@ The canvas fills its parent's width and grows to fit its content.
 | `diagnostics` | `Diagnostic[]` | The spec's problems changed |
 | `render` | `Metrics` | A frame was painted (node count and timings) |
 | `inspect` | `{ node, box }` or `null` | Inspect mode selected something |
+| `navigate` | `{ screen, from }` | The visible screen changed |
+| `notify` | `{ text }` | A message was shown |
 
 ```ts
 loom.on("action", ({ name, value }) => {

@@ -15,7 +15,7 @@ import { createLayoutContext, isVisible } from "./layout";
 import { parse, type ParseResult } from "./parser";
 import { Registry } from "./registry";
 import { Store } from "./state";
-import { CanvasMeasurer, font as fontString } from "./text";
+import { CanvasMeasurer, font as fontString, wrapText } from "./text";
 import { darkTheme, lightTheme, themeFromCSS, type Theme } from "./theme";
 import { Inspector } from "./inspector";
 import type { Box, Diagnostic, HitRegion, HitTarget, LoomNode, Value } from "./types";
@@ -42,6 +42,10 @@ export interface LoomEvents {
   diagnostics: Diagnostic[];
   /** Inspect mode selected (or cleared) a node. */
   inspect: { node: LoomNode; box: Box } | null;
+  /** A notify: action (or the host) showed a message. */
+  notify: { text: string };
+  /** The visible screen changed, through go:, back or the host. */
+  navigate: { screen: string; from: string | undefined };
 }
 
 export interface LoomOptions {
@@ -76,6 +80,10 @@ export class Loom {
   private rootBox: Box | null = null;
   private hits: HitRegion[] = [];
   private seen = new Map<string, number>();
+  /** Screens visited before the current one, for back. */
+  private history: string[] = [];
+  private toast: { text: string; shownAt: number } | null = null;
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private dirty = { parse: true, layout: true, paint: true };
   private frame = 0;
   private width = 0;
@@ -118,7 +126,7 @@ export class Loom {
 
   /** Replace the whole spec. State is kept unless resetState is true. */
   setSpec(src: string, opts: { resetState?: boolean } = {}): void {
-    if (opts.resetState) { this.state.clear(); this.seen.clear(); }
+    if (opts.resetState) this.resetState();
     this.source = src;
     this.streaming = false;
     this.invalidate("parse");
@@ -130,7 +138,7 @@ export class Loom {
 
   /** Start a new streamed spec (e.g. a model response). Clears state by default. */
   beginStream(opts: { keepState?: boolean } = {}): void {
-    if (!opts.keepState) { this.state.clear(); this.seen.clear(); }
+    if (!opts.keepState) this.resetState();
     this.source = "";
     this.streaming = true;
     this.invalidate("parse");
@@ -210,6 +218,7 @@ export class Loom {
       rootProps: { pad: String(this.opts.padding ?? 20), gap: String(s.md) },
     });
     for (const { key, value } of this.parsed.state) this.state.declare(key, value);
+    this.syncScreen();
     this.metrics.parseMs = now() - t;
     this.metrics.nodes = this.parsed.nodeCount;
     this.dirty.parse = false;
@@ -248,6 +257,7 @@ export class Loom {
     this.paintBox(this.rootBox, ctx, 1);
     this.resolveFocus();
     if (this.focus && this.keyboardMode && !this.inspector.inspecting) this.paintFocusRing(g, this.focus.box);
+    this.paintToast(g);
     this.inspector.paintOverlay(g, this.rootBox, this.hits);
     this.inspector.endCapture();
     this.metrics.paintMs = now() - t;
@@ -324,6 +334,64 @@ export class Loom {
     }
   }
 
+  // ---------------------------------------------------------------- notifications
+
+  /** Show a short message over the screen for a few seconds, replacing any current one. */
+  notify(text: string): void {
+    this.toast = { text, shownAt: now() };
+    this.events.emit("notify", { text });
+    if (this.toastTimer !== null) clearTimeout(this.toastTimer);
+    // Repaint once it has expired, so it disappears even without animation.
+    this.toastTimer = setTimeout(() => { this.toastTimer = null; this.invalidate("paint"); }, TOAST_MS + 20);
+    this.invalidate("paint");
+  }
+
+  /** The message currently shown, if any. */
+  get notification(): string | null {
+    return this.toast && now() - this.toast.shownAt < TOAST_MS ? this.toast.text : null;
+  }
+
+  private paintToast(g: CanvasRenderingContext2D): void {
+    if (!this.toast) return;
+    const age = now() - this.toast.shownAt;
+    if (age >= TOAST_MS) { this.toast = null; return; }
+    const animate = this.opts.animate ?? !(typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    let alpha = 1;
+    if (animate) {
+      alpha = Math.min(1, age / TOAST_FADE, (TOAST_MS - age) / TOAST_FADE);
+      if (age < TOAST_FADE || age > TOAST_MS - TOAST_FADE) this.invalidate("paint");
+    }
+    const t = this.theme;
+    const font = fontString(600, 14, t.font.family);
+    const width = this.metrics.width;
+    const maxW = Math.max(40, Math.min(420, width - 32));
+    const lines = wrapText(this.toast.text, maxW - 32, font, this.measurer).slice(0, 3);
+    g.font = font;
+    const w = Math.min(maxW, Math.max(...lines.map((l) => g.measureText(l).width)) + 32);
+    const lh = 20;
+    const h = lines.length * lh + 20;
+    const x = (width - w) / 2;
+    const y = Math.max(8, this.visibleBottom() - h - 16);
+    g.save();
+    g.globalAlpha = alpha;
+    roundRectPath(g, x, y, w, h, t.radius.md);
+    g.fillStyle = t.colors.ink;
+    g.fill();
+    g.fillStyle = t.colors.surface;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    lines.forEach((l, i) => g.fillText(l, width / 2, y + 10 + lh * i + lh / 2 + 1, maxW - 24));
+    g.restore();
+  }
+
+  /** The lowest point of the canvas the user can see, so a message isn't drawn off screen. */
+  private visibleBottom(): number {
+    const h = this.metrics.height;
+    if (typeof window === "undefined" || !window.innerHeight) return h;
+    const top = this.canvas.getBoundingClientRect().top;
+    return Math.max(Math.min(h, 80), Math.min(h, window.innerHeight - top));
+  }
+
   private paintFocusRing(g: CanvasRenderingContext2D, b: Box): void {
     g.save();
     g.strokeStyle = this.theme.colors.focus;
@@ -371,6 +439,59 @@ export class Loom {
     else if (target.node.props.on) this.runActionString(target.node.props.on, target.node);
   }
 
+  private resetState(): void {
+    this.state.clear();
+    this.seen.clear();
+    this.history = [];
+  }
+
+  // ---------------------------------------------------------------- screens
+
+  /** Names of the spec's screens, in order. */
+  get screens(): string[] {
+    return (this.parsed?.root.children ?? []).filter((n) => n.type === "screen").map((n) => n.props.name ?? "");
+  }
+
+  /** The visible screen's name, or undefined when the spec has no screens. */
+  get currentScreen(): string | undefined {
+    const v = this.state.get(SCREEN_KEY);
+    return typeof v === "string" && this.screens.includes(v) ? v : undefined;
+  }
+
+  /** Show a screen by name, remembering the current one for back(). Unknown names are ignored. */
+  go(screen: string): void {
+    if (!this.screens.includes(screen)) return;
+    const from = this.currentScreen;
+    if (from === screen) return;
+    if (from !== undefined) this.history.push(from);
+    this.state.set(SCREEN_KEY, screen);
+    this.events.emit("navigate", { screen, from });
+  }
+
+  /** Return to the previous screen. Does nothing on the first one. */
+  back(): void {
+    const from = this.currentScreen;
+    let prev = this.history.pop();
+    // Skip screens that are no longer in the spec.
+    while (prev !== undefined && !this.screens.includes(prev)) prev = this.history.pop();
+    if (prev === undefined) return;
+    this.state.set(SCREEN_KEY, prev);
+    this.events.emit("navigate", { screen: prev, from });
+  }
+
+  /** Whether back() has somewhere to go. */
+  get canGoBack(): boolean {
+    return this.history.some((s) => this.screens.includes(s));
+  }
+
+  /** Keep the `screen` state on a screen that exists: the first one, until the user moves. */
+  private syncScreen(): void {
+    const names = this.screens;
+    if (!names.length) return;
+    const v = this.state.get(SCREEN_KEY);
+    if (typeof v !== "string" || !names.includes(v)) this.state.set(SCREEN_KEY, names[0]!);
+  }
+
   private runActionString(src: string, node: LoomNode): void {
     const parsed = parseActions(src);
     if ("error" in parsed) return;
@@ -378,6 +499,9 @@ export class Loom {
       scope: this.state.scope,
       set: (k, v) => this.state.set(k, v),
       emit: (name, value) => this.events.emit("action", { name, value, node }),
+      go: (screen) => this.go(screen),
+      back: () => this.back(),
+      notify: (text) => this.notify(text),
     });
   }
 
@@ -400,7 +524,7 @@ export class Loom {
   }
 
   private isShown(node: LoomNode): boolean {
-    return isVisible(node, this.state.scope);
+    return isVisible(node, this.state.scope, this.registry);
   }
 
   private bindInput(): void {
@@ -497,6 +621,10 @@ export class Loom {
 
   private bindEnvironment(): void {
     if (typeof window === "undefined") return;
+    // A message sits at the bottom of the visible area, which moves when the page scrolls.
+    const onScroll = () => { if (this.toast) this.invalidate("paint"); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    this.cleanup.push(() => window.removeEventListener("scroll", onScroll));
     if (this.opts.width === undefined && this.canvas.parentElement && typeof ResizeObserver !== "undefined") {
       const ro = new ResizeObserver(() => {
         const w = this.canvas.parentElement?.clientWidth || 0;
@@ -536,6 +664,7 @@ export class Loom {
   }
 
   destroy(): void {
+    if (this.toastTimer !== null) clearTimeout(this.toastTimer);
     if (this.frame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(this.frame);
     this.cleanup.forEach((f) => f());
     this.events.clear();
@@ -554,6 +683,13 @@ export class Loom {
 function sameRegion(h: HitRegion, t: HitTarget): boolean {
   return h.box.node.id === t.node.id && h.detail === t.detail;
 }
+
+/** How long a notify: message stays up, and how long it takes to fade in or out. */
+const TOAST_MS = 3000;
+const TOAST_FADE = 180;
+
+/** The state name that holds the visible screen. */
+export const SCREEN_KEY = "screen";
 
 export function roundRectPath(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const rr = Math.max(0, Math.min(r, w / 2, h / 2));

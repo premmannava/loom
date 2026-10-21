@@ -9,7 +9,8 @@ import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
 import type { Box, HitTarget, LoomNode, Value } from "./types";
 
-export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "action" | "state";
+/** `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to. */
+export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "action" | "state" | "name";
 
 export interface PropDef {
   type: PropType;
@@ -104,6 +105,11 @@ export interface ComponentDef {
   hitTest?(box: Box, x: number, y: number): { detail?: unknown } | null;
   /** Default: run the `on` prop. */
   press?(ctx: PressContext): void;
+  /**
+   * Whether an element is shown, beyond its `if=` prop. Hidden elements aren't
+   * laid out or painted (only the active screen is, for example).
+   */
+  visible?(node: LoomNode, scope: Scope): boolean;
   /** Keyboard activation; default is the same as press. */
   cursor?(target: HitTarget): string;
 }

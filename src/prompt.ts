@@ -3,7 +3,7 @@
  * from the component registry. Because it's generated, the model's view of
  * the language can never drift from what the engine actually supports.
  */
-import { ACTION_OPS } from "./actions";
+import { ACTION_OPS, ACTION_SYNTAX } from "./actions";
 import { COMMON_PROPS, type ComponentDef, type PropDef } from "./component";
 import { EXPRESSION_FUNCTIONS } from "./expr";
 import type { Registry } from "./registry";
@@ -41,7 +41,7 @@ EXPRESSIONS
 - Functions: ${EXPRESSION_FUNCTIONS.join(", ")}
 
 ACTIONS (on=…)
-- ${ACTION_OPS.map((o) => ({ inc: "inc:key[:by]", dec: "dec:key[:by] (never below 0)", toggle: "toggle:key", set: "set:key:value or set:key:{expr}", emit: "emit:name[:value] tells the app what the user chose" }[o])).join("\n- ")}
+- ${ACTION_OPS.map((o) => ACTION_SYNTAX[o]).join("\n- ")}
 - Run several with ; e.g. on="set:step:2;emit:next"
 
 EVERY ELEMENT ACCEPTS

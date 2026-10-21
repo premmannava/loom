@@ -1,6 +1,7 @@
 import { literal } from "../actions";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
 import type { Box, LoomNode, Value } from "../types";
+import { wrapText } from "../text";
 import { chevron, fillTint, gapProp, onProp, partBox, runOn, stack, themeFont } from "./util";
 
 // ---------------------------------------------------------------- tabs
@@ -269,5 +270,62 @@ pagination bind=page pages=12`,
     const next = d === "prev" ? current - 1 : d === "next" ? current + 1 : typeof d === "number" ? d : current;
     ctx.set(key, Math.max(1, Math.min(pages, next)));
     runOn(ctx);
+  },
+};
+
+// ---------------------------------------------------------------- screen
+
+/** The state name holding the visible screen (kept in sync by the engine). */
+const SCREEN_STATE = "screen";
+
+export const screen: ComponentDef = {
+  type: "screen",
+  category: "navigation",
+  description: "One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.",
+  props: {
+    name: { type: "name", required: true, description: "The screen's name, used by go:name. The visible screen's name is in {screen}." },
+    title: { type: "string", description: "A heading shown at the top of the screen." },
+    gap: gapProp(14),
+  },
+  children: "any",
+  parents: ["root"],
+  example: `screen name=cart title="Your cart"
+  text "2 items"
+  button "Checkout" on=go:checkout
+screen name=checkout title="Checkout"
+  text "Pay with card"
+  button "Back to cart" variant=secondary on=back`,
+  visible(node, scope) {
+    return scope(SCREEN_STATE) === node.props.name;
+  },
+  layout(box, ctx) {
+    const p = ctx.props(box.node);
+    const gap = Math.max(0, p.num("gap", 14));
+    const t = ctx.theme;
+    let y = box.y;
+    if (p.has("title")) {
+      const font = themeFont(t, 700, t.text.title);
+      const lh = Math.round(t.text.title * 1.35);
+      const lines = wrapText(p.str("title"), box.w, font, ctx.measure);
+      box.data = { lines, font, lh };
+      y += lines.length * lh + gap;
+    }
+    ctx.visibleChildren(box.node).forEach((k, i) => {
+      if (i) y += gap;
+      const kb = ctx.layout(k, box.x, y, box.w);
+      box.children.push(kb);
+      y += kb.h;
+    });
+    box.h = y - box.y;
+  },
+  paint(box, ctx) {
+    const d = box.data as { lines: string[]; font: string; lh: number } | undefined;
+    if (!d) return;
+    const { g, theme } = ctx;
+    g.font = d.font;
+    g.fillStyle = theme.colors.ink;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    d.lines.forEach((l, i) => g.fillText(l, box.x, box.y + d.lh * i + d.lh / 2 + 1));
   },
 };

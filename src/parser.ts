@@ -172,6 +172,9 @@ function checkProp(name: string, raw: string, def: PropDef, line: number, diags:
     case "state":
       if (!/^[A-Za-z_]\w*$/.test(raw)) warn(`${name} should be a state name, got "${raw}"`);
       break;
+    case "name":
+      if (!/^[A-Za-z_]\w*$/.test(raw)) warn(`${name} should be a plain name (letters, digits and _), got "${raw}"`);
+      break;
     case "string":
       for (const part of splitTemplate(raw)) {
         if ("expr" in part) { const err = checkSyntax(part.expr); if (err) warn(`In ${name}: ${err}`); }
