@@ -17,7 +17,7 @@ import { fixtureImageLoader } from "./fixture-image";
 import { cases } from "./cases";
 
 declare global {
-  interface Window { __loomReady?: boolean; __loomError?: string }
+  interface Window { __loomReady?: boolean; __loomError?: string; __loom?: Loom }
 }
 
 async function main(): Promise<void> {
@@ -45,6 +45,8 @@ async function main(): Promise<void> {
     imageHosts: ["images.unsplash.com"],
     loadImage: fixtureImageLoader,
   });
+  // Interaction tests (typing.spec.ts) drive the engine directly.
+  window.__loom = loom;
   loom.setSpec(visual.spec);
   loom.renderNow();
   await loom.imagesLoaded();

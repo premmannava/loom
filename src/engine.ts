@@ -792,8 +792,12 @@ export class Loom {
       if (this.hover || this.pressed) { this.hover = null; this.pressed = null; this.invalidate("paint"); }
       this.inspector.pointerLeave();
     };
+    // Set while a press is focusing the canvas, so onFocus can tell a click from Tab.
+    let pressing = false;
     const onDown = (e: PointerEvent) => {
       this.keyboardMode = false;
+      pressing = true;
+      setTimeout(() => { pressing = false; }, 0);
       const p = local(e);
       if (this.inspector.inspecting) return;
       this.pressed = this.targetAt(p.x, p.y);
@@ -842,6 +846,11 @@ export class Loom {
       if (!this.focus) {
         const first = this.focusables()[0];
         if (first) this.focus = { node: first.box.node, box: first.box, detail: first.detail };
+      }
+      // Tabbing onto the canvas when its first element is a field: start typing there.
+      if (!pressing && !this.editing && this.focus && this.registry.get(this.focus.node.type)?.editor) {
+        this.keyboardMode = true;
+        this.beginEdit(this.focus);
       }
       this.invalidate("paint");
     };

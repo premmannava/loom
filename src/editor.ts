@@ -23,6 +23,8 @@ export interface EditorSpec {
   color: string;
   /** Caret and selection color. */
   accent: string;
+  /** Placeholder color. */
+  muted: string;
   kind: InputKind;
   value: string;
   placeholder: string;
