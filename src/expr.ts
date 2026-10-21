@@ -3,11 +3,14 @@
  *
  * Supports numbers, strings ('single' or "double"), true/false/null, state
  * identifiers, + - * / %, comparisons, && || !, the ternary `a ? b : c`,
- * parentheses, and a few whitelisted functions. There is no property access,
- * no assignment, and no way to reach JavaScript globals, so model-written
- * expressions cannot run arbitrary code.
+ * parentheses, a few whitelisted functions, list and record literals
+ * (`[1, 2]`, `{name: "Ada"}`), and reading fields and items (`t.text`,
+ * `cart[0]`, `todos.length`). Fields are read only through readField in
+ * data.ts, which reaches a record's own fields and a list's items and
+ * nothing else. There is no assignment and no way to reach JavaScript
+ * objects or globals, so model-written expressions cannot run code.
  */
-import { displayData, isData, isScalar, toNumber } from "./data";
+import { displayData, fieldOf, isData, isList, isScalar, makeList, makeRecord, MAX_DATA_DEPTH, readField, toNumber } from "./data";
 import type { Value } from "./types";
 
 type Node =
@@ -16,7 +19,10 @@ type Node =
   | { k: "un"; op: string; a: Node }
   | { k: "bin"; op: string; a: Node; b: Node }
   | { k: "cond"; c: Node; a: Node; b: Node }
-  | { k: "call"; fn: string; args: Node[] };
+  | { k: "call"; fn: string; args: Node[] }
+  | { k: "list"; items: Node[] }
+  | { k: "rec"; entries: Array<[string, Node]> }
+  | { k: "get"; obj: Node; key: Node };
 
 type Tok = { t: "num" | "str" | "id" | "op" | "end"; v: string; pos: number };
 
@@ -24,9 +30,41 @@ export class ExprError extends Error {}
 
 type Fn = (...a: Value[]) => Value;
 
+/** min(3, 5) or min(list): a single list argument stands for its items. */
+const spread = (a: Value[]): Value[] => (a.length === 1 && isList(a[0]) ? [...a[0]] : a);
+
+/** sum/avg over a list: the items, one field of each, or two fields multiplied (price × qty). */
+function amounts(v: Value, a?: Value, b?: Value): number[] | null {
+  if (!isList(v)) return null;
+  return v.map((item) => {
+    if (a === undefined) return toNumber(item);
+    const x = toNumber(fieldOf(item, a));
+    return b === undefined ? x : x * toNumber(fieldOf(item, b));
+  });
+}
+
 const BUILTINS: Record<string, Fn> = {
-  min: (...a) => Math.min(...a.map(toNumber)),
-  max: (...a) => Math.max(...a.map(toNumber)),
+  min: (...a) => Math.min(...spread(a).map(toNumber)),
+  max: (...a) => Math.max(...spread(a).map(toNumber)),
+  /** Items in a list, or characters in text. */
+  len: (v) => (isList(v) || typeof v === "string" ? v.length : NaN),
+  /** Items that are true, or whose field is true (or not empty). */
+  count: (v, field) => (isList(v) ? v.filter((item) => (field === undefined ? item : fieldOf(item, field))).length : NaN),
+  sum: (v, a, b) => amounts(v, a, b)?.reduce((t, x) => t + x, 0) ?? NaN,
+  avg: (v, a, b) => {
+    const xs = amounts(v, a, b);
+    return xs && xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : NaN;
+  },
+  /** join(tags) or join(tags, " / "), and for records join(cart, "name") or join(cart, "name", " / "). */
+  join: (v, a, b) => {
+    if (!isList(v)) return NaN;
+    const ofRecords = v.some((item) => typeof item === "object" && item !== null && !isList(item));
+    const parts = ofRecords ? v.map((item) => fieldOf(item, a)) : v;
+    const sep = ofRecords ? b : a;
+    return parts.map((x) => formatValue(x)).join(typeof sep === "string" ? sep : ", ");
+  },
+  /** Whether a list holds a value, or text contains other text. */
+  includes: (v, x) => (isList(v) ? v.some((item) => item === x) : typeof v === "string" && x !== undefined && x !== null ? v.includes(formatValue(x)) : false),
   round: (n, d = 0) => {
     const f = 10 ** toNumber(d);
     return Math.round(toNumber(n) * f) / f;
@@ -43,7 +81,7 @@ const FUNCTIONS: Readonly<Record<string, Fn>> = Object.freeze(Object.assign(Obje
 const isFunctionName = (name: string) => Object.hasOwn(FUNCTIONS, name);
 export const EXPRESSION_FUNCTIONS = Object.keys(FUNCTIONS);
 
-const OPS = ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", ","];
+const OPS = ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", ",", "[", "]", "{", "}"];
 
 function tokenize(src: string): Tok[] {
   const out: Tok[] = [];
@@ -51,6 +89,8 @@ function tokenize(src: string): Tok[] {
   while (i < src.length) {
     const c = src[i]!;
     if (c === " " || c === "\t") { i++; continue; }
+    // A dot reads a field (t.text), unless a digit follows: then it starts a number (.5).
+    if (c === "." && !/[0-9]/.test(src[i + 1] ?? "")) { out.push({ t: "op", v: ".", pos: i }); i++; continue; }
     if (/[0-9.]/.test(c)) {
       const m = /^(\d+\.?\d*|\.\d+)/.exec(src.slice(i));
       if (!m) throw new ExprError(`Unexpected "${c}" at ${i}`);
@@ -92,7 +132,47 @@ function parseExpr(src: string): Node {
     if (t.v !== v) throw new ExprError(`Expected "${v}" but found "${t.v || "end"}"`);
   };
 
+  /** Literals nest at most as deep as data may. */
+  let depth = 0;
+
+  /** Entries of a record literal, after its "{" (or at the start, for a bare record). */
+  function recordBody(close: string): Node {
+    const entries: Array<[string, Node]> = [];
+    while (peek().v !== close && peek().t !== "end") {
+      const k = next();
+      if (k.t !== "id" && k.t !== "str") throw new ExprError(`Expected a field name but found "${k.v || "end"}"`);
+      expect(":");
+      entries.push([k.v, ternary()]);
+      if (peek().v === ",") next();
+      else break;
+    }
+    return { k: "rec", entries };
+  }
+
+  function nested<T>(f: () => T): T {
+    if (++depth > MAX_DATA_DEPTH) throw new ExprError(`Lists and records nest more than ${MAX_DATA_DEPTH} levels deep`);
+    try { return f(); } finally { depth--; }
+  }
+
+  /** A value, then any number of .field and [item] reads after it. */
   function primary(): Node {
+    let n = atom();
+    for (;;) {
+      if (peek().v === ".") {
+        next();
+        const name = next();
+        if (name.t !== "id") throw new ExprError(`Expected a field name after "." but found "${name.v || "end"}"`);
+        n = { k: "get", obj: n, key: { k: "lit", v: name.v } };
+      } else if (peek().v === "[") {
+        next();
+        const key = ternary();
+        expect("]");
+        n = { k: "get", obj: n, key };
+      } else return n;
+    }
+  }
+
+  function atom(): Node {
     const t = next();
     if (t.t === "num") return { k: "lit", v: Number(t.v) };
     if (t.t === "str") return { k: "lit", v: t.v };
@@ -114,6 +194,19 @@ function parseExpr(src: string): Node {
       return { k: "id", name: t.v };
     }
     if (t.v === "(") { const e = ternary(); expect(")"); return e; }
+    if (t.v === "[") {
+      return nested(() => {
+        const items: Node[] = [];
+        while (peek().v !== "]" && peek().t !== "end") {
+          items.push(ternary());
+          if (peek().v === ",") next();
+          else break;
+        }
+        expect("]");
+        return { k: "list", items } as Node;
+      });
+    }
+    if (t.v === "{") return nested(() => { const r = recordBody("}"); expect("}"); return r; });
     if (t.v === "!" || t.v === "-") return { k: "un", op: t.v, a: primary() };
     throw new ExprError(t.t === "end" ? "Expression ended early" : `Unexpected "${t.v}"`);
   }
@@ -138,7 +231,10 @@ function parseExpr(src: string): Node {
     return { k: "cond", c, a, b: ternary() };
   }
 
-  const root = ternary();
+  // Braces whose content starts with "name:" hold a record: {text:'Snacks', done:false}.
+  // A ternary always has "?" before its ":", so the two can't be confused.
+  const startsRecord = (toks[0]!.t === "id" || toks[0]!.t === "str") && toks[1]?.v === ":";
+  const root = startsRecord ? nested(() => recordBody("")) : ternary();
   if (peek().t !== "end") throw new ExprError(`Unexpected "${peek().v}"`);
   return root;
 }
@@ -161,6 +257,13 @@ function run(n: Node, scope: Scope): Value {
       return n.op === "!" ? !a : -toNumber(a);
     }
     case "cond": return run(n.c, scope) ? run(n.a, scope) : run(n.b, scope);
+    case "list": return makeList(n.items.map((x) => run(x, scope)));
+    case "rec": return makeRecord(n.entries.map(([k, x]) => [k, run(x, scope)]));
+    case "get": {
+      const r = readField(run(n.obj, scope), run(n.key, scope));
+      if ("error" in r) throw new ExprError(r.error);
+      return r.value;
+    }
     case "call": {
       // Called detached, so `this` is never the function table.
       const fn = FUNCTIONS[n.fn]!;
@@ -224,6 +327,9 @@ export function identifiers(src: string): string[] {
       else if (n.k === "bin") { walk(n.a); walk(n.b); }
       else if (n.k === "cond") { walk(n.c); walk(n.a); walk(n.b); }
       else if (n.k === "call") n.args.forEach(walk);
+      else if (n.k === "list") n.items.forEach(walk);
+      else if (n.k === "rec") n.entries.forEach(([, x]) => walk(x));
+      else if (n.k === "get") { walk(n.obj); walk(n.key); }
     };
     walk(compile(src));
     return [...out];

@@ -227,3 +227,52 @@ export function displayData(v: DataList | DataRecord, format: (x: Value) => stri
   if (isList(v) && v.every(isScalar)) return v.map(format).join(", ");
   return "—";
 }
+
+// ---------------------------------------------------------------- reading
+
+/** Field names that are never readable, even on a record that has them. */
+const BLOCKED = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Make a list or record from values an expression computed. */
+export function makeList(items: Value[]): DataList {
+  return list(items);
+}
+
+export function makeRecord(entries: Array<[string, Value]>): DataRecord {
+  return record(entries);
+}
+
+/**
+ * Read `v.key` or `v[key]`. The only way expressions reach inside values:
+ *
+ * - a record's own fields (records have no prototype, and some names are blocked anyway),
+ * - a list's items by whole-number position, and `length`,
+ * - a string's `length`.
+ *
+ * Anything else is an error that names what was asked for.
+ */
+export function readField(v: Value, key: Value): { value: Value } | { error: string } {
+  if (typeof key === "string" && BLOCKED.has(key)) return { error: `"${key}" can't be read` };
+  if (isList(v)) {
+    if (key === "length") return { value: v.length };
+    if (typeof key === "number" && Number.isInteger(key) && key >= 0 && key < v.length) return { value: v[key]! };
+    if (typeof key === "number") return { error: `No item ${key} in a list of ${v.length}` };
+    return { error: `Lists only have items by number and length, not "${String(key)}"` };
+  }
+  if (typeof v === "string") {
+    if (key === "length") return { value: v.length };
+    return { error: `Text only has a length, not "${String(key)}"` };
+  }
+  if (isRecord(v)) {
+    if (typeof key === "string" && made.has(v) && Object.prototype.hasOwnProperty.call(v, key)) return { value: v[key]! };
+    return { error: `No field "${String(key)}"` };
+  }
+  return { error: `${v === null ? "null" : typeof v} has no "${String(key)}"` };
+}
+
+/** A record's field for the list functions, or undefined if it has none. */
+export function fieldOf(item: Value, name: Value): Value | undefined {
+  if (typeof name !== "string" || !isRecord(item)) return undefined;
+  const r = readField(item, name);
+  return "value" in r ? r.value : undefined;
+}

@@ -97,7 +97,8 @@ export function languageGuide(registry: Registry, opts: GuideOptions = {}): stri
 - Text can mix words and expressions: "Total: \${price*qty}"
 - Operators: + - * / % == != < <= > >= && || ! and a ? b : c
 - Functions: ${EXPRESSION_FUNCTIONS.join(", ")}
-- Only state names can be read. There are no objects, lists or property access (no a.b).`);
+- Read fields and items of lists and records: {item.name}, {cart[0].price}, {todos.length}
+- List functions: len(list), count(list, 'done') counts items whose field is true, sum(list, 'price') or sum(list, 'price', 'qty') adds a field or two fields multiplied, avg(list, 'field'), join(list) or join(list, 'name'), includes(list, value)`);
 
   sections.push(`ACTIONS (on=…)
 - ${ACTION_OPS.map((o) => ACTION_SYNTAX[o]).join("\n- ")}

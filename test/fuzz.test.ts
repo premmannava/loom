@@ -11,6 +11,7 @@ import { parseActions, runActions } from "../src/actions";
 import { DataError, isData, parseData, toData } from "../src/data";
 import { evaluate, interpolate } from "../src/expr";
 import { MAX_DEPTH, parse } from "../src/parser";
+import { Store } from "../src/state";
 import { render } from "../src/testing";
 import type { Box, Value } from "../src/types";
 import { walkBoxes } from "../src/layout";
@@ -21,7 +22,7 @@ const opts = { numRuns: RUNS };
 
 // ---------------------------------------------------------------- generators
 
-const names = ["a", "b", "count", "done", "price", "qty", "x", "first", "second", "screen"];
+const names = ["a", "b", "count", "done", "price", "qty", "x", "first", "second", "screen", "todos", "lines"];
 const types = [...ALL_COMPONENTS.map((c) => c.type), "state", "sparkle", "Button", "row-x"];
 const propNames = [...new Set(ALL_COMPONENTS.flatMap((c) => Object.keys(c.props))), "if", "colour", "on", "x-y"];
 
@@ -40,7 +41,12 @@ const expr: fc.Arbitrary<string> = fc.letrec<{ e: string }>((tie) => ({
     fc.tuple(tie("e"), tie("e"), tie("e")).map(([c, a, b]) => `${c} ? ${a} : ${b}`),
     tie("e").map((a) => `(${a})`),
     tie("e").map((a) => `!${a}`),
-    fc.tuple(fc.constantFrom("min", "max", "round", "fixed", "abs", "nope", "valueOf"), fc.array(tie("e"), { maxLength: 3 })).map(([f, args]) => `${f}(${args.join(", ")})`),
+    fc.tuple(fc.constantFrom("min", "max", "round", "fixed", "abs", "len", "count", "sum", "avg", "join", "includes", "nope", "valueOf"), fc.array(tie("e"), { maxLength: 3 })).map(([f, args]) => `${f}(${args.join(", ")})`),
+    // Reading inside data, including names that must stay unreadable.
+    fc.tuple(tie("e"), fc.constantFrom("text", "done", "price", "length", "lines", "constructor", "__proto__", "prototype", "toString", "map")).map(([o, k]) => `${o}.${k}`),
+    fc.tuple(tie("e"), tie("e")).map(([o, k]) => `${o}[${k}]`),
+    fc.array(tie("e"), { maxLength: 3 }).map((xs) => `[${xs.join(", ")}]`),
+    fc.array(fc.tuple(fc.constantFrom("text", "done", "__proto__", "'unit price'"), tie("e")), { maxLength: 3 }).map((kv) => `{${kv.map(([k, v]) => `${k}: ${v}`).join(", ")}}`),
   ),
 })).e;
 
@@ -228,7 +234,12 @@ describe("engine", () => {
 });
 
 describe("expressions", () => {
-  const scope = (k: string): Value | undefined => ({ a: 2, b: "s", count: 0, done: true, price: 9.5, qty: null, x: -1 })[k];
+  // Scalars plus real Loom data, as a spec's state would hold.
+  const data = new Store();
+  for (const [k, v] of Object.entries({ a: 2, b: "s", count: 0, done: true, price: 9.5, qty: null, x: -1 })) data.set(k, v);
+  data.set("todos", [{ text: "Pack", done: false, price: 3 }, { text: "Go", done: true, lines: [1, 2] }] as unknown as Value);
+  data.set("lines", [1, "two", null] as unknown as Value);
+  const scope = data.scope;
 
   it("never throw and only produce plain values", () => {
     fc.assert(
@@ -246,7 +257,7 @@ describe("expressions", () => {
     fc.assert(
       fc.property(fc.stringMatching(/^[A-Za-z_]\w{0,15}$/), (name) => {
         const r = evaluate(`${name}(1)`, scope);
-        const allowed = ["min", "max", "round", "floor", "ceil", "abs", "fixed"].includes(name);
+        const allowed = ["min", "max", "round", "floor", "ceil", "abs", "fixed", "len", "count", "sum", "avg", "join", "includes"].includes(name);
         expect(r.ok || !allowed).toBe(true);
         if (!allowed) expect(r.ok).toBe(false);
       }),
