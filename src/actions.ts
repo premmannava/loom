@@ -17,7 +17,7 @@
  * Several actions can run in order, separated by `;`. Targets may be paths
  * into data, like toggle:t.done inside each.
  */
-import { checkSyntax, evaluate, interpolate, splitTemplate, type Scope } from "./expr";
+import { checkSyntax, evaluate, interpolate, splitTemplate, wholeExpression, type Scope } from "./expr";
 import { isList, makeList, toNumber } from "./data";
 import { PATH } from "./paths";
 import type { Value } from "./types";
@@ -123,9 +123,9 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
       default:
         return { error: `Unknown action "${op}". Use ${ACTION_OPS.join(", ")}` };
     }
-    const exprArg = arg && /^\{.*\}$/.test(arg) ? arg.slice(1, -1) : undefined;
-    if (exprArg !== undefined) {
-      const err = checkSyntax(exprArg);
+    const exprArg = arg === undefined ? null : wholeExpression(arg);
+    for (const src of exprArg !== null ? [exprArg] : arg?.includes("{") ? splitTemplate(literalText(arg)).flatMap((p) => ("expr" in p ? [p.expr] : [])) : []) {
+      const err = checkSyntax(src);
       if (err) return { error: `In action "${part}": ${err}` };
     }
   }
@@ -135,7 +135,12 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
 /** The expressions an action list reads: `{…}` arguments and the parts of notify messages. */
 export function actionExpressions(actions: readonly Action[]): string[] {
   const out: string[] = [];
-  const arg = (a: string | undefined) => { const m = a === undefined ? null : /^\{(.*)\}$/s.exec(a); if (m) out.push(m[1]!); };
+  const arg = (a: string | undefined) => {
+    if (a === undefined) return;
+    const whole = wholeExpression(a);
+    if (whole !== null) out.push(whole);
+    else for (const p of splitTemplate(literalText(a))) if ("expr" in p) out.push(p.expr);
+  };
   for (const a of actions) {
     // Write targets (t.done) read their first name like an expression does.
     if ("key" in a) out.push(a.key);
@@ -153,14 +158,24 @@ export function actionTargets(actions: readonly Action[]): string[] {
   return actions.flatMap((a) => ("key" in a ? [a.key.split(".")[0]!] : []));
 }
 
-/** Resolve an action argument: `{expr}` is evaluated, anything else is a literal. */
+/**
+ * Resolve an action argument: a whole `{expr}` is evaluated, text with
+ * `{expressions}` in it is filled in ('Hi {name}'), anything else is a literal.
+ */
 export function resolveArg(arg: string, scope: Scope): Value {
-  const m = /^\{(.*)\}$/.exec(arg);
-  if (m) {
-    const r = evaluate(m[1]!, scope);
+  const whole = wholeExpression(arg);
+  if (whole !== null) {
+    const r = evaluate(whole, scope);
     return r.ok ? r.value : null;
   }
-  return literal(arg);
+  const v = literal(arg);
+  return typeof v === "string" && v.includes("{") ? interpolate(v, scope) : v;
+}
+
+/** An argument's text without one pair of surrounding quotes. */
+function literalText(arg: string): string {
+  const v = literal(arg);
+  return typeof v === "string" ? v : arg;
 }
 
 export function literal(s: string): Value {

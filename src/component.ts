@@ -4,7 +4,7 @@
  * lives in one ComponentDef, so adding a component never touches the engine.
  */
 import { toNumber } from "./data";
-import { evaluate, formatValue, interpolate, type Scope } from "./expr";
+import { bareExpression, evaluate, formatValue, interpolate, wholeExpression, type Scope } from "./expr";
 import { literal } from "./actions";
 import type { ImageState } from "./images";
 import type { Theme } from "./theme";
@@ -170,12 +170,13 @@ export class PropReader {
   value(name: string): Value | undefined {
     const raw = this.node.props[name];
     if (raw === undefined) return undefined;
-    const m = /^\{(.*)\}$/s.exec(raw);
-    if (m) {
-      const r = evaluate(m[1]!, this.scope);
+    const whole = wholeExpression(raw);
+    if (whole !== null) {
+      const r = evaluate(whole, this.scope);
       return r.ok ? r.value : undefined;
     }
-    return literal(raw);
+    // Text with {expressions} in it, like value="{done} of {total}".
+    return raw.includes("{") ? interpolate(raw, this.scope) : literal(raw);
   }
 
   num(name: string, fallback: number): number {
@@ -187,7 +188,7 @@ export class PropReader {
   str(name: string, fallback = ""): string {
     const raw = this.node.props[name];
     if (raw === undefined) return fallback;
-    if (/^\{.*\}$/s.test(raw)) {
+    if (wholeExpression(raw) !== null) {
       const v = this.value(name);
       return v === undefined || v === null ? fallback : formatValue(v);
     }
@@ -203,7 +204,7 @@ export class PropReader {
   cond(name: string, fallback = false): boolean {
     const raw = this.node.props[name];
     if (raw === undefined) return fallback;
-    const r = evaluate(raw.replace(/^\{([\s\S]*)\}$/, "$1"), this.scope);
+    const r = evaluate(bareExpression(raw), this.scope);
     return r.ok ? !!r.value : fallback;
   }
 

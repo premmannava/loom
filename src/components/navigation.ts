@@ -1,4 +1,3 @@
-import { literal } from "../actions";
 import { toNumber } from "../data";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
 import type { Box, LoomNode, Value } from "../types";
@@ -12,7 +11,7 @@ const BAR_H = 42, TAB_PAD = 16;
 /** The value a tab stands for: its value= prop, or its label. */
 function tabValue(node: LoomNode, props: (n: LoomNode) => PropReader): Value {
   const p = props(node);
-  return p.has("value") ? literal(p.raw("value")!) : p.text();
+  return p.has("value") ? (p.value("value") ?? "") : p.text();
 }
 
 /** Which visible tab is selected: the one matching bind=, or the first. */

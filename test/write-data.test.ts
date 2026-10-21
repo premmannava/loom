@@ -201,6 +201,37 @@ each items=todos as=t key={t.text}
   });
 });
 
+describe("choices made from a list", () => {
+  it("give radio and tab values from expressions, not the expression's text", () => {
+    const ui = render(`state room="" view="" rooms=[{id: "q", name: "Queen"}, {id: "k", name: "King"}]
+each items=rooms as=r
+  radio "{r.name}" bind=room value={r.id}
+tabs bind=view
+  each items=rooms as=r
+    tab "{r.name}" value={r.id}
+      text "Panel {r.name}"
+`);
+    expect(ui.diagnostics).toEqual([]);
+    ui.press({ type: "radio", text: "King" });
+    expect(ui.state.room).toBe("k");
+    ui.set("view", "k");
+    expect(ui.text()).toContain("Panel King");
+    expect(ui.text()).not.toContain("Panel Queen");
+  });
+
+  it("let each question in a list keep its own answer", () => {
+    const ui = render(`state qs=[{q: "A?", options: ["x", "y"], pick: ""}, {q: "B?", options: ["x", "y"], pick: ""}]
+each items=qs as=q
+  text "{q.q}"
+  each items=q.options as=o
+    radio "{q.q} {o}" bind=q.pick value={o}
+`);
+    ui.press({ type: "radio", text: "A? y" });
+    ui.press({ type: "radio", text: "B? x" });
+    expect(json(ui.state.qs).map((q: { pick: string }) => q.pick)).toEqual(["y", "x"]);
+  });
+});
+
 describe("change events", () => {
   it("report the whole list, as a new value each time", () => {
     const ui = render(`${todos}

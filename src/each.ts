@@ -14,7 +14,7 @@
  * Copies are made fresh on every layout, which is cheap next to measuring
  * text, and means nothing here can go stale when the list changes.
  */
-import { evaluate, type Scope } from "./expr";
+import { bareExpression, evaluate, type Scope } from "./expr";
 import { isList, isScalar } from "./data";
 import { PATH, placeOf, stateLocate, type Locate } from "./paths";
 import type { LoomNode, Value } from "./types";
@@ -55,7 +55,7 @@ export function locateOf(node: LoomNode): Locate {
 
 /** Strip one pair of braces, so `items=todos` and `items={todos}` mean the same. */
 export function bare(raw: string): string {
-  return raw.replace(/^\{([\s\S]*)\}$/, "$1");
+  return bareExpression(raw);
 }
 
 /** The loop variable names an `each` introduces. */

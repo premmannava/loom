@@ -15,7 +15,7 @@
 import { actionExpressions, parseActions } from "./actions";
 import { COMMON_PROPS, type ComponentDef, type PropDef } from "./component";
 import { looksLikeData, parseData } from "./data";
-import { checkSyntax, identifiers, splitTemplate } from "./expr";
+import { bareExpression, checkSyntax, identifiers, splitTemplate, wholeExpression } from "./expr";
 import { actionTargets } from "./actions";
 import { loopNames } from "./each";
 import { PATH } from "./paths";
@@ -197,7 +197,7 @@ function parseStateLine(body: string, line: number, diags: Diagnostic[]): Array<
       out.push({ key, value: r.value, line });
       continue;
     }
-    if (/^\{.*\}$/s.test(raw)) diags.push({ line, severity: "warning", message: `Initial state "${key}" must be a plain value, list or record, not an expression` });
+    if (wholeExpression(raw) !== null) diags.push({ line, severity: "warning", message: `Initial state "${key}" must be a plain value, list or record, not an expression` });
     out.push({ key, value: literal(raw), line });
   }
   return out;
@@ -211,24 +211,24 @@ function expressionsOf(text: string | undefined, props: Record<string, string>, 
   for (const [name, raw] of Object.entries(props)) {
     const def = defs[name] ?? COMMON_PROPS[name];
     if (!def) continue;
-    const braced = /^\{(.*)\}$/s.exec(raw);
+    const whole = wholeExpression(raw);
     if (def.type === "action") {
       const r = parseActions(raw);
       if ("actions" in r) out.push(...actionExpressions(r.actions));
     } else if (def.type === "state") {
       if (PATH.test(raw)) out.push(raw);
-    } else if (braced) out.push(braced[1]!);
+    } else if (whole !== null) out.push(whole);
     else if (def.type === "condition" || def.type === "expression") out.push(raw);
-    else if (def.type === "string") template(raw);
+    else if (raw.includes("{")) template(raw);
   }
   return out;
 }
 
 function checkProp(name: string, raw: string, def: PropDef, line: number, diags: Diagnostic[]): void {
   const warn = (message: string) => diags.push({ line, severity: "warning", message });
-  const braced = /^\{(.*)\}$/s.exec(raw);
-  if (braced) {
-    const err = checkSyntax(braced[1]!);
+  const whole = wholeExpression(raw);
+  if (whole !== null) {
+    const err = checkSyntax(whole);
     if (err) warn(`In ${name}: ${err}`);
     return;
   }
@@ -418,7 +418,7 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     for (const n of stack) if (n.type === "each") for (const name of loopNames(n)) inScope.add(name);
     // An each's own items= and key= are read outside and inside it respectively; only check items=.
     const exprs = tok.type === "each"
-      ? (tok.props.items === undefined ? [] : [tok.props.items.replace(/^\{([\s\S]*)\}$/, "$1")])
+      ? (tok.props.items === undefined ? [] : [bareExpression(tok.props.items)])
       : expressionsOf(tok.text, tok.props, def.props);
     const names = [...new Set(exprs.flatMap(identifiers))].filter((n) => !inScope.has(n));
     if (names.length) outsideUses.push({ line: lineNo, names });

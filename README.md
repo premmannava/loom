@@ -127,7 +127,7 @@ state todos=[{text: "Pack water", done: false}, {text: "Snacks", done: true}]
 
 A value must fit on one line, however long, so a streamed spec can render line by line. Lists and records hold data only: they're parsed, never run, and are limited to 20 levels deep and 10,000 values.
 
-State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
+State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere). When a new spec declares a different starting value, such as a refined screen with new data, the new value replaces the old one. Values your app set itself are never replaced by a declaration. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
 
 ### Expressions
 

@@ -395,3 +395,26 @@ export function interpolate(s: string, scope: Scope): string {
     .map((p) => ("text" in p ? p.text : (() => { const r = evaluate(p.expr, scope); return r.ok ? formatValue(r.value) : "—"; })()))
     .join("");
 }
+
+/**
+ * The expression inside a prop value that is one whole {…}, or null.
+ * "{a} of {b}" starts with { and ends with } but is text with two
+ * expressions in it, so it isn't one expression.
+ */
+export function wholeExpression(raw: string): string | null {
+  if (raw[0] !== "{" || raw[raw.length - 1] !== "}") return null;
+  let depth = 0, quote = "";
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]!;
+    if (quote) { if (c === "\\") i++; else if (c === quote) quote = ""; continue; }
+    if (c === "'" || c === '"') quote = c;
+    else if (c === "{") depth++;
+    else if (c === "}" && --depth === 0 && i < raw.length - 1) return null;
+  }
+  return depth === 0 ? raw.slice(1, -1) : null;
+}
+
+/** A condition or expression prop's source: the inside of a whole {…}, or the value as written (if=done). */
+export function bareExpression(raw: string): string {
+  return wholeExpression(raw) ?? raw;
+}

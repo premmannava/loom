@@ -7,6 +7,8 @@ type Listener = (key: string, value: Value) => void;
 export class Store {
   private values = new Map<string, Value>();
   private listeners = new Set<Listener>();
+  /** The last starting value each state line declared, to notice when a spec changes it. */
+  private declared = new Map<string, string>();
 
   get(key: string): Value | undefined {
     return this.values.get(key);
@@ -29,13 +31,25 @@ export class Store {
     for (const l of this.listeners) l(key, value);
   }
 
-  /** Set a value only if the key has never been set (used for `state` lines). */
+  /**
+   * Apply a `state` line's starting value. A value the user has changed is
+   * kept while the spec re-parses (streaming, small edits), but when the
+   * spec now declares something different (a model refined the screen with
+   * new data), the new declaration wins.
+   */
   declare(key: string, value: Value): void {
-    if (!this.values.has(key)) this.set(key, value);
+    const declared = JSON.stringify(value);
+    const before = this.declared.get(key);
+    this.declared.set(key, declared);
+    // Set by the app or an action, never declared: the app's data wins.
+    if (this.values.has(key) && before === undefined) return;
+    if (this.values.has(key) && before === declared) return;
+    this.set(key, value);
   }
 
   clear(): void {
     this.values.clear();
+    this.declared.clear();
   }
 
   snapshot(): Record<string, Value> {

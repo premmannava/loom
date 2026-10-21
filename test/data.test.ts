@@ -189,3 +189,26 @@ describe("data on state lines", () => {
     expect(ui.text()).toContain("Tags: rain, summit");
   });
 });
+
+describe("state lines over time", () => {
+  it("keep the user's changes while the declaration stays the same, and take a new declaration", async () => {
+    const { render } = await import("../src/testing");
+    const ui = render(`state n=1 todos=[{t: "A"}]\nstepper bind=n\ntext "{len(todos)}"\n`);
+    ui.set("n", 5);
+    ui.setSpec(`state n=1 todos=[{t: "A"}]\nstepper bind=n\ntext "{len(todos)} items"\n`);
+    expect(ui.state.n).toBe(5);
+    ui.setSpec(`state n=1 todos=[{t: "A"}, {t: "B"}]\nstepper bind=n\ntext "{len(todos)} items"\n`);
+    expect(ui.state.n).toBe(5);
+    expect(ui.text()).toContain("2 items");
+    ui.setSpec(`state n=2 todos=[{t: "A"}, {t: "B"}]\nstepper bind=n\n`);
+    expect(ui.state.n).toBe(2);
+  });
+
+  it("never replace data the app supplied itself", async () => {
+    const { render } = await import("../src/testing");
+    const ui = render(`text "x"\n`);
+    ui.set("products", [{ name: "Tent" }] as never);
+    ui.setSpec(`state products=[]\ntext "{len(products)} products"\n`);
+    expect(ui.text()).toContain("1 products");
+  });
+});

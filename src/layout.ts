@@ -4,7 +4,7 @@
  */
 import { PropReader, type LayoutContext } from "./component";
 import { eachInstances, MAX_EACH_ELEMENTS, scopeOf, type EachBudget } from "./each";
-import { evaluate, type Scope } from "./expr";
+import { bareExpression, evaluate, type Scope } from "./expr";
 import type { Registry } from "./registry";
 import type { TextMeasurer } from "./text";
 import type { Theme } from "./theme";
@@ -17,7 +17,7 @@ export function isVisible(node: LoomNode, base: Scope, registry?: Registry): boo
   if (own && !own(node, scope)) return false;
   const raw = node.props.if;
   if (raw === undefined) return true;
-  const expr = raw.replace(/^\{([\s\S]*)\}$/, "$1");
+  const expr = bareExpression(raw);
   const r = evaluate(expr, scope);
   return r.ok && !!r.value;
 }

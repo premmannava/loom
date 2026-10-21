@@ -1,4 +1,3 @@
-import { literal } from "../actions";
 import { toNumber } from "../data";
 import type { ComponentDef, PropReader } from "../component";
 import type { Box } from "../types";
@@ -170,7 +169,7 @@ radio "Large" bind=size value=l`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const chosen = p.bound() === literal(p.raw("value") ?? "");
+    const chosen = p.bound() === (p.value("value") ?? "");
     const cx = box.x + 9.5, cy = box.y + box.h / 2;
     g.beginPath();
     g.arc(cx, cy, 9, 0, Math.PI * 2);
@@ -196,7 +195,7 @@ radio "Large" bind=size value=l`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    ctx.set(key, literal(p.raw("value") ?? ""));
+    ctx.set(key, p.value("value") ?? "");
     runOn(ctx);
   },
 };

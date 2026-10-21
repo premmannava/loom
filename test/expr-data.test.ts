@@ -205,3 +205,33 @@ text "{r} {l} {includes('abc', r)}"
     for (let i = 0; i < 8; i++) { ui.tab(); ui.key("Enter"); ui.key("ArrowRight"); }
   });
 });
+
+describe("props with several expressions", () => {
+  it("treat {a} · {b} as text with two expressions, not one expression", async () => {
+    const { wholeExpression } = await import("../src/expr");
+    expect(wholeExpression("{a}")).toBe("a");
+    expect(wholeExpression("{a ? 'x' : 'y'}")).toBe("a ? 'x' : 'y'");
+    expect(wholeExpression("{{x: 1}}")).toBe("{x: 1}");
+    expect(wholeExpression("{a} · {b}")).toBeNull();
+    expect(wholeExpression("{a}{b}")).toBeNull();
+    expect(wholeExpression("{'}'}")).toBe("'}'");
+    expect(wholeExpression("a {b}")).toBeNull();
+
+    const { render } = await import("../src/testing");
+    const ui = render(`state tx=[{date: "Oct 20", cat: "Gas", amount: -46.5}]
+list
+  each items=tx as=t
+    list-item "Shell" detail="{t.date} · {t.cat}" trailing="{t.amount < 0 ? '-' : '+'}\${abs(t.amount)}"
+progress value={1} max=2 label="{len(tx)} of {2}"
+`);
+    expect(ui.diagnostics).toEqual([]);
+    expect(ui.text()).toEqual(expect.arrayContaining(["Oct 20 · Gas", "-$46.5", "1 of 2"]));
+  });
+
+  it("fill in text with expressions in action values", async () => {
+    const { render } = await import("../src/testing");
+    const ui = render(`state name="Ada" msg=""\nbutton "Hi" on="set:msg:'Hi {name}!'"\ntext "{msg}"\n`);
+    ui.press("button");
+    expect(ui.state.msg).toBe("Hi Ada!");
+  });
+});
