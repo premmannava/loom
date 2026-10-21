@@ -9,7 +9,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { parseActions, runActions } from "../src/actions";
 import { evaluate, interpolate } from "../src/expr";
-import { parse } from "../src/parser";
+import { MAX_DEPTH, parse } from "../src/parser";
 import { render } from "../src/testing";
 import type { Box, Value } from "../src/types";
 import { walkBoxes } from "../src/layout";
@@ -171,13 +171,23 @@ describe("parser", () => {
 
   it("survives very deep nesting and very long lines", () => {
     const deep = Array.from({ length: 2000 }, (_, i) => " ".repeat(i * 2) + "column").join("\n") + "\n";
-    expect(parse(deep, registry).nodeCount).toBe(2000);
+    expect(parse(deep, registry).nodeCount).toBe(MAX_DEPTH);
     checkParse(`text "${"x".repeat(100_000)}"\n`);
     checkParse(`text "{${"(".repeat(5000)}1${")".repeat(5000)}}"\n`);
   });
 });
 
 describe("engine", () => {
+  it("renders a spec nested thousands of levels deep, keeping what comes after it", () => {
+    for (const depth of [MAX_DEPTH, MAX_DEPTH + 1, 2000, 10_000]) {
+      const deep = Array.from({ length: depth }, (_, i) => " ".repeat(i * 2) + "card").join("\n");
+      const ui = render(`${deep}\ntext "After"\n`, { components: ALL_COMPONENTS });
+      expect(ui.text()).toContain("After");
+      expect(ui.diagnostics.length, `depth ${depth}`).toBe(depth > MAX_DEPTH ? 1 : 0);
+      ui.destroy();
+    }
+  });
+
   it("never throws rendering and using grammar-shaped specs", () => {
     fc.assert(fc.property(grammarSpec, checkEngine), { numRuns: Math.ceil(RUNS / 2) });
   });

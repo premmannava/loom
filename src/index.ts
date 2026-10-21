@@ -1,5 +1,5 @@
 export { Loom, roundRectPath, type LoomOptions, type LoomEvents, type Metrics } from "./engine";
-export { parse, tokenizeLine, type ParseOptions, type ParseResult } from "./parser";
+export { parse, tokenizeLine, MAX_DEPTH, type ParseOptions, type ParseResult } from "./parser";
 export { evaluate, interpolate, formatValue, checkSyntax, identifiers, type EvalResult, type Scope } from "./expr";
 export { parseActions, runActions, type Action } from "./actions";
 export { Registry } from "./registry";

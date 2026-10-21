@@ -19,6 +19,13 @@ import { literal } from "./actions";
 import type { Registry } from "./registry";
 import type { Diagnostic, LoomNode, Value } from "./types";
 
+/**
+ * How deeply elements may nest. Real screens use under ten levels; the limit
+ * stops a runaway or hostile spec from overflowing the engine's recursive
+ * layout and paint (which fail somewhere past 500 levels).
+ */
+export const MAX_DEPTH = 100;
+
 export interface ParseOptions {
   /** Ignore the last line if it has no trailing newline (it may still be streaming). */
   partial?: boolean;
@@ -225,6 +232,12 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     }
     while (stack.length > 1 && stack[stack.length - 1]!.indent >= indent) stack.pop();
     const parent = stack[stack.length - 1]!;
+    // stack holds the root and every open container, so a new element sits at depth stack.length.
+    if (stack.length > MAX_DEPTH) {
+      diagnostics.push({ line: lineNo, severity: "error", message: `Nested too deeply (more than ${MAX_DEPTH} levels). This line and anything inside it were skipped; flatten the layout` });
+      skipDeeperThan = indent;
+      return;
+    }
     const parentDef = parent === root ? registry.get("column") : registry.get(parent.type);
     const accepts = parentDef?.children;
     const parentName = parent === root ? "the top level" : `"${parent.type}" (line ${parent.line})`;

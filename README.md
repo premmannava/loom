@@ -176,7 +176,7 @@ Lines starting with `#` are ignored.
 
 Loom never stops on a mistake. Each problem becomes a diagnostic with a line number:
 
-- **Errors** (unknown element, element in the wrong place): that line and anything nested under it are skipped.
+- **Errors** (unknown element, element in the wrong place, nesting more than 100 levels deep): that line and anything nested under it are skipped.
 - **Warnings** (unknown prop, bad value, broken expression): the element still renders, and the bad part is ignored.
 
 ```

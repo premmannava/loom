@@ -91,7 +91,7 @@ What the new tests found on their first runs:
 - `evaluate()` accepted non-plain values from object-backed scopes (e.g. `{__proto__}`). It now treats them as unknown state.
 - The `text` component's description had three sentences, against the one-or-two rule.
 - The map can't be reached by keyboard. Recorded as a known gap in the contract tests until Phase 3.
-- Specs nested hundreds of levels deep overflow the engine's recursion. Recorded under Phase 7.
+- Specs nested hundreds of levels deep overflowed the engine's recursion. Fixed after Phase 1 with a parser limit of 100 levels (`MAX_DEPTH`); deeper lines are skipped with an error diagnostic.
 
 ---
 
@@ -311,7 +311,7 @@ User actions take two different paths:
 
 - **Performance:** repaint only changed regions, cache text layout, virtualize everything that scrolls. Budget: 60 frames per second while scrolling a 5,000-item list on a mid-range phone.
 - **Security review:** the expression sandbox, spec size and depth limits, source and command rate limits, image host allowlists, and content security policy guidance.
-  - Found in Phase 1: the engine overflows the call stack on specs nested somewhere between 500 and 2,000 levels deep, because layout and paint are recursive (the parser itself is fine). A nesting limit in the parser, reported as a diagnostic that skips deeper lines, would turn this into an ordinary error.
+  - Done: nesting depth. The engine overflowed the call stack on specs nested between 500 and 2,000 levels deep, because layout and paint are recursive. The parser now stops at 100 levels (`MAX_DEPTH`) and reports deeper lines as errors. Still to decide: limits on total spec size and element count.
 - **Internationalization:** right-to-left layout, number and currency formatting by locale, and font fallback for other scripts.
 - **Native renderer experiment:** run the same engine in Rust with WebAssembly for heavy screens, and as a native app outside the browser (see the speed discussion in the README).
 - **Release:** publish `loom-ui` to npm with semantic versioning and a changelog, and a migration guide for language changes.

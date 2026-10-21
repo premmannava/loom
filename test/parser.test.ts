@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parse, tokenizeLine } from "../src/parser";
+import { MAX_DEPTH, parse, tokenizeLine } from "../src/parser";
 import { Registry } from "../src/registry";
 import { coreComponents } from "../src/components";
 
@@ -78,6 +78,21 @@ describe("parse", () => {
     const r = p(`card\n  text "Hello"\n  butt`, true);
     expect(r.nodeCount).toBe(2);
     expect(r.diagnostics).toEqual([]);
+  });
+
+  it("skips elements nested more than MAX_DEPTH levels, and only those", () => {
+    const lines = Array.from({ length: MAX_DEPTH + 5 }, (_, i) => " ".repeat(i * 2) + "column");
+    const r = p([...lines, 'text "Still here"', ""].join("\n"));
+    expect(r.nodeCount).toBe(MAX_DEPTH + 1);
+    expect(r.diagnostics).toEqual([
+      { line: MAX_DEPTH + 1, severity: "error", message: expect.stringMatching(/Nested too deeply \(more than 100 levels\)/) },
+    ]);
+    expect(r.root.children.at(-1)!.text).toBe("Still here");
+  });
+
+  it("counts nesting levels, not indentation width", () => {
+    const lines = Array.from({ length: MAX_DEPTH }, (_, i) => " ".repeat(i * 7) + "column");
+    expect(p(lines.join("\n") + "\n").diagnostics).toEqual([]);
   });
 
   it("gives nodes stable ids from line and type", () => {
