@@ -262,7 +262,7 @@ accordion "Shipping" bind=shipping
   text "Ships in two business days."`,
   layout(box, ctx) {
     const p = ctx.props(box.node);
-    const open = !!ctx.scope(p.raw("bind") ?? "");
+    const open = !!p.bound();
     const t = ctx.theme;
     const font = themeFont(t, 600, t.text.body);
     const lines = wrapText(p.text(), Math.max(40, box.w - 32), font, ctx.measure);
@@ -303,7 +303,7 @@ accordion "Shipping" bind=shipping
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
     if (!key) return;
-    ctx.set(key, !ctx.scope(key));
+    ctx.set(key, !ctx.props(ctx.target.node).bound());
     runOn(ctx);
   },
 };

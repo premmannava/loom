@@ -55,7 +55,7 @@ const exprish = fc.oneof(expr, fc.string({ maxLength: 20 }), fc.constantFrom("((
 
 const action = fc.oneof(
   fc.constantFrom("back", "back:x", "go:first", "go:second", "go:nowhere", "notify:'Saved {a}; done'", "notify:", "notify:'{a +}'"),
-  fc.tuple(fc.constantFrom("inc", "dec", "toggle", "set", "emit", "go", "notify", "jump", ""), fc.constantFrom(...names, "", "1x"), fc.option(fc.oneof(atom, exprish.map((e) => `{${e}}`)))).map(
+  fc.tuple(fc.constantFrom("inc", "dec", "toggle", "set", "emit", "go", "notify", "add", "remove", "clear", "jump", ""), fc.constantFrom(...names, "", "1x", "t.done", "item.qty", "todos.0", "t.__proto__", "a.constructor.prototype"), fc.option(fc.oneof(atom, exprish.map((e) => `{${e}}`)))).map(
     ([op, key, arg]) => `${op}:${key}${arg === null ? "" : ":" + arg}`,
   ),
   fc.string({ maxLength: 12 }),

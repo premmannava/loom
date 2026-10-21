@@ -66,7 +66,7 @@ map highlight="Japan,Kenya" bind=picked
     const s = (box.data as { scale: number }).scale;
     const highlighted = new Set(list(p.str("highlight")));
     const bind = p.raw("bind");
-    const selected = bind ? ctx.scope(bind) : null;
+    const selected = bind ? p.bound() : null;
     const hovered = ctx.hover && ctx.hover.node.id === box.node.id ? (ctx.hover.detail as string | undefined) : undefined;
     g.save();
     g.translate(box.x, box.y);

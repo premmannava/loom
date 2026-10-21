@@ -9,11 +9,17 @@
  *   go:screen           show another screen, remembering this one
  *   back                return to the previous screen
  *   notify:'message'    show a short message; may include {expressions}
+ *   add:list:value      add an item to the end of a list
+ *   remove:t            remove the item t points at (inside each)
+ *   remove:list:index   remove the item at a position
+ *   clear:list          empty a list
  *
- * Several actions can run in order, separated by `;`.
+ * Several actions can run in order, separated by `;`. Targets may be paths
+ * into data, like toggle:t.done inside each.
  */
 import { checkSyntax, evaluate, interpolate, splitTemplate, type Scope } from "./expr";
-import { toNumber } from "./data";
+import { isList, makeList, toNumber } from "./data";
+import { PATH } from "./paths";
 import type { Value } from "./types";
 
 export type Action =
@@ -23,9 +29,12 @@ export type Action =
   | { op: "emit"; name: string; value?: string }
   | { op: "go"; screen: string }
   | { op: "back" }
-  | { op: "notify"; message: string };
+  | { op: "notify"; message: string }
+  | { op: "add"; key: string; value: string }
+  | { op: "remove"; key: string; at?: string }
+  | { op: "clear"; key: string };
 
-export const ACTION_OPS = ["inc", "dec", "toggle", "set", "emit", "go", "back", "notify"] as const;
+export const ACTION_OPS = ["inc", "dec", "toggle", "set", "emit", "go", "back", "notify", "add", "remove", "clear"] as const;
 
 /** How each action is written, for the model guide and error messages. */
 export const ACTION_SYNTAX: Record<(typeof ACTION_OPS)[number], string> = {
@@ -37,6 +46,9 @@ export const ACTION_SYNTAX: Record<(typeof ACTION_OPS)[number], string> = {
   go: "go:screen shows another screen (see screen)",
   back: "back returns to the previous screen",
   notify: "notify:'Saved {n} items' shows a short message",
+  add: "add:list:value adds an item to the end, e.g. add:todos:{text: 'Snacks', done: false}",
+  remove: "remove:t removes the current item inside each as=t; remove:list:index removes by position",
+  clear: "clear:list empties a list",
 };
 
 const NAME = /^[A-Za-z_]\w*$/;
@@ -73,7 +85,11 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
     const second = rest.indexOf(":");
     const key = second < 0 ? rest : rest.slice(0, second);
     const arg = second < 0 ? undefined : rest.slice(second + 1);
-    if (!NAME.test(key)) return { error: `"${key}" is not a valid name in action "${part}"` };
+    // State-changing actions take paths (t.done); names elsewhere are plain.
+    const writes = op === "inc" || op === "dec" || op === "toggle" || op === "set" || op === "add" || op === "remove" || op === "clear";
+    if (!(writes ? PATH : NAME).test(key)) {
+      return { error: `"${key}" is not a valid ${writes ? "state name or path, like count or t.done," : "name"} in action "${part}"` };
+    }
     switch (op) {
       case "inc":
       case "dec":
@@ -93,6 +109,17 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
         if (arg !== undefined) return { error: `go takes one screen name, like go:${key}` };
         actions.push({ op, screen: key });
         break;
+      case "add":
+        if (arg === undefined) return { error: `add needs a value, like add:${key}:{text: 'New', done: false}` };
+        actions.push({ op, key, value: arg });
+        break;
+      case "remove":
+        actions.push(arg === undefined ? { op, key } : { op, key, at: arg });
+        break;
+      case "clear":
+        if (arg !== undefined) return { error: `clear takes just the list, like clear:${key}` };
+        actions.push({ op, key });
+        break;
       default:
         return { error: `Unknown action "${op}". Use ${ACTION_OPS.join(", ")}` };
     }
@@ -110,8 +137,11 @@ export function actionExpressions(actions: readonly Action[]): string[] {
   const out: string[] = [];
   const arg = (a: string | undefined) => { const m = a === undefined ? null : /^\{(.*)\}$/s.exec(a); if (m) out.push(m[1]!); };
   for (const a of actions) {
+    // Write targets (t.done) read their first name like an expression does.
+    if ("key" in a) out.push(a.key);
     if (a.op === "inc" || a.op === "dec") arg(a.by);
-    else if (a.op === "set") arg(a.value);
+    else if (a.op === "set" || a.op === "add") arg(a.value);
+    else if (a.op === "remove") arg(a.at);
     else if (a.op === "emit") arg(a.value);
     else if (a.op === "notify") for (const p of splitTemplate(a.message)) if ("expr" in p) out.push(p.expr);
   }
@@ -129,6 +159,9 @@ export function resolveArg(arg: string, scope: Scope): Value {
 }
 
 export function literal(s: string): Value {
+  // A quoted value is that text: set:msg:'Hi there', add:tags:"7" (stays text).
+  const quoted = /^(['"])([\s\S]*)\1$/.exec(s);
+  if (quoted) return quoted[2]!;
   if (s === "true") return true;
   if (s === "false") return false;
   if (s === "null") return null;
@@ -138,7 +171,12 @@ export function literal(s: string): Value {
 
 export interface ActionHost {
   scope: Scope;
-  set(key: string, value: Value): void;
+  /** Change the value at a state name or path (t.done inside each). */
+  set(path: string, value: Value): void;
+  /** Remove the list item a path points at (remove:t). Hosts without each can leave it out. */
+  removeAt?(path: string): void;
+  /** Hear about actions that couldn't run, like add: on something that isn't a list. */
+  warn?(message: string): void;
   emit(name: string, value: Value | undefined): void;
   /** Show a screen. Hosts without screens can leave these out; the actions then do nothing. */
   go?(screen: string): void;
@@ -153,13 +191,13 @@ export function runActions(actions: Action[], host: ActionHost): void {
       case "inc":
       case "dec": {
         // toNumber, not Number: a list or record here must count as 0, not crash.
-        const cur = toNumber(host.scope(a.key) ?? 0) || 0;
+        const cur = toNumber(read(a.key, host.scope) ?? 0) || 0;
         const by = toNumber(resolveArg(a.by, host.scope)) || 0;
         host.set(a.key, a.op === "inc" ? cur + by : Math.max(0, cur - by));
         break;
       }
       case "toggle":
-        host.set(a.key, !host.scope(a.key));
+        host.set(a.key, !read(a.key, host.scope));
         break;
       case "set":
         host.set(a.key, resolveArg(a.value, host.scope));
@@ -176,8 +214,35 @@ export function runActions(actions: Action[], host: ActionHost): void {
       case "notify":
         host.notify?.(interpolate(a.message, host.scope));
         break;
+      case "add":
+      case "clear":
+      case "remove": {
+        if (a.op === "remove" && a.at === undefined) {
+          if (host.removeAt) host.removeAt(a.key);
+          continue;
+        }
+        const cur = read(a.key, host.scope);
+        if (cur !== undefined && cur !== null && !isList(cur)) {
+          host.warn?.(`${a.op}:${a.key} needs a list, but ${a.key} isn't one`);
+          continue;
+        }
+        const items = cur ?? [];
+        if (a.op === "clear") host.set(a.key, makeList([]));
+        else if (a.op === "add") host.set(a.key, makeList([...items, resolveArg(a.value, host.scope)]));
+        else {
+          const at = toNumber(resolveArg(a.at!, host.scope));
+          if (Number.isInteger(at) && at >= 0 && at < items.length) host.set(a.key, makeList(items.filter((_, i) => i !== at)));
+        }
+        break;
+      }
     }
   }
+}
+
+/** The current value at a path: a state name, or a path like t.done read through the scope. */
+function read(path: string, scope: Scope): Value | undefined {
+  const r = evaluate(path, scope);
+  return r.ok ? r.value : undefined;
 }
 
 /**

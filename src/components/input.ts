@@ -1,7 +1,7 @@
 import { literal } from "../actions";
 import { toNumber } from "../data";
-import type { ComponentDef } from "../component";
-import type { Box, Value } from "../types";
+import type { ComponentDef, PropReader } from "../component";
+import type { Box } from "../types";
 import { fillTint, onProp, partBox, runOn } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
@@ -71,8 +71,7 @@ check "I agree to the terms" bind=agreed`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const key = p.raw("bind") ?? "";
-    const on = !!ctx.scope(key);
+    const on = !!p.bound();
     const hot = ctx.isHovered(box.node);
     ctx.roundRect(box.x + 0.5, box.y + 4.5, 18, 18, theme.radius.sm);
     if (on) {
@@ -103,7 +102,7 @@ check "I agree to the terms" bind=agreed`,
   },
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
-    if (key) ctx.set(key, !ctx.scope(key));
+    if (key) ctx.set(key, !ctx.props(ctx.target.node).bound());
   },
 };
 
@@ -125,7 +124,7 @@ switch "Email me order updates" bind=updates`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const on = !!ctx.scope(p.raw("bind") ?? "");
+    const on = !!p.bound();
     const tw = 40, th = 24, tx = box.x + box.w - tw, ty = box.y + (box.h - th) / 2;
     g.font = ctx.font(400, theme.text.body);
     g.fillStyle = c.ink;
@@ -145,7 +144,7 @@ switch "Email me order updates" bind=updates`,
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
     if (!key) return;
-    ctx.set(key, !ctx.scope(key));
+    ctx.set(key, !ctx.props(ctx.target.node).bound());
     runOn(ctx);
   },
 };
@@ -171,7 +170,7 @@ radio "Large" bind=size value=l`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const chosen = ctx.scope(p.raw("bind") ?? "") === literal(p.raw("value") ?? "");
+    const chosen = p.bound() === literal(p.raw("value") ?? "");
     const cx = box.x + 9.5, cy = box.y + box.h / 2;
     g.beginPath();
     g.arc(cx, cy, 9, 0, Math.PI * 2);
@@ -205,11 +204,11 @@ radio "Large" bind=size value=l`,
 const STEP_W = 42, VALUE_W = 52;
 
 /** A stepper's limits and current value, read the same way when painting and pressing. */
-function stepperState(p: { num(n: string, f: number): number; has(n: string): boolean; raw(n: string): string | undefined }, scope: (k: string) => Value | undefined) {
+function stepperState(p: PropReader) {
   const min = p.num("min", 0);
   const max = p.has("max") ? p.num("max", Infinity) : Infinity;
   const step = Math.abs(p.num("step", 1)) || 1;
-  const raw = toNumber(scope(p.raw("bind") ?? ""));
+  const raw = toNumber(p.bound());
   const value = Number.isFinite(raw) ? raw : min;
   return { min, max, step, value };
 }
@@ -235,7 +234,7 @@ stepper "Quantity" bind=qty min=1 max=10`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { min, max, value } = stepperState(p, ctx.scope);
+    const { min, max, value } = stepperState(p);
     const total = STEP_W * 2 + VALUE_W;
     const label = p.text();
     const x0 = label ? box.x + Math.max(0, box.w - total) : box.x;
@@ -283,7 +282,7 @@ stepper "Quantity" bind=qty min=1 max=10`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    const { min, max, step, value } = stepperState(p, ctx.scope);
+    const { min, max, step, value } = stepperState(p);
     const next = ctx.target.detail === "inc" ? value + step : value - step;
     ctx.set(key, Math.round(Math.min(max, Math.max(min, next)) * 1e6) / 1e6);
     runOn(ctx);
@@ -325,7 +324,7 @@ rating bind=stars`,
     const c = theme.colors;
     const max = Math.max(1, Math.min(10, Math.round(p.num("max", 5))));
     const bind = p.raw("bind");
-    let value = bind ? toNumber(ctx.scope(bind)) || 0 : p.num("value", 0);
+    let value = bind ? toNumber(p.bound()) || 0 : p.num("value", 0);
     if (bind && ctx.hover && ctx.hover.node.id === box.node.id && typeof ctx.hover.detail === "number") value = ctx.hover.detail;
     for (let i = 0; i < max; i++) {
       const x = box.x + i * (STAR + STAR_GAP);
@@ -385,11 +384,11 @@ export const link: ComponentDef = {
 const THUMB_R = 10, TRACK_H = 6, SLIDER_AREA = 32;
 
 /** A slider's range and current value, read the same way when painting, dragging and on keys. */
-function sliderState(p: { num(n: string, f: number): number; raw(n: string): string | undefined }, scope: (k: string) => Value | undefined) {
+function sliderState(p: PropReader) {
   const min = p.num("min", 0);
   const max = Math.max(min, p.num("max", 100));
   const step = Math.abs(p.num("step", 1)) || 1;
-  const raw = toNumber(scope(p.raw("bind") ?? ""));
+  const raw = toNumber(p.bound());
   const value = Number.isFinite(raw) ? Math.min(max, Math.max(min, raw)) : min;
   return { min, max, step, value };
 }
@@ -427,7 +426,7 @@ slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { min, max, value } = sliderState(p, ctx.scope);
+    const { min, max, value } = sliderState(p);
     const label = p.text();
     let y = box.y;
     if (label) {
@@ -469,7 +468,7 @@ slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    const { min, max, step, value } = sliderState(p, ctx.scope);
+    const { min, max, step, value } = sliderState(p);
     const { left, width } = travel(ctx.target.box);
     const frac = Math.min(1, Math.max(0, (ctx.x - left) / width));
     const next = snap(min + frac * (max - min), min, max, step);
@@ -480,7 +479,7 @@ slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return false;
-    const { min, max, step, value } = sliderState(p, ctx.scope);
+    const { min, max, step, value } = sliderState(p);
     const big = Math.max(step, snap((max - min) / 10, 0, Infinity, step));
     const moves: Record<string, number> = {
       ArrowRight: value + step, ArrowUp: value + step, ArrowLeft: value - step, ArrowDown: value - step,

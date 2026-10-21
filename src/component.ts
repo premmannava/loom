@@ -85,7 +85,11 @@ export interface PressContext {
   target: HitTarget;
   scope: Scope;
   props(node: LoomNode): PropReader;
-  set(key: string, value: Value): void;
+  /**
+   * Write a value to a state name or path, as seen from the pressed element:
+   * pass its bind= as written (count, or t.done inside each).
+   */
+  set(path: string, value: Value): void;
   /** Run an action string such as "inc:count;emit:saved". */
   run(actions: string): void;
 }
@@ -206,6 +210,17 @@ export class PropReader {
   oneOf<T extends string>(name: string, values: readonly T[], fallback: T): T {
     const v = this.str(name, fallback);
     return (values as readonly string[]).includes(v) ? (v as T) : fallback;
+  }
+
+  /**
+   * The current value of a state name or path prop such as bind= (count, or
+   * t.done inside each), or undefined when it isn't set.
+   */
+  bound(name = "bind"): Value | undefined {
+    const raw = this.node.props[name];
+    if (raw === undefined) return undefined;
+    const r = evaluate(raw, this.scope);
+    return r.ok ? r.value : undefined;
   }
 
   /** The positional text, with `{expressions}` filled in. */

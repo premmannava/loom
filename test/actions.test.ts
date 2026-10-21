@@ -26,6 +26,12 @@ describe("actions", () => {
     expect(run("set:total:{a * b}", { a: 3, b: 4 }).state.total).toBe(12);
   });
 
+  it("treats a quoted value as that text", () => {
+    expect(run("set:msg:'Hi there'", {}).state.msg).toBe("Hi there");
+    expect(run(`set:code:"7"`, {}).state.code).toBe("7");
+    expect(run("set:n:7", {}).state.n).toBe(7);
+  });
+
   it("runs several actions in order", () => {
     const r = run("set:step:2;inc:step;emit:next:{step}", {});
     expect(r.state.step).toBe(3);

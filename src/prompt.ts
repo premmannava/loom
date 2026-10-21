@@ -104,6 +104,7 @@ export function languageGuide(registry: Registry, opts: GuideOptions = {}): stri
 
   sections.push(`ACTIONS (on=…)
 - ${ACTION_OPS.map((o) => ACTION_SYNTAX[o]).join("\n- ")}
+- Inside each, bind= and action targets can be paths into the item: check "{t.text}" bind=t.done, on=toggle:t.done, on=inc:item.qty, on=remove:t
 - Run several with ; e.g. on="set:step:2;emit:next"
 - Quote on= when it has spaces: on="inc:n;notify:'Saved {n}'"`);
 

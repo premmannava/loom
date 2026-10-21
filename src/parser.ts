@@ -17,6 +17,7 @@ import { COMMON_PROPS, type PropDef } from "./component";
 import { looksLikeData, parseData } from "./data";
 import { checkSyntax, identifiers, splitTemplate } from "./expr";
 import { loopNames } from "./each";
+import { PATH } from "./paths";
 import { literal } from "./actions";
 import type { Registry } from "./registry";
 import type { Diagnostic, LoomNode, Value } from "./types";
@@ -185,6 +186,8 @@ function expressionsOf(text: string | undefined, props: Record<string, string>, 
     if (def.type === "action") {
       const r = parseActions(raw);
       if ("actions" in r) out.push(...actionExpressions(r.actions));
+    } else if (def.type === "state") {
+      if (PATH.test(raw)) out.push(raw);
     } else if (braced) out.push(braced[1]!);
     else if (def.type === "condition" || def.type === "expression") out.push(raw);
     else if (def.type === "string") template(raw);
@@ -222,7 +225,7 @@ function checkProp(name: string, raw: string, def: PropDef, line: number, diags:
       break;
     }
     case "state":
-      if (!/^[A-Za-z_]\w*$/.test(raw)) warn(`${name} should be a state name, got "${raw}"`);
+      if (!PATH.test(raw)) warn(`${name} should be a state name or a path like t.done, got "${raw}"`);
       break;
     case "name":
       if (!/^[A-Za-z_]\w*$/.test(raw)) warn(`${name} should be a plain name (letters, digits and _), got "${raw}"`);

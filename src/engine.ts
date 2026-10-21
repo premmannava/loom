@@ -11,7 +11,9 @@
 import { parseActions, runActions } from "./actions";
 import { PropReader, type ComponentDef, type DragContext, type PaintContext, type PressContext } from "./component";
 import { Emitter } from "./emitter";
-import { scopeOf } from "./each";
+import { locateOf, scopeOf } from "./each";
+import { isList, makeList } from "./data";
+import { getIn, placeOf, setIn } from "./paths";
 import { createLayoutContext, isVisible } from "./layout";
 import { parse, type ParseResult } from "./parser";
 import { Registry } from "./registry";
@@ -466,13 +468,13 @@ export class Loom {
     const readers = new WeakMap<LoomNode, PropReader>();
     return {
       target,
-      scope: this.state.scope,
+      scope: scopeOf(target.node, this.state.scope),
       props: (node) => {
         let r = readers.get(node);
         if (!r) readers.set(node, (r = new PropReader(node, scopeOf(node, this.state.scope))));
         return r;
       },
-      set: (k, v) => this.state.set(k, v),
+      set: (path, v) => this.writePath(target.node, path, v),
       run: (actions) => this.runActionString(actions, target.node),
     };
   }
@@ -564,12 +566,48 @@ export class Loom {
     runActions(parsed.actions, {
       // Inside each, actions read the item's loop variables first.
       scope: scopeOf(node, this.state.scope),
-      set: (k, v) => this.state.set(k, v),
+      set: (path, v) => this.writePath(node, path, v),
+      removeAt: (path) => this.removeAt(node, path),
+      warn: (m) => this.warn(m),
       emit: (name, value) => this.events.emit("action", { name, value, node }),
       go: (screen) => this.go(screen),
       back: () => this.back(),
       notify: (text) => this.notify(text),
     });
+  }
+
+  /**
+   * Write a value at a path as seen from a node: a state name, or inside each
+   * a path through the item (t.done), which rebuilds the list it lives in.
+   */
+  private writePath(node: LoomNode, path: string, value: Value): void {
+    const place = placeOf(path, locateOf(node));
+    if (!place) {
+      this.warn(`Can't change ${path}: it isn't in state. Inside each, items= must name a list in state (like items=todos) for its items to change`);
+      return;
+    }
+    if (!place.steps.length) { this.state.set(place.key, value); return; }
+    const r = setIn(this.state.get(place.key), place.steps, value);
+    if ("error" in r) this.warn(`Can't change ${path}: ${r.error}`);
+    else this.state.set(place.key, r.value);
+  }
+
+  /** Remove the list item a path points at, like remove:t inside each as=t. */
+  private removeAt(node: LoomNode, path: string): void {
+    const place = placeOf(path, locateOf(node));
+    const at = place?.steps.at(-1);
+    if (!place || typeof at !== "number") {
+      this.warn(`remove:${path} needs ${path} to be an item of a list in state, like remove:t inside each items=todos as=t. To remove by position, write remove:list:index`);
+      return;
+    }
+    const parent = place.steps.slice(0, -1);
+    const root = this.state.get(place.key);
+    const list = parent.length ? getIn(root, parent) : root;
+    if (!isList(list)) return;
+    const next = makeList(list.filter((_, i) => i !== at));
+    if (!parent.length) { this.state.set(place.key, next); return; }
+    const r = setIn(root, parent, next);
+    if (!("error" in r)) this.state.set(place.key, r.value);
   }
 
   private focusables(): HitRegion[] {

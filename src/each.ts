@@ -16,6 +16,7 @@
  */
 import { evaluate, type Scope } from "./expr";
 import { isList, isScalar } from "./data";
+import { PATH, placeOf, stateLocate, type Locate } from "./paths";
 import type { LoomNode, Value } from "./types";
 
 /** At most this many items are shown per `each`; the rest are left out with a warning. */
@@ -37,10 +38,19 @@ export interface EachBudget {
 export const DEFAULT_AS = "item";
 
 const scopes = new WeakMap<LoomNode, Scope>();
+const locators = new WeakMap<LoomNode, Locate>();
 
 /** The scope a node reads values through: its item's scope inside an `each`, otherwise `base`. */
 export function scopeOf(node: LoomNode, base: Scope): Scope {
   return scopes.get(node) ?? base;
+}
+
+/**
+ * Where a node's names live in state, for writing: inside each, the loop
+ * variable points at its item (`t` is item 2 of `todos`).
+ */
+export function locateOf(node: LoomNode): Locate {
+  return locators.get(node) ?? stateLocate;
 }
 
 /** Strip one pair of braces, so `items=todos` and `items={todos}` mean the same. */
@@ -61,9 +71,10 @@ function size(node: LoomNode): number {
   return n;
 }
 
-function copy(node: LoomNode, suffix: string, scope: Scope): LoomNode {
-  const out: LoomNode = { ...node, id: node.id + suffix, children: node.children.map((c) => copy(c, suffix, scope)) };
+function copy(node: LoomNode, suffix: string, scope: Scope, locate: Locate): LoomNode {
+  const out: LoomNode = { ...node, id: node.id + suffix, children: node.children.map((c) => copy(c, suffix, scope, locate)) };
   scopes.set(out, scope);
+  locators.set(out, locate);
   return out;
 }
 
@@ -88,6 +99,10 @@ export function eachInstances(each: LoomNode, scope: Scope, warn?: (message: str
 
   const as = each.props.as ?? DEFAULT_AS;
   const index = each.props.index;
+  // Items can be written to when the list is a path into state (todos, g.lines), not computed.
+  const outer = locateOf(each);
+  const itemsPath = bare(raw).trim();
+  const listPlace = PATH.test(itemsPath) ? placeOf(itemsPath, outer) : null;
   const keyExpr = each.props.key === undefined ? undefined : bare(each.props.key);
   const seen = new Set<string>();
   const out: LoomNode[] = [];
@@ -101,6 +116,8 @@ export function eachInstances(each: LoomNode, scope: Scope, warn?: (message: str
     budget.left -= perItem;
     const item = items[i]!;
     const own: Scope = (name) => (name === as ? item : name === index ? i : scope(name));
+    const place = listPlace && { key: listPlace.key, steps: [...listPlace.steps, i] };
+    const locate: Locate = (name) => (name === as ? place : name === index ? null : outer(name));
     let key = String(i);
     if (keyExpr !== undefined) {
       const k = evaluate(keyExpr, own);
@@ -113,7 +130,7 @@ export function eachInstances(each: LoomNode, scope: Scope, warn?: (message: str
     seen.add(key);
     // `#` can't appear in a spec id, so these never collide with real ids.
     const suffix = `#${key.replace(/#/g, "%23")}`;
-    for (const child of each.children) out.push(copy(child, suffix, own));
+    for (const child of each.children) out.push(copy(child, suffix, own, locate));
   }
   return out;
 }

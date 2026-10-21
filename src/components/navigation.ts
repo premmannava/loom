@@ -40,7 +40,7 @@ tabs bind=view
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const kids = ctx.visibleChildren(box.node);
-    const current = ctx.scope(p.raw("bind") ?? "");
+    const current = p.bound();
     const selected = selectedTab(kids, current, ctx.props);
     const font = themeFont(ctx.theme, 600, 14);
     const natural = kids.map((k) => ctx.measure.width(ctx.props(k).text(), font) + TAB_PAD * 2);
@@ -200,9 +200,9 @@ export function pageSlots(current: number, pages: number): Array<number | "…">
   return [1, "…", current - 1, current, current + 1, "…", pages];
 }
 
-function pageState(p: PropReader, scope: (k: string) => Value | undefined) {
+function pageState(p: PropReader) {
   const pages = Math.max(1, Math.min(100000, Math.round(p.num("pages", 1))));
-  const raw = Math.round(toNumber(scope(p.raw("bind") ?? "")));
+  const raw = Math.round(toNumber(p.bound()));
   const current = Number.isFinite(raw) ? Math.max(1, Math.min(pages, raw)) : 1;
   return { pages, current };
 }
@@ -225,7 +225,7 @@ pagination bind=page pages=12`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { pages, current } = pageState(p, ctx.scope);
+    const { pages, current } = pageState(p);
     const slots: Array<{ kind: "prev" | "next" | "page" | "gap"; page?: number }> = [
       { kind: "prev" },
       ...pageSlots(current, pages).map((s) => (s === "…" ? { kind: "gap" as const } : { kind: "page" as const, page: s })),
@@ -266,7 +266,7 @@ pagination bind=page pages=12`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    const { pages, current } = pageState(p, ctx.scope);
+    const { pages, current } = pageState(p);
     const d = ctx.target.detail;
     const next = d === "prev" ? current - 1 : d === "next" ? current + 1 : typeof d === "number" ? d : current;
     ctx.set(key, Math.max(1, Math.min(pages, next)));
