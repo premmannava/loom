@@ -325,6 +325,17 @@ card
     expect(d[1]!.message).toMatch(/more of the state value on line 1.*Write the whole value on line 1/);
   });
 
+  it("ignores a prop written on a line of its own, keeping the lines under it", () => {
+    const ui = render(`state todos=[{text: "Milk", done: false}, {text: "Eggs", done: true}]
+list
+  each items=todos as=t
+    if={t.done==false}
+      list-item "{t.text}"
+`);
+    expect(ui.diagnostics).toEqual([{ line: 4, severity: "warning", message: `A line can't start with if=, so it was ignored. Put it on the element it's for, like list-item "Milk" if=…` }]);
+    expect(ui.text()).toEqual(["Milk", "Eggs"]);
+  });
+
   it("needs items=", () => {
     expect(diags(`each\n  text "x"\n`)).toEqual([{ line: 1, severity: "warning", message: `"each" needs items=` }]);
   });

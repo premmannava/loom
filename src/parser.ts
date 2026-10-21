@@ -275,6 +275,14 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       return;
     }
 
+    // A prop on a line of its own (`if={…}`), usually meant for the element below it.
+    const loneProp = /^([A-Za-z_][\w-]*)=/.exec(body);
+    if (loneProp && !openState) {
+      const name = loneProp[1]!;
+      diagnostics.push({ line: lineNo, severity: "warning", message: `A line can't start with ${name}=, so it was ignored. Put it on the element it's for, like list-item "Milk" ${name}=…` });
+      return;
+    }
+
     const tok = tokenizeLine(body);
     if (!tok.type && openState) {
       if (!openState.reported) {
