@@ -118,13 +118,13 @@ Language changes touch several places. Do them together, in this order:
 
 ## Current status
 
-Version 0.1, the foundation, plus the Phase 1 testing and tooling. Working: the engine, parser, expressions, actions, keyboard focus (including parts of elements), inspector, 30 components (layout: `column`, `row`, `grid`, `card`, `list`, `list-item`, `accordion`, `divider`, `spacer`; content: `text`, `code`, `badge`, `avatar`; data: `stat`, `rating`, `map`, `pin`; input: `button`, `link`, `check`, `switch`, `radio`, `stepper`; navigation: `tabs`, `tab`, `breadcrumb`, `pagination`; feedback: `progress`, `skeleton`, `empty`), the playground, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
+Version 0.1, the foundation, plus the Phase 1 testing and tooling. Working: the engine, parser, expressions, actions, keyboard focus (including parts of elements), inspector, 33 components (layout: `column`, `row`, `grid`, `card`, `list`, `list-item`, `accordion`, `divider`, `spacer`; content: `text`, `image`, `code`, `badge`, `avatar`; data: `stat`, `rating`, `map`, `pin`; input: `button`, `link`, `check`, `switch`, `radio`, `stepper`, `slider`; navigation: `screen`, `tabs`, `tab`, `breadcrumb`, `pagination`; feedback: `progress`, `skeleton`, `empty`), screens with `go:` and `back`, `notify:` messages, images (own origin plus `imageHosts`), dragging, the playground, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
 
 Known gaps: the map can't be reached by keyboard (recorded in `test/contract.test.ts`).
 
 Limits: elements may nest at most `MAX_DEPTH` (100) levels (`src/parser.ts`), because layout and paint are recursive. Deeper lines become an error diagnostic and are skipped.
 
-Not built yet (see `docs/PLAN.md`): lists and structured data (`each`), data sources and host commands, navigation between screens, text input, images, scrolling regions, overlays, drag gestures and the components that need them (`input`, `image`, `select`, `slider`, `table`, `chart`, `dialog`, `menu`, `tooltip`), the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
+Not built yet (see `docs/PLAN.md`): lists and structured data (`each`), data sources and host commands, text input, scrolling regions, overlays and the components that need them (`input`, `select`, `table`, `chart`, `dialog`, `menu`, `tooltip`), the accessibility mirror, the model connection, the docs site and the reference store app. Don't describe these as existing.
 
 ## Where to look next
 

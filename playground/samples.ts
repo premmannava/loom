@@ -108,6 +108,26 @@ card
     text "Free shipping over $100. Free returns within 30 days."
 `,
   },
+  finder: {
+    label: "Gear finder",
+    prompt: "Help me find trail shoes under a budget, then show me the one I pick.",
+    spec: `state maxPrice=150 picked="Ridgeline" price=128 cart=0
+screen name=browse title="Trail shoes"
+  slider "Up to \${maxPrice}" bind=maxPrice min=50 max=200 step=5
+  list if={maxPrice >= 95}
+    list-item "Switchback" detail="Light and fast, 240 g" trailing="$95" on="set:picked:Switchback;set:price:95;go:shoe" if={maxPrice >= 95}
+    list-item "Ridgeline" detail="Waterproof, 280 g" trailing="$128" on="set:picked:Ridgeline;set:price:128;go:shoe" if={maxPrice >= 128}
+    list-item "Summit Pro" detail="Rock plate, 310 g" trailing="$175" on="set:picked:Summit Pro;set:price:175;go:shoe" if={maxPrice >= 175}
+  empty "Nothing under \${maxPrice}" detail="Our lightest pair starts at $95." action="Show all" on=set:maxPrice:200 if={maxPrice < 95}
+screen name=shoe title="{picked}"
+  image "{picked} trail shoes, side view" src="/samples/trail-shoe.jpg" ratio=16:9
+  row
+    rating value=4.6
+    text "\${price}" style=title align=right
+  button "Add to cart" on="inc:cart;notify:'Added {picked}. {cart} in your cart'"
+  button "Back to results" variant=secondary on=back
+`,
+  },
   habits: {
     label: "Habit tracker",
     prompt: "Make me a tracker for three daily habits with a streak.",

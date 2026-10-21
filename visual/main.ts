@@ -13,41 +13,8 @@ import { Loom } from "../src/engine";
 import { coreComponents } from "../src/components";
 import { mapComponents } from "../src/components/map";
 import { darkTheme, lightTheme } from "../src/theme";
-import type { LoadedImage } from "../src/images";
+import { fixtureImageLoader } from "../playground/sample-images";
 import { cases } from "./cases";
-
-/**
- * Every image in a visual case is the same drawn landscape, so screenshots
- * test the image component's cropping and corners without the network.
- */
-function fixtureImage(): Promise<LoadedImage> {
-  const c = document.createElement("canvas");
-  c.width = 800;
-  c.height = 500;
-  const g = c.getContext("2d")!;
-  const sky = g.createLinearGradient(0, 0, 0, 500);
-  sky.addColorStop(0, "#9BC7E8");
-  sky.addColorStop(1, "#F3E3C3");
-  g.fillStyle = sky;
-  g.fillRect(0, 0, 800, 500);
-  g.fillStyle = "#F2B84B";
-  g.beginPath();
-  g.arc(620, 130, 50, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = "#5D7F72";
-  g.beginPath();
-  g.moveTo(0, 420);
-  g.lineTo(220, 200);
-  g.lineTo(380, 360);
-  g.lineTo(520, 230);
-  g.lineTo(800, 430);
-  g.lineTo(800, 500);
-  g.lineTo(0, 500);
-  g.fill();
-  g.fillStyle = "#2F4F48";
-  g.fillRect(0, 440, 800, 60);
-  return Promise.resolve({ source: c, width: c.width, height: c.height });
-}
 
 declare global {
   interface Window { __loomReady?: boolean; __loomError?: string }
@@ -73,7 +40,7 @@ async function main(): Promise<void> {
     theme,
     width,
     animate: false,
-    loadImage: fixtureImage,
+    loadImage: fixtureImageLoader,
   });
   loom.setSpec(visual.spec);
   loom.renderNow();

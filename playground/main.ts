@@ -1,5 +1,6 @@
 import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
 import { mapComponents } from "../src/components/map";
+import { sampleImageLoader } from "./sample-images";
 import { samples } from "./samples";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -7,7 +8,7 @@ const ta = $<HTMLTextAreaElement>("spec");
 const gutter = $("gutter");
 const canvas = $<HTMLCanvasElement>("cv");
 
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents] }).expose("loom");
+const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], loadImage: sampleImageLoader }).expose("loom");
 $("guide").textContent = languageGuide(loom.registry);
 
 let current = "map";
@@ -185,11 +186,14 @@ function renderState() {
   }
 }
 loom.on("change", ({ key }) => { flashKey = key; queueMicrotask(renderState); });
-loom.on("action", ({ name, value }) => {
+function logEvent(text: string) {
   const li = document.createElement("li");
-  li.textContent = `emit ${name}${value === undefined ? "" : " → " + JSON.stringify(value)}`;
+  li.textContent = text;
   $("events").prepend(li);
-});
+}
+loom.on("action", ({ name, value }) => logEvent(`emit ${name}${value === undefined ? "" : " → " + JSON.stringify(value)}`));
+loom.on("navigate", ({ screen, from }) => logEvent(`screen ${from ?? "—"} → ${screen}`));
+loom.on("notify", ({ text }) => logEvent(`notify "${text}"`));
 
 loom.on("render", (m) => {
   $("mNodes").textContent = String(m.nodes);

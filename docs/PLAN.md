@@ -172,9 +172,13 @@ screen name=product title="{product.data.name}"
 - Actions `go:product` and `back` switch screens, with history. The current screen is available as `{screen}`.
 - Only the active screen is laid out and painted. The first screen is shown by default.
 
+**Status: built.** `screen name= title=`, `go:`, `back` and `{screen}` work, and the host can call `loom.go()` / `loom.back()` and listen to `navigate`. Two decisions made while building it: `go:` to an unknown screen does nothing rather than being a diagnostic (a parse-time check would break streaming, because the target screen may arrive later), and while streaming, the first screen to arrive is shown, so models should write the starting screen first.
+
 ### 2.7 Notifications
 
 `notify:'Added {p.name} to your cart'` shows a short toast message. The text, position and look are controlled by the engine.
+
+**Status: built**, drawn by the engine at the bottom of the visible part of the canvas for three seconds, with a `notify` event for the host. Screen readers won't hear it until the accessibility mirror adds a live region (Phase 3.1).
 
 **Exit criteria:** the catalog and product screens in [the ecommerce example](examples/ecommerce.md) parse, render (with placeholder components where Phase 3 hasn't landed) and pass streaming tests. The model guide documents sources and commands generated from their registrations.
 
@@ -189,11 +193,11 @@ screen name=product title="{product.data.name}"
 | Capability | Approach |
 |---|---|
 | **Text input** | While a field is focused, place a real, transparent `<input>` exactly over its box. The browser handles typing, IME for other languages, autocorrect, password managers and mobile keyboards. Loom paints the field and mirrors its value. |
-| **Images** | Async loading with placeholder and fade-in, a cache, `ratio=` to reserve space before load, and an allowlist of image hosts. CORS-enabled images only, so the canvas stays readable for tests. |
+| **Images** | Async loading with placeholder and fade-in, a cache, `ratio=` to reserve space before load, and an allowlist of image hosts. CORS-enabled images only, so the canvas stays readable for tests. **Built** (`image`, `imageHosts`, `loadImage`): the page's origin is always allowed, other hosts must be https and listed. |
 | **Scrolling** | Scroll containers that clip children, handle wheel, touch and keyboard scrolling, and only lay out what is visible (virtualization) for long lists. |
 | **Overlays** | A layer above the page for dialogs, dropdowns, tooltips and toasts, with focus trapping and Escape to close. |
 | **Accessibility mirror** | A hidden DOM tree that mirrors the canvas: a role, a label and a state for each element, focus kept in sync, and live regions so screen readers hear updates. Same idea as Flutter's semantics tree. |
-| **Pointer gestures** | Drag for sliders and scroll areas, long press, and touch targets at least 44 px. |
+| **Pointer gestures** | Drag for sliders and scroll areas, long press, and touch targets at least 44 px. **Drag built** (`drag` and `key` hooks, pointer capture, `touch-action: pan-y pinch-zoom`) and used by `slider`. Long press and a 44 px minimum for every target are still to do. |
 
 ### 3.2 Components
 
@@ -211,7 +215,9 @@ screen name=product title="{product.data.name}"
 - `tabs` holds `tab` children, and only the selected tab's content is laid out.
 - `avatar` shows initials only; photos wait for `image`.
 
-Still waiting on engine capabilities: `input`, `image`, `select`/`option`, `slider` (needs drag), `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+Since then: `image` and `slider` (with the engine's images and dragging), and `screen` (Phase 2.6).
+
+Still waiting on engine capabilities: `input`, `select`/`option`, `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
 
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 

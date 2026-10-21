@@ -1117,7 +1117,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components**: 18 components that work with the current engine are done (grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, plus pressable cards and struck-through text). Next: text input (a real input positioned over the canvas while typing), images, scrolling, select, slider, table, chart, dialog and toast, plus the accessibility layer.
+2. **Components**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, and `notify:` messages. Next: text input (a real input positioned over the canvas while typing), scrolling, select, table, chart and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: a server-side streaming endpoint and a measured comparison against other generative UI formats (token count, validity, time to first pixel).
 5. **An app** built on top.
