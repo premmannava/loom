@@ -1,5 +1,6 @@
 import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
 import { mapComponents } from "../src/components/map";
+import { setupAsk } from "./ask";
 import { samples } from "./samples";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -8,8 +9,23 @@ const gutter = $("gutter");
 const canvas = $<HTMLCanvasElement>("cv");
 
 // The samples use real photos from Unsplash; images from any other host are blocked.
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts: ["images.unsplash.com"] }).expose("loom");
-$("guide").textContent = languageGuide(loom.registry);
+const imageHosts = ["images.unsplash.com"];
+const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts }).expose("loom");
+// The same guide a model gets from "Ask a model", so copying it into a chat app works the same way.
+const guideOptions = { imageHosts };
+const guideText = languageGuide(loom.registry, guideOptions);
+$("guide").textContent = guideText;
+$("copyGuide").addEventListener("click", async (e) => {
+  e.preventDefault(); // inside <summary>: don't toggle the panel
+  const b = e.currentTarget as HTMLButtonElement;
+  try {
+    await navigator.clipboard.writeText(guideText);
+    b.textContent = "Copied";
+  } catch {
+    b.textContent = "Couldn't copy";
+  }
+  setTimeout(() => { b.textContent = "Copy guide"; }, 1500);
+});
 
 let current = "map";
 let streamId = 0;
@@ -206,3 +222,22 @@ loom.on("render", (m) => {
 
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
 fontsReady.then(() => stream("map"));
+
+// ------------------------------------------------------------ ask a model
+
+setupAsk({
+  loom,
+  guide: guideOptions,
+  stopSample: () => {
+    streamId++;
+    nav.querySelectorAll<HTMLButtonElement>(".chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+  },
+  setEditor: (text, o = {}) => {
+    ta.value = o.append ? ta.value + text : text;
+    ta.readOnly = !!o.readOnly;
+    if (o.append) ta.scrollTop = ta.scrollHeight;
+    renderGutter();
+  },
+  setPrompt: (text) => { $("promptText").textContent = text; },
+  setStatus,
+});

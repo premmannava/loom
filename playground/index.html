@@ -26,6 +26,17 @@
 
   <nav class="samples" id="samples" aria-label="Samples"></nav>
 
+  <section class="pane ask" aria-label="Ask a model">
+    <form class="ask-form" id="askForm">
+      <input id="askInput" type="text" autocomplete="off" aria-label="Describe a screen" placeholder="Describe a screen, e.g. a booking form for a cabin, 2 to 6 guests">
+      <select id="askModel" aria-label="Model"></select>
+      <label class="tog" title="Send the current screen and conversation, so the model changes it instead of starting over"><input type="checkbox" id="askRefine"> Refine this screen</label>
+      <button class="btn primary" id="askGo" type="submit">Ask</button>
+      <button class="btn" id="askStop" type="button" hidden>Stop</button>
+    </form>
+    <p class="ask-status" id="askStatus" role="status">Checking for a model server…</p>
+  </section>
+
   <main class="bench">
     <section class="pane editor-pane" aria-label="Spec">
       <div class="pane-head">
@@ -70,7 +81,7 @@
   </section>
 
   <details class="guide">
-    <summary>Model guide (generated from the component registry)</summary>
+    <summary>Model guide (generated from the component registry) <button class="btn" id="copyGuide" type="button">Copy guide</button></summary>
     <pre class="mono" id="guide"></pre>
   </details>
 </div>

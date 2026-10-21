@@ -89,3 +89,15 @@ canvas { display: block }
   .editor { height: 300px }
 }
 @media (prefers-reduced-motion: reduce) { .status.live i { animation: none } }
+
+.ask { margin-bottom: 14px }
+.ask-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px 0 }
+.ask-form input[type="text"] { flex: 1 1 280px; min-width: 0; font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink) }
+.ask-form select { flex: 0 1 220px; min-width: 0; font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink) }
+.ask-form input[type="text"]:focus-visible, .ask-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.btn.primary { background: var(--accent); color: var(--card); padding: 7px 14px; font-size: 13px }
+.ask-status { margin: 8px 14px 10px; font-size: 13px; color: var(--muted); min-height: 1.5em }
+.ask-status.live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; vertical-align: 1px }
+.ask-status.error { color: var(--bad) }
+.ask-status code { font: 12px var(--f-mono); color: var(--ink) }
+.guide summary .btn { margin-left: 10px }
