@@ -265,6 +265,9 @@ export class Loom {
 
   private runPaint(): void {
     if (!this.rootBox) return;
+    // Clear the flag first: painting can ask for another frame (a fade, a pulse),
+    // and clearing it afterwards would drop that request and freeze the animation.
+    this.dirty.paint = false;
     const t = now();
     const g = this.inspector.wrapContext(this.g);
     const dpr = this.canvas.width / Math.max(1, this.metrics.width);
@@ -279,7 +282,6 @@ export class Loom {
     this.inspector.paintOverlay(g, this.rootBox, this.hits);
     this.inspector.endCapture();
     this.metrics.paintMs = now() - t;
-    this.dirty.paint = false;
     this.events.emit("render", { ...this.metrics });
   }
 
