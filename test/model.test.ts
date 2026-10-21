@@ -1,3 +1,4 @@
+import { render } from "../src/testing";
 import { describe, expect, it } from "vitest";
 import { coreComponents } from "../src/components";
 import { generateSpec, loomLineTest, ModelError, SpecFilter, streamChat, type ChatMessage } from "../src/model";
@@ -80,6 +81,30 @@ describe("SpecFilter", () => {
 
   it("keeps the last line without a newline", () => {
     expect(run(["card\n  text \"Hi\""]).text).toBe(`card\n  text "Hi"\n`);
+  });
+
+  it("joins a state value spread over several lines, as models write long lists", () => {
+    const raw = `state picked="" trails=[
+    {name: "Four Peaks", miles: 12, note: "a ] in text"},
+
+    {name: "Papago", miles: 3}
+]
+card
+  each items=trails as=t
+    text "{t.name}"
+`;
+    const joined = `state picked="" trails=[ {name: "Four Peaks", miles: 12, note: "a ] in text"},  {name: "Papago", miles: 3} ]\ncard\n  each items=trails as=t\n    text "{t.name}"\n`;
+    for (const size of [1, 5, 1000]) {
+      const chunks = raw.match(new RegExp(`[\\s\\S]{1,${size}}`, "g"))!;
+      expect(run(chunks).text, `chunks of ${size}`).toBe(joined);
+    }
+    const ui = render(joined);
+    expect(ui.diagnostics).toEqual([]);
+    expect(ui.text()).toEqual(["Four Peaks", "Papago"]);
+  });
+
+  it("passes an unclosed state value on unchanged when it never closes", () => {
+    expect(run(["state xs=[1,\n2,\n"]).text).toBe("state xs=[1,\n2,\n");
   });
 
   it("recognises how a spec can start", () => {

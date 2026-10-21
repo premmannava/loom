@@ -28,6 +28,19 @@ import type { Diagnostic, LoomNode, Value } from "./types";
  */
 export const MAX_DEPTH = 100;
 
+/** How many `[` and `{` are still open at the end of a line, outside quotes. */
+export function openBrackets(line: string, depth = 0): number {
+  let quote = "";
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (quote) { if (c === "\\") i++; else if (c === quote) quote = ""; continue; }
+    if (c === "'" || c === '"') quote = c;
+    else if (c === "[" || c === "{") depth++;
+    else if (c === "]" || c === "}") depth--;
+  }
+  return depth;
+}
+
 export interface ParseOptions {
   /** Ignore the last line if it has no trailing newline (it may still be streaming). */
   partial?: boolean;
@@ -234,6 +247,8 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
   let nodeCount = 0;
   let skipDeeperThan: number | null = null;
   let last: LoomNode | null = null;
+  // A state line whose list or record was left open: the lines after it are probably the rest of it.
+  let openState: { line: number; reported: boolean } | null = null;
   // Names each line reads that it isn't inside the each for, checked once every each is known.
   const outsideUses: Array<{ line: number; names: string[] }> = [];
   const eaches: LoomNode[] = [];
@@ -256,10 +271,19 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     if (/^state(\s|$)/.test(body)) {
       if (indent > 0) diagnostics.push({ line: lineNo, severity: "warning", message: `state lines should not be indented` });
       state.push(...parseStateLine(body.slice(5), lineNo, diagnostics));
+      openState = openBrackets(body) > 0 ? { line: lineNo, reported: false } : null;
       return;
     }
 
     const tok = tokenizeLine(body);
+    if (!tok.type && openState) {
+      if (!openState.reported) {
+        openState.reported = true;
+        diagnostics.push({ line: lineNo, severity: "warning", message: `This looks like more of the state value on line ${openState.line}, which was skipped. Write the whole value on line ${openState.line}, like state items=[{name: "A"}, {name: "B"}]` });
+      }
+      return;
+    }
+    openState = null;
     for (const p of tok.problems) diagnostics.push({ line: lineNo, severity: "warning", message: p });
     if (!tok.type) { skipDeeperThan = indent; return; }
 

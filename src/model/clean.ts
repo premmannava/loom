@@ -3,7 +3,10 @@
  *
  * - drops thinking (`<think>…</think>`, as Qwen3 and DeepSeek R1 write it),
  * - drops code fences (```), which models add out of habit,
- * - drops chatter before the spec starts ("Here is your interface:").
+ * - drops chatter before the spec starts ("Here is your interface:"),
+ * - joins a state value spread over several lines back into one line. Loom
+ *   needs each value on one line (so a stream can render line by line), but
+ *   models often lay out long lists like JSON, one item per line.
  *
  * It works on whole lines, so a tag or fence split across chunks is still
  * caught. A reasoning model may also start thinking without an opening tag
@@ -18,12 +21,21 @@ export interface FilterOutput {
   reset: boolean;
 }
 
+import { openBrackets } from "../parser";
+
 const FENCE = /^\s*```/;
+
+/** A multi-line state value longer than this is passed on as it is, for the parser to report. */
+const MAX_JOINED_LINES = 300;
+
 
 export class SpecFilter {
   private partial = "";
   private thinking = false;
   private started = false;
+  /** Lines of a state value still being joined, and how many brackets they leave open. */
+  private joining: string[] = [];
+  private depth = 0;
   /** Characters of thinking seen, for reporting. */
   thinkingChars = 0;
 
@@ -46,7 +58,16 @@ export class SpecFilter {
   end(): FilterOutput {
     const rest = this.partial;
     this.partial = "";
-    return rest ? this.lines([rest]) : { text: "", reset: false };
+    const out = rest ? this.lines([rest]) : { text: "", reset: false };
+    return { text: out.text + this.flushJoin(), reset: out.reset };
+  }
+
+  private flushJoin(): string {
+    if (!this.joining.length) return "";
+    const lines = this.joining;
+    this.joining = [];
+    // Unbalanced to the end, or too long: pass the lines on unchanged.
+    return lines.map((l) => l + "\n").join("");
   }
 
   private lines(lines: string[]): FilterOutput {
@@ -72,6 +93,7 @@ export class SpecFilter {
           this.thinkingChars += out.length + orphanClose;
           out = "";
           this.started = false;
+          this.joining = [];
           line = line.slice(orphanClose + "</think>".length);
           continue;
         }
@@ -92,6 +114,24 @@ export class SpecFilter {
     if (!this.started) {
       if (!this.looksLikeLoom(line)) return "";
       this.started = true;
+    }
+    if (this.joining.length) {
+      this.joining.push(line);
+      this.depth = openBrackets(line, this.depth);
+      if (this.depth <= 0) {
+        const joined = this.joining.map((l, i) => (i ? l.trim() : l.trimEnd())).join(" ");
+        this.joining = [];
+        return joined + "\n";
+      }
+      return this.joining.length >= MAX_JOINED_LINES ? this.flushJoin() : "";
+    }
+    if (/^state\s/.test(line)) {
+      const depth = openBrackets(line);
+      if (depth > 0) {
+        this.joining = [line];
+        this.depth = depth;
+        return "";
+      }
     }
     return line + "\n";
   }

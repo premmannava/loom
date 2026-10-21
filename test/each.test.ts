@@ -313,6 +313,18 @@ column
 `)[0]!.message).toMatch(/can't contain anything/);
   });
 
+  it("explains a list spread over several lines once, not on every line", () => {
+    const d = diags(`state trails=[
+  {name: "A"},
+  {name: "B"}
+]
+card
+  text "Trails"
+`);
+    expect(d.map((x) => x.line)).toEqual([1, 2]);
+    expect(d[1]!.message).toMatch(/more of the state value on line 1.*Write the whole value on line 1/);
+  });
+
   it("needs items=", () => {
     expect(diags(`each\n  text "x"\n`)).toEqual([{ line: 1, severity: "warning", message: `"each" needs items=` }]);
   });

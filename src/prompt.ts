@@ -90,6 +90,7 @@ export function languageGuide(registry: Registry, opts: GuideOptions = {}): stri
 - One element per line: type "optional text" name=value name="quoted value" name={expression}
 - Indent children with 2 spaces under a container.
 - Declare state first, at the top, unindented: state count=0 done=false name="Ada"
+- Every element and every state value fits on one line, even a long list: state trails=[{name: "Camelback", miles: 2.5}, {name: "Piestewa", miles: 2.1}]
 - Lines starting with # are comments.`);
 
   sections.push(`EXPRESSIONS
