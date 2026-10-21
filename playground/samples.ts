@@ -186,7 +186,7 @@ card
   packing: {
     label: "Packing list",
     prompt: "A packing list for a weekend hike where I can tick things off, hide what's packed, and add or remove items.",
-    spec: `state hide=false gear=[{id: 1, text: "Water, 3 L", kg: 3, done: true}, {id: 2, text: "Headlamp", kg: 0.1, done: false}, {id: 3, text: "Rain shell", kg: 0.4, done: false}, {id: 4, text: "First aid kit", kg: 0.3, done: true}, {id: 5, text: "Trail snacks", kg: 0.6, done: false}]
+    spec: `state hide=false item="" gear=[{id: 1, text: "Water, 3 L", kg: 3, done: true}, {id: 2, text: "Headlamp", kg: 0.1, done: false}, {id: 3, text: "Rain shell", kg: 0.4, done: false}, {id: 4, text: "First aid kit", kg: 0.3, done: true}, {id: 5, text: "Trail snacks", kg: 0.6, done: false}]
 card
   text "Weekend packing list" style=title
   text "{count(gear, 'done')} of {len(gear)} packed · {round(sum(gear, 'kg'), 1)} kg in total" tone=muted
@@ -199,8 +199,23 @@ card
       button "Remove" variant=secondary on="remove:g;notify:'Removed {g.text}'"
   text "Everything's packed. Have a great hike!" tone=good if={len(gear) > 0 && count(gear, 'done') == len(gear)}
   row
-    button "Add map" variant=secondary on="add:gear:{id: len(gear) + 100, text: 'Paper map', kg: 0.1, done: false}"
-    button "Clear list" variant=danger on=clear:gear
+    input bind=item placeholder="Add an item, e.g. Sunscreen" on="add:gear:{id: len(gear) + 100, text: trim(item), kg: 0, done: false};set:item:''"
+    button "Add" variant=secondary on="add:gear:{id: len(gear) + 100, text: trim(item), kg: 0, done: false};set:item:''" disabled={trim(item) == ''}
+  button "Clear list" variant=danger on=clear:gear
+`,
+  },
+  search: {
+    label: "Search",
+    prompt: "Hiking trails near Phoenix with a search box that filters them as I type.",
+    spec: `state query="" trails=[{name: "Camelback Mountain", area: "Phoenix", miles: 2.5, level: "Hard"}, {name: "Piestewa Peak", area: "Phoenix", miles: 2.1, level: "Hard"}, {name: "Flatiron", area: "Apache Junction", miles: 6.2, level: "Hard"}, {name: "Wind Cave", area: "Mesa", miles: 3, level: "Moderate"}, {name: "Hieroglyphic Trail", area: "Gold Canyon", miles: 3, level: "Moderate"}, {name: "Holbert Trail", area: "South Mountain", miles: 5, level: "Moderate"}, {name: "Siphon Draw", area: "Lost Dutchman", miles: 4, level: "Hard"}, {name: "Lost Dog Wash", area: "Scottsdale", miles: 4.3, level: "Easy"}]
+card
+  text "Trails near Phoenix" style=title
+  input bind=query kind=search placeholder="Search trails"
+  text "{plural(len(search(trails, 'name', query)), 'trail')}" tone=muted
+  list
+    each items=trails as=t key={t.name}
+      list-item "{t.name}" detail="{t.area} · {t.miles} mi" trailing="{t.level}" on="emit:open_trail:{t.name}" if={includes(lower(t.name), lower(trim(query)))}
+  empty "No trails match {query}" detail="Try a shorter name." action="Clear search" on="set:query:''" if={len(search(trails, 'name', query)) == 0}
 `,
   },
   cart: {

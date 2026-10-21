@@ -4,7 +4,7 @@
  * of them will do. `checks` render the answer and use it (see checks.ts).
  * Traps check that models stay within the language.
  */
-import { acts, allDoneShowsMore, calls, nested, pressChanges, removes, repeats, type Check } from "./checks";
+import { acts, allDoneShowsMore, calls, nested, pressChanges, removes, repeats, typingChanges, typingFilters, type Check } from "./checks";
 
 export interface EvalCase {
   id: string;
@@ -22,6 +22,8 @@ export const cases: EvalCase[] = [
   { id: "form-booking", category: "form", request: "A booking form for a mountain cabin: 2 to 6 guests, 1 to 14 nights, and a Book button.", expect: ["stepper", "button"] },
   { id: "form-settings", category: "form", request: "Notification settings with switches for email, SMS and push notifications, and a Save button.", expect: ["switch", "button"] },
   { id: "form-survey", category: "form", request: "A one-question survey: how did you hear about us? Pick one of four answers, then Submit.", expect: ["radio", "button"] },
+  { id: "form-login", category: "form", request: "A login form with email and password fields.", expect: ["input", "button"], checks: [typingChanges("ada@example.com")] },
+  { id: "form-signup", category: "form", request: "A sign-up form: name, email, password, and agreeing to the terms.", expect: ["input", "check", "button"], checks: [typingChanges("Ada")] },
   { id: "form-checklist", category: "form", request: "A packing checklist for a day hike with six items and a bar showing how many are packed.", expect: ["check", "progress"] },
 
   // Comparisons
@@ -65,7 +67,8 @@ export const cases: EvalCase[] = [
   { id: "data-products", category: "data", request: "A grid of 6 tents, each with its name, price and an Add to cart button.", expect: ["each", "button"], checks: [repeats(6)] },
   { id: "data-orders", category: "data", request: "My last 3 orders, each showing its date, its 2 or 3 items, and the order total.", expect: ["each"], checks: [nested, repeats(3)] },
   { id: "data-kanban", category: "data", request: "A kanban board with three columns, To do, Doing and Done, each holding 2 or 3 task cards.", expect: ["each"], checks: [repeats(6)] },
-  { id: "data-contacts", category: "data", request: "A contact list of 6 people with name and phone, where I can remove a contact or add a new one.", expect: ["each", "button"], checks: [repeats(6), acts("add"), removes(/remove|delete/i)] },
+  { id: "data-contacts", category: "data", request: "A contact list of 6 people with name and phone, where I can remove a contact or add a new one.", expect: ["each", "button", "input"], checks: [repeats(6), acts("add"), removes(/remove|delete/i)] },
+  { id: "data-search", category: "data", request: "A list of 8 hiking trails near Phoenix with a search box that filters them as I type.", expect: ["each", "input"], checks: [repeats(8), typingFilters] },
 
   // Hard: several ideas at once, from testing with a 14B model
   { id: "hard-bill", category: "hard", request: "Split a $186 dinner bill: tip from 0 to 25% with a slider, 2 to 8 people with a stepper, and show each person's share.", expect: ["slider", "stepper"], checks: [pressChanges("stepper")] },
@@ -74,6 +77,5 @@ export const cases: EvalCase[] = [
   // Traps: staying inside the language
   { id: "trap-red", category: "trap", request: "A big red Buy now button.", expect: ["button"], note: "No colors in Loom: the closest role is variant=danger." },
   { id: "trap-css", category: "trap", request: "A card with a blue background and 18px Helvetica text saying Welcome back.", expect: ["card"], note: "No backgrounds, sizes or fonts: should ignore them, not invent props." },
-  { id: "trap-login", category: "trap", request: "A login form with email and password fields.", note: "Loom has no text input yet: inventing an input element is an error." },
   { id: "trap-prose", category: "trap", request: "Explain what you are.", note: "Should still answer in Loom, not prose." },
 ];

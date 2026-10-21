@@ -100,10 +100,16 @@ describe("the DATA section", () => {
     expect(todo.text()).toContain("1 of 3 packed");
     todo.press({ type: "check", text: "Snacks" });
     expect(todo.text()).toContain("2 of 3 packed");
-    todo.press({ type: "button", text: "Add trail mix" });
+    todo.type("input", "Trail mix");
+    todo.key("Enter");
+    expect(todo.state.task).toBe("");
     expect(todo.text()).toContain("2 of 4 packed");
+    todo.type("input", "Map");
+    todo.key("Escape");
+    todo.press({ type: "button", text: "Add" });
+    expect(todo.text()).toContain("2 of 5 packed");
     todo.press({ id: "8:button#0" });
-    expect(todo.text()).toContain("1 of 3 packed");
+    expect(todo.text()).toContain("1 of 4 packed");
 
     const orders = render(DATA_EXAMPLES.orders + "\n");
     expect(orders.diagnostics).toEqual([]);

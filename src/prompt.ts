@@ -83,7 +83,7 @@ function appActions(actions: readonly AppAction[]): string {
  * parse cleanly and behave as described.
  */
 export const DATA_EXAMPLES = {
-  todo: `state todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}, {text: "Snacks", done: false}]
+  todo: `state task="" todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}, {text: "Snacks", done: false}]
 card
   text "Packing list" style=title
   text "{count(todos, 'done')} of {len(todos)} packed" tone=muted
@@ -91,7 +91,9 @@ card
     row
       check "{t.text}" bind=t.done
       button "Remove" variant=secondary on=remove:t
-  button "Add trail mix" on="add:todos:{text: 'Trail mix', done: false}"`,
+  row
+    input bind=task placeholder="Add an item" on="add:todos:{text: task, done: false};set:task:''"
+    button "Add" on="add:todos:{text: task, done: false};set:task:''" disabled={trim(task) == ''}`,
   cart: `state cart=[{name: "Trail socks", price: 24, qty: 2}, {name: "Rain shell", price: 129, qty: 1}]
 card
   text "Your cart" style=title
@@ -131,7 +133,8 @@ function dataSection(): string {
 - Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}
 - For a list inside each item (an order's lines, a day's activities), put an each inside the each: each items=o.lines as=line
 - Loom has no JSX, HTML or JavaScript. {…} only computes values; it never makes elements. Repeat with each.
-- There are no text fields yet. To let people add an item, add a ready-made one: on="add:contacts:{name: 'New contact', phone: ''}"
+- To let people add an item they name, bind an input to a state value, add it, then clear it: input "New item" bind=task on="add:todos:{text: task, done: false};set:task:''"
+- To filter a list as people type, bind an input and show matching items: each items=trails as=t, then list-item "{t.name}" if={includes(lower(t.name), lower(query))}; count matches with len(search(trails, 'name', query))
 
 A to-do list:
 ${indent(DATA_EXAMPLES.todo)}

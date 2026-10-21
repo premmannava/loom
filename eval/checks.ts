@@ -113,3 +113,30 @@ export const allDoneShowsMore: Check = {
 function isTicked(ui: Rendered, node: LoomNode): boolean {
   return !!new PropReader(node, scopeOf(node, ui.loom.state.scope)).bound();
 }
+
+/** Type into the first field, stop typing, and see the screen change (a greeting, a count, the field's value). */
+export const typingChanges = (text: string): Check => ({
+  label: "typing in the field changes the screen",
+  test: (_spec, ui) => {
+    const field = ui.findAll("input").find((f) => f.box);
+    if (!field) return false;
+    const before = ui.text().join("\n");
+    ui.type({ id: field.node.id }, text);
+    ui.key("Escape");
+    return ui.text().join("\n") !== before;
+  },
+});
+
+/** Typing text that matches nothing shows fewer list items, as a search should. */
+export const typingFilters: Check = {
+  label: "typing in the search field filters the list",
+  test: (_spec, ui) => {
+    const field = ui.findAll("input").find((f) => f.box);
+    if (!field) return false;
+    const shown = () => ui.findAll({}).filter((f) => f.box && f.node.id.includes("#")).length;
+    const before = shown();
+    ui.type({ id: field.node.id }, "zzqx");
+    ui.key("Escape");
+    return before > 0 && shown() < before;
+  },
+};

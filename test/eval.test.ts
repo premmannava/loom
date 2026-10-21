@@ -24,15 +24,15 @@ function fakeModel(byRequest: (request: string, attempt: number) => string) {
 const config = { url: "http://model.test/v1", model: "fake" };
 
 describe("evaluation set", () => {
-  it("has 39 requests with unique ids, expecting only elements that exist", () => {
-    expect(cases).toHaveLength(39);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(39);
+  it("has 41 requests with unique ids, expecting only elements that exist", () => {
+    expect(cases).toHaveLength(41);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(41);
     for (const c of cases) for (const e of (c.expect ?? []).flat()) expect(registry.has(e), `${c.id}: ${e}`).toBe(true);
   });
 });
 
 describe("scoring", () => {
-  const trap = cases.filter((c) => c.id === "trap-red" || c.id === "trap-login" || c.id === "form-booking");
+  const trap = cases.filter((c) => c.id === "trap-red" || c.id === "form-login" || c.id === "form-booking");
 
   it("scores valid answers, invented design props and elements, and missing elements", async () => {
     const fetch = fakeModel((req, attempt) => {
@@ -43,12 +43,12 @@ describe("scoring", () => {
     const results = await runEval(trap, { config, registry, fetch });
     const by = Object.fromEntries(results.map((r) => [r.id, r]));
     expect(by["trap-red"]).toMatchObject({ validFirst: false, validFinal: true, repaired: true, inventedDesign: ["color"], missing: [] });
-    expect(by["trap-login"]).toMatchObject({ validFirst: false, inventedElements: ["textbox"] });
+    expect(by["form-login"]).toMatchObject({ validFirst: false, inventedElements: ["textbox"] });
     expect(by["form-booking"]).toMatchObject({ validFirst: true, validFinal: true, missing: ["stepper"], repaired: false });
     expect(by["form-booking"]!.tokensEstimated).toBe(true);
 
     const s = summarize(results);
-    expect(s).toMatchObject({ cases: 3, validFirst: 1, inventedDesign: 1, inventedElements: 1, expectedMet: 2 });
+    expect(s).toMatchObject({ cases: 3, validFirst: 1, inventedDesign: 1, inventedElements: 1, expectedMet: 1 });
     const md = report(results, { model: "fake", url: config.url, date: "2026-10-20 23:00", guideTokens: 4000, repair: true });
     expect(md).toMatch(/\| Valid on the first try \| 1\/3 \(33%\) \|/);
     expect(md).toMatch(/\| trap-red \| 1 problems \| valid \| — \| — \| color= \|/);
@@ -157,6 +157,34 @@ row
       text "{c.name}"
       text "Task one"
       text "Task two"
+`,
+    ],
+    "data-search": [
+      `state query="" trails=[{name: "Camelback"}, {name: "Piestewa"}, {name: "Flatiron"}, {name: "Wind Cave"}, {name: "Hieroglyphic"}, {name: "Pass Mountain"}, {name: "Holbert"}, {name: "Siphon Draw"}]
+card
+  input "Search" bind=query kind=search
+  list
+    each items=trails as=t
+      list-item "{t.name}" if={includes(lower(t.name), lower(query))}
+`,
+      `state trails=[{name: "Camelback"}, {name: "Piestewa"}, {name: "Flatiron"}, {name: "Wind Cave"}, {name: "Hieroglyphic"}, {name: "Pass Mountain"}, {name: "Holbert"}, {name: "Siphon Draw"}] query=""
+card
+  input "Search" bind=query kind=search
+  list
+    each items=trails as=t
+      list-item "{t.name}"
+`,
+    ],
+    "form-login": [
+      `state email="" pw=""
+card
+  input "Email" bind=email kind=email
+  input "Password" bind=pw kind=password
+  button "Log in" on=emit:login disabled={email == '' || pw == ''}
+`,
+      `card
+  text "Log in" style=title
+  button "Log in" on=emit:login
 `,
     ],
     "hard-celebrate": [

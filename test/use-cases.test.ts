@@ -3,7 +3,7 @@
  * formatting, written as a model would with the guide. They must keep
  * working exactly as described.
  */
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render } from "../src/testing";
 const screens: Record<string, [string, (ui: ReturnType<typeof render>) => void]> = {
   transactions: [`state cat="All" tx=[{name: "Whole Foods", cat: "Groceries", amount: -84.12}, {name: "Shell", cat: "Gas", amount: -46.5}, {name: "Payroll", cat: "Income", amount: 2400}, {name: "Trader Joe's", cat: "Groceries", amount: -38.9}]
@@ -60,3 +60,30 @@ empty "No articles about {topic}" if={count(articles, 'topic', topic) == 0}
 for (const [name, [spec, check]] of Object.entries(screens)) {
   it(name, () => { const ui = render(spec); expect(ui.diagnostics).toEqual([]); expect(ui.warnings).toEqual([]); check(ui); });
 }
+
+describe("typing samples", () => {
+  it("Search filters as you type, counts matches, and clears", async () => {
+    const { samples } = await import("../playground/samples");
+    const ui = render(samples.search!.spec);
+    expect(ui.diagnostics).toEqual([]);
+    expect(ui.text()).toContain("8 trails");
+    ui.type("input", "pe");
+    ui.key("Escape");
+    expect(ui.text()).toEqual(expect.arrayContaining(["1 trail", "Piestewa Peak"]));
+    ui.type("input", "zz");
+    ui.key("Escape");
+    expect(ui.text()).toContain("No trails match pezz");
+    ui.press("empty");
+    expect(ui.text()).toContain("8 trails");
+  });
+
+  it("Packing list adds an item someone types", async () => {
+    const { samples } = await import("../playground/samples");
+    const ui = render(samples.packing!.spec);
+    expect(ui.diagnostics).toEqual([]);
+    ui.type("input", "Sunscreen");
+    ui.key("Enter");
+    expect(ui.text()).toContain("Sunscreen");
+    expect(ui.state.item).toBe("");
+  });
+});

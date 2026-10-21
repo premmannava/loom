@@ -189,10 +189,14 @@ loom.on("diagnostics", (d) => {
 
 const stateBody = $("state").querySelector("tbody")!;
 let flashKey = "";
+/** State bound to password fields, shown masked: typed passwords shouldn't sit on screen in plain text. */
+const passwordKeys = () => new Set(loom.find("input").filter((n) => n.props.kind === "password" && n.props.bind).map((n) => n.props.bind!.split(".")[0]!));
 function renderState() {
   const snap = loom.state.snapshot();
+  const secret = passwordKeys();
   stateBody.innerHTML = "";
-  for (const [k, v] of Object.entries(snap)) {
+  for (const [k, v0] of Object.entries(snap)) {
+    const v = secret.has(k) && typeof v0 === "string" ? "•".repeat(v0.length) : v0;
     const tr = document.createElement("tr");
     if (k === flashKey) tr.className = "flash";
     tr.innerHTML = `<td></td><td></td>`;
