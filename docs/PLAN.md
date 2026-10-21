@@ -31,8 +31,8 @@ Time estimates are rough, for one developer working with AI assistance, and will
 
 | Gap | Why it matters |
 |---|---|
-| State holds only single values | Products, carts and orders are lists of records |
-| No way to repeat an element over a list | A catalog can't be written without it |
+| ~~State holds only single values~~ (done: lists and records, Phase 2.1) | Products, carts and orders are lists of records |
+| ~~No way to repeat an element over a list~~ (done: `each`, Phase 2.2) | A catalog can't be written without it |
 | No connection to real data | A model must never invent prices or stock |
 | No host commands | "Add to cart" and "checkout" must run trusted app code |
 | One screen per spec | Apps move between catalog, product, cart and checkout |
@@ -99,6 +99,8 @@ What the new tests found on their first runs:
 
 **Goal:** make the language able to describe real applications, while keeping the three guarantees: streamable, safe, and design-free.
 
+**Status:** 2.1 and 2.2 are done ([details](#status-of-21-and-22)), along with screens (2.6). Data sources (2.4) and host commands (2.5) come next.
+
 ### 2.1 Structured data and property access
 
 State and expressions gain lists and records:
@@ -125,6 +127,16 @@ each items={products.data.items} as=p key={p.id}
 
 - `each` repeats its children once per item, with the item available under the `as` name. `key` keeps state and fade-in stable when the list changes.
 - Streaming still works, because `each` is a normal container line.
+
+### Status of 2.1 and 2.2
+
+Built as planned in [`plans/lists-and-data.md`](plans/lists-and-data.md), with these differences:
+
+- Copies are made inside layout (`shownChildren`), where containers ask for their children, rather than in a separate expand step. Same result, fewer moving parts.
+- Besides the 500-item limit per `each`, a screen copies at most 10,000 elements, because nested lists multiply.
+- Inputs write items through `bind=t.done` and path actions; `$value` and `money`, `lower`, `upper` aren't built yet.
+- From testing with Qwen3 14B: a line holding only `if=` is now a condition block (models write it naturally), multi-line state lists from a model are joined back into one line by `loom-ui/model`, a spec written inside unclosed thinking is recovered, and names nothing defines are warnings that go to the repair pass.
+- `npm run eval` gained "data" and "hard" categories and behavior checks that use the rendered screen.
 
 ### 2.3 Grid layout
 
@@ -219,7 +231,7 @@ screen name=product title="{product.data.name}"
 
 Since then: `image` and `slider` (with the engine's images and dragging), and `screen` (Phase 2.6).
 
-Still waiting on engine capabilities: `input`, `select`/`option`, `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+Still waiting on engine capabilities: `input`, `select`/`option`, `table` and `chart` (lists of data now exist; they still need scrolling and, for `select`, overlays), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
 
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 

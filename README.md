@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, a first set of components, tests and debugging tools are in place. Text input, accessibility and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, 34 components, lists and data, a model connection, tests and debugging tools are in place. Text input, accessibility and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -79,7 +79,7 @@ npm run dev        # opens the playground
 | `npm run test:visual` | Runs the visual regression tests (Playwright) |
 | `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
 | `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
-| `npm run eval` | Scores a real model on 30 requests ([Measure it](#measure-it)) |
+| `npm run eval` | Scores a real model on 39 requests ([Measure it](#measure-it)) |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
@@ -118,27 +118,33 @@ card
 
 ### State
 
-Declare state on unindented `state` lines, usually at the top. Values are numbers, `true`/`false`, `null` or text.
+Declare state on unindented `state` lines, usually at the top. Values are numbers, `true`/`false`, `null`, text, lists `[…]` and records `{name: value}`.
 
 ```
 state qty=2 price=24 gift=false name="Ada"
+state todos=[{text: "Pack water", done: false}, {text: "Snacks", done: true}]
 ```
 
-State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed.
+A value must fit on one line, however long, so a streamed spec can render line by line. Lists and records hold data only: they're parsed, never run, and are limited to 20 levels deep and 10,000 values.
+
+State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
 
 ### Expressions
 
 Anything inside `{…}` is evaluated against state.
 
 ```
+state qty=2 price=24 gift=true
 text "Total: ${qty * price + (gift ? 4 : 0)}"
 stat label="Each" value={round(price / 3, 2)}
 ```
 
 - Operators: `+ - * / %`, `== != < <= > >=`, `&& || !`, and `a ? b : c`
 - Text joins with `+`: `{'$' + price}` (use single quotes inside a quoted prop)
-- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`
-- There is no property access, assignment or global access. An unknown name shows as `—` rather than guessing.
+- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`, and the list functions in [Lists](#lists)
+- Fields and items: `{order.city}`, `{cart[0].price}`, `{todos.length}`
+- Words inside `{…}` are state names, so quote text: `{done ? 'Packed' : 'To pack'}`
+- There is no assignment, no calling methods and no global access, and `__proto__`, `constructor` and `prototype` can't be read. Anything that can't be read shows as `—` rather than guessing, and the parser warns about names nothing defines.
 
 ### Actions
 
@@ -154,10 +160,16 @@ Interactive elements run actions from their `on=` prop.
 | `go:screen` | Show another screen ([Screens](#screens)) |
 | `back` | Return to the previous screen |
 | `notify:'message'` | Show a short message for a few seconds; it can include `{expressions}` |
+| `add:list:value` | Add an item to the end of a list: `add:todos:{text: 'Map', done: false}` |
+| `remove:t` or `remove:list:index` | Remove the current item inside `each`, or the item at a position |
+| `clear:list` | Empty a list |
+
+The key of `inc`, `dec`, `toggle` and `set` can be a path into data, like `toggle:t.done` ([Lists](#lists)). A quoted value is text: `set:msg:'Hi there'`.
 
 Run several in order with `;`:
 
 ```
+state qty=2 placed=false
 button "Place order" on="set:placed:true;emit:order:{qty}"
 ```
 
@@ -167,6 +179,53 @@ button "Place order" on="set:placed:true;emit:order:{qty}"
 
 ```
 button "Add to cart" on="inc:items;notify:'Added. {items} in your cart'"
+```
+
+### Lists
+
+`each` repeats what's indented under it once per item of a list. It has no look of its own: the copies sit in the container around it, so `each` inside a `row`, `grid`, `list` or `tabs` makes one cell, row or tab per item.
+
+```
+state todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}]
+card
+  text "{count(todos, 'done')} of {len(todos)} packed" tone=muted
+  each items=todos as=t
+    row
+      check "{t.text}" bind=t.done
+      button "Remove" variant=secondary on=remove:t
+  button "Add snacks" on="add:todos:{text: 'Snacks', done: false}"
+```
+
+| Prop | Meaning |
+|---|---|
+| `items` | The list: a state name, a field (`o.lines`) or an `{expression}` |
+| `as` | Name of the current item inside (default `item`) |
+| `index` | Name of its position, from 0 |
+| `key` | A value unique to each item, like `{t.id}`, so focus stays with the item when the list changes (default: the position) |
+
+- **Reading:** `{t.text}` inside the `each`. A loop variable only exists inside its `each`; using it outside is a warning.
+- **Changing an item:** `bind=t.done`, `toggle:t.done`, `inc:item.qty`. This works only when `items=` names a list in state, not a computed one. Changes never edit data in place: the whole list is replaced, so the `change` event reports it (`todos`) and your app can save it.
+- **Changing the list:** `add`, `remove` and `clear` (see [Actions](#actions)).
+- **Lists in lists:** put an `each` inside an `each`, as in `each items=o.lines as=line`. Inner items can read outer ones.
+- **Limits:** at most 500 items per `each`, and 10,000 repeated elements per screen however lists nest. Past either, the rest are left out with a warning.
+
+List functions, for computing instead of typing numbers:
+
+| Function | Result |
+|---|---|
+| `len(list)` | Number of items |
+| `count(list, 'done')` | Items whose field is true |
+| `sum(list)`, `sum(list, 'price')`, `sum(list, 'price', 'qty')` | Total of the items, of a field, or of two fields multiplied per item (cart totals) |
+| `avg(list, 'field')` | Average |
+| `join(list)`, `join(list, 'name', ' / ')` | Text listing the items or a field |
+| `includes(list, value)` | Whether a value is in the list |
+| `min(list)`, `max(list)` | Smallest and largest |
+
+Your app can pass its own data, which is copied into plain, frozen Loom data (functions, class instances and cycles are refused with a clear error):
+
+```ts
+loom.state.set("products", await fetchProducts());
+loom.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
 ```
 
 ### Screens
@@ -190,8 +249,17 @@ State is shared by every screen. Screens only go at the top level, and their nam
 Every element accepts `if=`. The element (and everything inside it) is shown only while the condition is true.
 
 ```
+state water=true read=false walk=true drink=true
 text "Packed!" tone=good if=water
 text "All done" if={read && walk && drink}
+```
+
+To show several lines under one condition, put them under a line holding only `if=`. Like `each`, it has no look of its own:
+
+```
+if={count(todos, 'done') == len(todos)}
+  text "All done!" tone=good
+  button "Start over" on=clear:todos
 ```
 
 ### Comments
@@ -203,7 +271,7 @@ Lines starting with `#` are ignored.
 Loom never stops on a mistake. Each problem becomes a diagnostic with a line number:
 
 - **Errors** (unknown element, element in the wrong place, nesting more than 100 levels deep): that line and anything nested under it are skipped.
-- **Warnings** (unknown prop, bad value, broken expression): the element still renders, and the bad part is ignored.
+- **Warnings** (unknown prop, bad value, broken expression, a name nothing defines, a loop variable outside its `each`): the element still renders, and the bad part is ignored.
 
 ```
 L10  Unknown element "sparkle". It was skipped, along with anything inside it
@@ -910,13 +978,17 @@ Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their think
 ### Measure it
 
 ```bash
-npm run eval                        # all 30 requests, with the model from .env.local
+npm run eval                        # all 39 requests, with the model from .env.local
 npm run eval -- --model qwen3-14b   # another model on the same server
-npm run eval -- --only form,trap    # some categories or request ids
+npm run eval -- --only data,hard    # some categories or request ids
 npm run eval -- --no-repair         # first tries only
 ```
 
-`eval/cases.ts` holds 30 requests: forms, comparisons, dashboards, shopping, multi-screen flows, content, and traps like "a big red button" (Loom has no colors) or "a login form" (no text input yet). The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, any invented props or elements, output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground.
+`eval/cases.ts` holds 39 requests: forms, comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines), harder multi-part requests, and traps like "a big red button" (Loom has no colors) or "a login form" (no text input yet).
+
+Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item. A spec can be valid and still not work, and these catch that.
+
+The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
 
 ### In your own app
 
@@ -941,6 +1013,8 @@ const result = await generateSpec({
 loom.endStream();
 // result.spec, result.diagnostics, result.first, result.repair, result.timings, result.messages
 ```
+
+If your app supplies data with `loom.state.set`, pass its names as `stateNames: ["products"]`, so a spec that reads them isn't flagged as using unknown names and sent back for a needless repair. When a model writes its whole spec inside a thinking block it never closes, `generateSpec` finds the spec there (`result.first.recovered`).
 
 The guide comes from `languageGuide(registry, options)`, generated from the registered components, so it always matches what the engine supports. Its options tell the model which image hosts work, which `emit:` actions your app listens for, and anything about your app it should know.
 
@@ -1183,7 +1257,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, and `notify:` messages. Next: text input (a real input positioned over the canvas while typing), scrolling, select, table, chart and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, and `if` blocks. Next: text input (a real input positioned over the canvas while typing), scrolling, select, table, chart and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

@@ -1,6 +1,6 @@
 # Plan: lists and structured data
 
-**Status:** design approved (2026-10-21), not started. Part of [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) (sections 2.1 and 2.2).
+**Status:** done (2026-10-21), steps 1 to 6. What changed along the way is under [Results](#results). Part of [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) (sections 2.1 and 2.2).
 **Rough size:** 3 to 5 days, in six steps that each end in a working, tested commit.
 
 ## The problem
@@ -162,3 +162,17 @@ Each step ends with typecheck, tests and build passing, and its own commit.
 - **Sorting and filtering functions**, like `sort(list, 'price')`. They're easy to add later if the eval shows models want them. Until then, `if=` on items filters.
 - **Data sources and host commands** (Phase 2.4 and 2.5): fetching data by name, and buttons that run the app's code with checked arguments. They build on this and get their own plan.
 - **`table` and `chart`** become straightforward once lists exist. They come after this, as components.
+
+## Results
+
+All six steps shipped on `develop`, each with tests (912 in all), fuzzing and visual baselines.
+
+Changes from the design above:
+
+- **Where copies are made.** Not a separate expand step: layout's `shownChildren` replaces each `each` with its copies when a container asks for its children. It works in every container without changes to them.
+- **A second limit.** 10,000 copied elements per screen, since nested lists multiply (three nested 500-item lists would be 125 million).
+- **`if` blocks.** A line holding only `if={…}` became a condition for the lines under it, because Qwen3 14B kept writing conditions that way even after the repair message.
+- **Help for models.** `loom-ui/model` joins a state list written over several lines and recovers a spec written inside a thinking block that was never closed. The parser warns about unquoted words (`{done ? Yes : No}`), JSX (`{items.map(…)}`) and props on a line of their own, and those warnings go to the repair pass.
+- **Quoted action values** are text: `set:msg:'Hi'` no longer keeps the quotes.
+
+First eval with Qwen3 14B (data and hard categories, 9 requests): valid after repair 5/9, worked when used 4/9. The misses were two answers written inside unclosed thinking, JSX instead of a nested `each`, an invented `input` (there are no text fields yet), `if=` on its own line, and one check in the eval that counted wrongly. Each of those was fixed afterwards; a fresh run is still to do.
