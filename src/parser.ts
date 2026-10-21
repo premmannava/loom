@@ -14,6 +14,7 @@
  */
 import { parseActions } from "./actions";
 import { COMMON_PROPS, type PropDef } from "./component";
+import { looksLikeData, parseData } from "./data";
 import { checkSyntax, splitTemplate } from "./expr";
 import { literal } from "./actions";
 import type { Registry } from "./registry";
@@ -68,14 +69,15 @@ export function tokenizeLine(body: string): LineTokens {
     return s;
   };
 
-  const readBraced = (): string | null => {
+  /** A `{…}` expression or a `[…]` list, which may hold spaces, quotes and each other. */
+  const readGroup = (): string | null => {
     let depth = 0, j = i, quote = "";
     for (; j < n; j++) {
       const c = body[j]!;
-      if (quote) { if (c === quote) quote = ""; continue; }
+      if (quote) { if (c === "\\") j++; else if (c === quote) quote = ""; continue; }
       if (c === "'" || c === '"') quote = c;
-      else if (c === "{") depth++;
-      else if (c === "}" && --depth === 0) break;
+      else if (c === "{" || c === "[") depth++;
+      else if ((c === "}" || c === "]") && --depth === 0) break;
     }
     if (depth !== 0 || j >= n) return null;
     const s = body.slice(i, j + 1);
@@ -87,8 +89,8 @@ export function tokenizeLine(body: string): LineTokens {
   const readBare = (): string => {
     let s = "";
     while (i < n && !/\s/.test(body[i]!)) {
-      if (body[i] === "{") {
-        const b = readBraced();
+      if (body[i] === "{" || body[i] === "[") {
+        const b = readGroup();
         if (b === null) { s += body.slice(i); i = n; break; }
         s += b;
       } else { s += body[i]; i++; }
@@ -116,11 +118,16 @@ export function tokenizeLine(body: string): LineTokens {
     const key = /^[A-Za-z_][\w-]*(?==)/.exec(body.slice(i));
     if (key) {
       i += key[0].length + 1;
+      const start = i;
       let v: string | null;
       if (body[i] === '"' || body[i] === "'") v = readQuoted();
-      else if (body[i] === "{") v = readBraced() ?? null;
+      else if (body[i] === "{" || body[i] === "[") v = readGroup() ?? null;
       else v = readBare();
-      if (v === null) { out.problems.push(`Unclosed value for "${key[0]}"`); break; }
+      if (v === null) {
+        const what = body[start] === "[" ? `its "[" isn't closed with "]"` : body[start] === "{" ? `its "{" isn't closed with "}"` : "its quote isn't closed";
+        out.problems.push(`Unclosed value for "${key[0]}": ${what} on this line`);
+        break;
+      }
       if (key[0] in out.props) out.problems.push(`"${key[0]}" is set twice; using the last one`);
       out.props[key[0]] = v;
       continue;
@@ -135,10 +142,21 @@ function parseStateLine(body: string, line: number, diags: Diagnostic[]): Array<
   const t = tokenizeLine("state " + body);
   for (const p of t.problems) diags.push({ line, severity: "warning", message: p });
   if (t.text !== undefined) diags.push({ line, severity: "warning", message: `state lines take name=value pairs, not quoted text` });
-  return Object.entries(t.props).map(([key, raw]) => {
-    if (/^\{.*\}$/.test(raw)) diags.push({ line, severity: "warning", message: `Initial state "${key}" must be a plain value, not an expression` });
-    return { key, value: literal(raw), line };
-  });
+  const out: Array<{ key: string; value: Value; line: number }> = [];
+  for (const [key, raw] of Object.entries(t.props)) {
+    if (looksLikeData(raw)) {
+      const r = parseData(raw);
+      if ("error" in r) {
+        diags.push({ line, severity: "warning", message: `State "${key}" wasn't set: ${r.error}. Write lists like [1, 2] and records like {name: "Ada", age: 36}, on one line` });
+        continue;
+      }
+      out.push({ key, value: r.value, line });
+      continue;
+    }
+    if (/^\{.*\}$/s.test(raw)) diags.push({ line, severity: "warning", message: `Initial state "${key}" must be a plain value, list or record, not an expression` });
+    out.push({ key, value: literal(raw), line });
+  }
+  return out;
 }
 
 function checkProp(name: string, raw: string, def: PropDef, line: number, diags: Diagnostic[]): void {

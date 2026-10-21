@@ -7,6 +7,7 @@
  * no assignment, and no way to reach JavaScript globals, so model-written
  * expressions cannot run arbitrary code.
  */
+import { displayData, isData, isScalar, toNumber } from "./data";
 import type { Value } from "./types";
 
 type Node =
@@ -24,16 +25,16 @@ export class ExprError extends Error {}
 type Fn = (...a: Value[]) => Value;
 
 const BUILTINS: Record<string, Fn> = {
-  min: (...a) => Math.min(...a.map(Number)),
-  max: (...a) => Math.max(...a.map(Number)),
+  min: (...a) => Math.min(...a.map(toNumber)),
+  max: (...a) => Math.max(...a.map(toNumber)),
   round: (n, d = 0) => {
-    const f = 10 ** Number(d);
-    return Math.round(Number(n) * f) / f;
+    const f = 10 ** toNumber(d);
+    return Math.round(toNumber(n) * f) / f;
   },
-  floor: (n) => Math.floor(Number(n)),
-  ceil: (n) => Math.ceil(Number(n)),
-  abs: (n) => Math.abs(Number(n)),
-  fixed: (n, d = 2) => Number(n).toFixed(Number(d)),
+  floor: (n) => Math.floor(toNumber(n)),
+  ceil: (n) => Math.ceil(toNumber(n)),
+  abs: (n) => Math.abs(toNumber(n)),
+  fixed: (n, d = 2) => toNumber(n).toFixed(toNumber(d)),
 };
 
 // A frozen copy with no prototype, looked up by own property only, so names
@@ -144,22 +145,20 @@ function parseExpr(src: string): Node {
 
 export type Scope = (name: string) => Value | undefined;
 
-const isPlainValue = (v: unknown): v is Value =>
-  v === null || typeof v === "number" || typeof v === "string" || typeof v === "boolean";
 
 function run(n: Node, scope: Scope): Value {
   switch (n.k) {
     case "lit": return n.v;
     case "id": {
       const v = scope(n.name);
-      // Only plain values count: a scope backed by an object could otherwise
+      // Only Loom data counts: a scope backed by an object could otherwise
       // hand back things like Object.prototype for `__proto__`.
-      if (!isPlainValue(v)) throw new ExprError(`Unknown state "${n.name}"`);
+      if (!isData(v)) throw new ExprError(`Unknown state "${n.name}"`);
       return v;
     }
     case "un": {
       const a = run(n.a, scope);
-      return n.op === "!" ? !a : -Number(a);
+      return n.op === "!" ? !a : -toNumber(a);
     }
     case "cond": return run(n.c, scope) ? run(n.a, scope) : run(n.b, scope);
     case "call": {
@@ -172,17 +171,14 @@ function run(n: Node, scope: Scope): Value {
       if (n.op === "||") return run(n.a, scope) || run(n.b, scope);
       const a = run(n.a, scope), b = run(n.b, scope);
       switch (n.op) {
-        case "+": return typeof a === "string" || typeof b === "string" ? `${a ?? ""}${b ?? ""}` : Number(a) + Number(b);
-        case "-": return Number(a) - Number(b);
-        case "*": return Number(a) * Number(b);
-        case "/": return Number(a) / Number(b);
-        case "%": return Number(a) % Number(b);
+        case "+": return typeof a === "string" || typeof b === "string" ? `${joinText(a)}${joinText(b)}` : toNumber(a) + toNumber(b);
+        case "-": return toNumber(a) - toNumber(b);
+        case "*": return toNumber(a) * toNumber(b);
+        case "/": return toNumber(a) / toNumber(b);
+        case "%": return toNumber(a) % toNumber(b);
         case "==": case "===": return a === b;
         case "!=": case "!==": return a !== b;
-        case "<": return (a as number) < (b as number);
-        case "<=": return (a as number) <= (b as number);
-        case ">": return (a as number) > (b as number);
-        case ">=": return (a as number) >= (b as number);
+        case "<": case "<=": case ">": case ">=": return compare(n.op, a, b);
       }
     }
   }
@@ -241,7 +237,20 @@ export function formatValue(v: Value | undefined): string {
     if (!isFinite(v)) return "—";
     return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
   }
+  if (typeof v === "object") return displayData(v, formatValue);
   return String(v);
+}
+
+/** A value joined into text with +: as it would display, except null stays empty. */
+function joinText(v: Value): string {
+  return v === null ? "" : typeof v === "object" ? formatValue(v) : String(v);
+}
+
+/** <, <=, > and >=: text compares as text, plain values as numbers, and lists or records are never ordered. */
+function compare(op: string, a: Value, b: Value): boolean {
+  if (!isScalar(a) || !isScalar(b)) return false;
+  const [x, y] = typeof a === "string" && typeof b === "string" ? [a, b] : [toNumber(a), toNumber(b)];
+  return op === "<" ? x < y : op === "<=" ? x <= y : op === ">" ? x > y : x >= y;
 }
 
 /** Find `{...}` segments in a string, respecting nested braces and quotes. */

@@ -1,5 +1,13 @@
 /** A value that can live in Loom state or result from an expression. */
-export type Value = number | string | boolean | null;
+export type Value = number | string | boolean | null | DataList | DataRecord;
+
+/** A list of values (frozen; see src/data.ts). */
+export type DataList = readonly Value[];
+
+/** A record of named values, with no prototype (frozen; see src/data.ts). */
+export interface DataRecord {
+  readonly [field: string]: Value;
+}
 
 /** One element in the spec tree, created from one line of the spec. */
 export interface LoomNode {

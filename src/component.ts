@@ -3,7 +3,8 @@
  * (how it is described to models, how it measures, paints and responds)
  * lives in one ComponentDef, so adding a component never touches the engine.
  */
-import { evaluate, interpolate, type Scope } from "./expr";
+import { toNumber } from "./data";
+import { evaluate, formatValue, interpolate, type Scope } from "./expr";
 import { literal } from "./actions";
 import type { ImageState } from "./images";
 import type { Theme } from "./theme";
@@ -172,7 +173,7 @@ export class PropReader {
 
   num(name: string, fallback: number): number {
     const v = this.value(name);
-    const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+    const n = typeof v === "number" || typeof v === "string" ? toNumber(v) : NaN;
     return isFinite(n) ? n : fallback;
   }
 
@@ -181,7 +182,7 @@ export class PropReader {
     if (raw === undefined) return fallback;
     if (/^\{.*\}$/s.test(raw)) {
       const v = this.value(name);
-      return v === undefined || v === null ? fallback : String(v);
+      return v === undefined || v === null ? fallback : formatValue(v);
     }
     return interpolate(raw, this.scope);
   }

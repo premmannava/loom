@@ -8,6 +8,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { parseActions, runActions } from "../src/actions";
+import { DataError, isData, parseData, toData } from "../src/data";
 import { evaluate, interpolate } from "../src/expr";
 import { MAX_DEPTH, parse } from "../src/parser";
 import { render } from "../src/testing";
@@ -79,8 +80,23 @@ const elementBody = fc
   )
   .map(([type, text, props]) => [type, text ?? "", ...props.map(([k, v]) => `${k}=${v}`)].filter(Boolean).join(" "));
 
+/** List and record literals, well-formed or slightly broken, as a model might write them. */
+const dataLiteral: fc.Arbitrary<string> = fc.letrec<{ d: string }>((tie) => ({
+  d: fc.oneof(
+    { depthSize: "small", withCrossShrink: true },
+    fc.constantFrom("1", "-2.5", "'a b'", '"x"', "true", "null", "[]", "{}"),
+    fc.array(tie("d"), { maxLength: 4 }).map((xs) => `[${xs.join(", ")}]`),
+    fc.array(fc.tuple(fc.constantFrom("text", "done", "price", "'unit price'", "__proto__", "constructor"), tie("d")), { maxLength: 4 })
+      .map((kv) => `{${kv.map(([k, v]) => `${k}: ${v}`).join(", ")}}`),
+  ),
+})).d;
+const brokenLiteral = fc.tuple(dataLiteral, fc.nat(), fc.constantFrom("", "]", "}", ",", ":", "'", "[", "{")).map(([d, i, c]) => {
+  const at = d.length ? i % d.length : 0;
+  return d.slice(0, at) + c + d.slice(at + 1);
+});
+
 const stateLine = fc
-  .array(fc.tuple(fc.constantFrom(...names), fc.oneof(atom, fc.constant("{x}"))), { minLength: 1, maxLength: 4 })
+  .array(fc.tuple(fc.constantFrom(...names), fc.oneof(atom, fc.constant("{x}"), dataLiteral, brokenLiteral)), { minLength: 1, maxLength: 4 })
   .map((pairs) => "state " + pairs.map(([k, v]) => `${k}=${v}`).join(" "));
 
 const otherLine = fc.oneof(
@@ -124,7 +140,8 @@ const mutatedSpec = fc
 
 // ---------------------------------------------------------------- checks
 
-const isValue = (v: unknown): v is Value => v === null || ["number", "string", "boolean"].includes(typeof v);
+/** A plain value, or a list or record made by Loom's data module (never a host object). */
+const isValue = (v: unknown): v is Value => isData(v);
 
 function checkParse(spec: string): void {
   const r = parse(spec, registry);
@@ -234,6 +251,33 @@ describe("expressions", () => {
         if (!allowed) expect(r.ok).toBe(false);
       }),
       opts,
+    );
+  });
+});
+
+describe("data", () => {
+  it("host values become data or a DataError, never anything else", () => {
+    fc.assert(
+      fc.property(fc.anything({ withNullPrototype: true, withBoxedValues: true, withMap: true, withSet: true, withDate: true, withTypedArray: true, withSparseArray: true }), (v) => {
+        try {
+          expect(isData(toData(v))).toBe(true);
+        } catch (e) {
+          expect(e).toBeInstanceOf(DataError);
+        }
+      }),
+      { numRuns: RUNS * 3 },
+    );
+  });
+
+  it("literals parse to data or an error message, and never touch Object.prototype", () => {
+    fc.assert(
+      fc.property(fc.oneof(dataLiteral, brokenLiteral, fc.string({ maxLength: 40 })), (src) => {
+        const r = parseData(src);
+        if ("value" in r) expect(isData(r.value)).toBe(true);
+        else expect(r.error.trim()).not.toBe("");
+        expect(Object.keys(Object.prototype)).toEqual([]);
+      }),
+      { numRuns: RUNS * 3 },
     );
   });
 });

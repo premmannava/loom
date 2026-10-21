@@ -1,3 +1,4 @@
+import { toData } from "./data";
 import type { Value } from "./types";
 
 type Listener = (key: string, value: Value) => void;
@@ -15,7 +16,14 @@ export class Store {
     return this.values.has(key);
   }
 
+  /**
+   * Change a value. Lists and records are copied into plain, frozen Loom data,
+   * so they can be passed straight from an app (`loom.state.set("rows", rows)`).
+   * Throws a DataError explaining the problem for values that can't be data,
+   * such as functions, class instances or cycles.
+   */
   set(key: string, value: Value): void {
+    value = toData(value);
     if (this.values.get(key) === value) return;
     this.values.set(key, value);
     for (const l of this.listeners) l(key, value);
