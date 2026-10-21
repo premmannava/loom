@@ -6,7 +6,7 @@ export { Registry } from "./registry";
 export { Store } from "./state";
 export { layoutTree, boxAt, walkBoxes, isVisible } from "./layout";
 export { Inspector, type DrawCall } from "./inspector";
-export { languageGuide } from "./prompt";
+export { languageGuide, type GuideOptions, type AppAction } from "./prompt";
 export { lightTheme, darkTheme, extendTheme, themeFromCSS, type Theme } from "./theme";
 export { CanvasMeasurer, MonoMeasurer, wrapText, type TextMeasurer } from "./text";
 export { PropReader, COMMON_PROPS, CATEGORIES, type ComponentDef, type PropDef, type LayoutContext, type PaintContext, type PressContext, type DragContext, type Category } from "./component";
