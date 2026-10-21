@@ -24,6 +24,7 @@
     "test",
     "playground",
     "bench",
+    "eval",
     "visual",
     "scripts/**/*.ts",
     "*.config.ts"
