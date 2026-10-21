@@ -115,6 +115,8 @@ text "{len(cart.items)} items"
 
 ### 2.2 Lists: `each`
 
+The detailed plan for 2.1 and 2.2, including the design, steps, risks and decisions to confirm, is in [`plans/lists-and-data.md`](plans/lists-and-data.md).
+
 ```
 each items={products.data.items} as=p key={p.id}
   card
