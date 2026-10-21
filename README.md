@@ -79,6 +79,7 @@ npm run dev        # opens the playground
 | `npm run test:visual` | Runs the visual regression tests (Playwright) |
 | `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
 | `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
+| `npm run eval` | Scores a real model on 30 requests ([Measure it](#measure-it)) |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
@@ -861,25 +862,66 @@ On touch screens, vertical swipes still scroll the page and pinches still zoom, 
 
 ## Connecting a model
 
-`languageGuide()` builds the system prompt that teaches a model Loom. It's generated from the registered components, so it always matches what the engine supports.
+### Try it in the playground
 
-```ts
-import { languageGuide } from "loom-ui";
+The playground's **Ask a model** box sends your request to a real model and streams the screen in as the model writes it. It works with any server that speaks the OpenAI chat format: LM Studio, Ollama, vLLM and llama.cpp on your own machine, or DeepSeek, OpenAI, OpenRouter and others in the cloud.
 
-const system = languageGuide(loom.registry);
+1. Start a model server. With **LM Studio**: load a model (Qwen3 14B works well), open the Developer tab and start the server. It listens on `http://localhost:1234/v1`, which is the default, so no settings are needed.
+2. For anything else, copy `.env.example` to `.env.local` and fill it in. `.env.local` is never committed.
+3. Run `npm run dev`, pick the model in the box, describe a screen and press **Ask**.
+
+```bash
+# .env.local
+LOOM_MODEL_URL=http://localhost:1234/v1   # LM Studio (default); Ollama: http://localhost:11434/v1
+LOOM_MODEL=                               # optional: the model to preselect
+LOOM_API_KEY=                             # only for servers that need one
+LOOM_USER_SUFFIX=                         # optional: added to every request, e.g. /no_think for Qwen3
 ```
 
-Stream the model's response straight into the engine:
+The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether Loom's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one.
+
+Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their thinking is hidden from the screen, but it delays the first line. With Qwen3, `LOOM_USER_SUFFIX=/no_think` skips it.
+
+**Copy guide**, under the model guide at the bottom of the playground, copies the same instructions the model gets, for trying Loom in any chat app.
+
+### Measure it
+
+```bash
+npm run eval                        # all 30 requests, with the model from .env.local
+npm run eval -- --model qwen3-14b   # another model on the same server
+npm run eval -- --only form,trap    # some categories or request ids
+npm run eval -- --no-repair         # first tries only
+```
+
+`eval/cases.ts` holds 30 requests: forms, comparisons, dashboards, shopping, multi-screen flows, content, and traps like "a big red button" (Loom has no colors) or "a login form" (no text input yet). The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, any invented props or elements, output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground.
+
+### In your own app
+
+`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with Loom's parser, and asks once for a fix.
 
 ```ts
+import { generateSpec } from "loom-ui/model";
+
 loom.beginStream();
-for await (const chunk of streamFromYourServer(userPrompt)) {
-  loom.push(chunk);
-}
+const result = await generateSpec({
+  config: { url: "/api/model", model: "qwen3-14b" }, // a route on your server that adds the key
+  registry: loom.registry,
+  request: "A booking form for a cabin, 2 to 6 guests",
+  guide: {
+    imageHosts: ["cdn.example.com"],
+    actions: [{ name: "book", value: "the number of guests", description: "when the user books" }],
+    notes: "A cabin rental site. Prices are per night.",
+  },
+  onText: (text) => loom.push(text),
+  onReset: () => loom.beginStream(), // a fix is coming: start the screen over
+});
 loom.endStream();
+// result.spec, result.diagnostics, result.first, result.repair, result.timings, result.messages
 ```
 
-Then send the user's choices back to the model with `emit` actions:
+The guide comes from `languageGuide(registry, options)`, generated from the registered components, so it always matches what the engine supports. Its options tell the model which image hosts work, which `emit:` actions your app listens for, and anything about your app it should know.
+
+Send the user's choices back to the model with `emit` actions, passing `result.messages` as `history` to continue the conversation:
 
 ```ts
 loom.on("action", ({ name, value }) => {
@@ -887,9 +929,7 @@ loom.on("action", ({ name, value }) => {
 });
 ```
 
-> **Keep API keys on a server.** Call the model from your backend and stream the text to the browser. Never put a model API key in front-end code.
-
-A ready-made model connection is on the [roadmap](#roadmap).
+> **Keep API keys on a server.** Point `config.url` at a route on your backend that adds the key, as the playground's dev server does. Never put a model API key in front-end code.
 
 ---
 
@@ -1086,10 +1126,12 @@ src/
   state.ts          The state store
   components/       Built-in components; map/ is a separate entry point
   testing/          loom-ui/testing: render() and the recording canvas
+  model/            loom-ui/model: stream, clean, check and repair a model's spec
 playground/         The development playground
 test/               Unit, contract, streaming, fuzz and interaction tests (Vitest)
 visual/             Visual regression page, cases and baselines (Playwright)
 bench/              Benchmarks
+eval/               The evaluation set and its scoring (npm run eval)
 scripts/            Map outlines, component docs, component scaffold, benchmark comparison
 .github/workflows/  CI
 docs/               Plan, examples and images
@@ -1120,7 +1162,7 @@ The full phase-by-phase plan, including the component pipeline, testing strategy
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
 2. **Components**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, and `notify:` messages. Next: text input (a real input positioned over the canvas while typing), scrolling, select, table, chart and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
-4. **Model connection**: a server-side streaming endpoint and a measured comparison against other generative UI formats (token count, validity, time to first pixel).
+4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
 
 ---

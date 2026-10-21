@@ -273,6 +273,15 @@ User actions take two different paths:
 | Call registered commands through buttons | Skip confirmation on money-moving commands |
 | Ask for the user's next choice with `emit` | Generate payment or login forms (those are fixed, reviewed screens) |
 
+**Status: started.** Built so far, and tested end to end against a fake OpenAI-compatible server (the real runs happen on a developer's machine):
+
+- `loom-ui/model`: streaming from any OpenAI-compatible endpoint (LM Studio, Ollama, vLLM, DeepSeek, OpenRouter…), removing reasoning (`<think>` blocks, or a separate reasoning field) and code fences, checking with the parser and one repair that lists the problems by line.
+- The playground's Ask a model box, through the dev server, which adds any key so the browser never sees it. Refining sends the clean conversation, not the repair turns.
+- `languageGuide(registry, options)`: a one-line index first, then each element with its example; image hosts, the app's own `emit:` actions and notes about the app.
+- `npm run eval` with 30 requests (`eval/cases.ts`), reporting validity before and after repair, expected elements, invented props and elements, tokens and timings.
+
+Still to do from the list above: the production server package (rate limits, sessions), commerce rules, patches, templates, and comparing token counts with JSON formats.
+
 **Exit criteria:** on the evaluation set, at least 95% of generated specs have no errors after one repair, the first line is on screen within about a second of the model starting to answer, and token counts are measured against JSON-based formats (A2UI, json-render) for the same screens.
 
 ---
