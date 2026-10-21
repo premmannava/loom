@@ -71,6 +71,43 @@ card
   text "Order placed. A confirmation is on its way." tone=good if=placed
 `,
   },
+  product: {
+    label: "Product page",
+    prompt: "Show me the trail runners with sizes, reviews and shipping info.",
+    spec: `state at="Trail runners" size=10 qty=1 view=details stars=0 shipping=false added=false
+breadcrumb "Shop / Shoes / Trail runners" bind=at
+card
+  row align=top
+    column gap=6
+      badge "Waterproof" tone=good
+      text "Ridgeline trail runners" style=title
+      rating value=4.6
+    column gap=2
+      text "$128" style=title align=right
+      text "$160" tone=muted align=right strike=true
+  text "Size" weight=semibold
+  row
+    radio "9" bind=size value=9
+    radio "10" bind=size value=10
+    radio "11" bind=size value=11
+  stepper "Quantity" bind=qty min=1 max=5
+  button "Add {qty} to cart" on="set:added:true;emit:add_to_cart:{size}" disabled=added
+  text "Added size {size} to your cart." tone=good if=added
+  tabs bind=view
+    tab "Details" value=details
+      text "A grippy, waterproof trail shoe with a 6 mm drop."
+      list
+        list-item "Weight" trailing="280 g"
+        list-item "Upper" trailing="Recycled mesh"
+    tab "Reviews" value=reviews
+      avatar "Maya Ortiz" detail="Hiked the John Muir Trail"
+      text "Dry feet through three river crossings."
+      text "Rate them" weight=semibold
+      rating bind=stars on=emit:rated:{stars}
+  accordion "Shipping and returns" bind=shipping
+    text "Free shipping over $100. Free returns within 30 days."
+`,
+  },
   habits: {
     label: "Habit tracker",
     prompt: "Make me a tracker for three daily habits with a streak.",

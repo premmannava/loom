@@ -163,6 +163,11 @@ export class Loom {
     return this.parsed?.diagnostics ?? [];
   }
 
+  /** The interactive regions registered while painting the last frame, in paint order. */
+  get hitRegions(): readonly HitRegion[] {
+    return this.hits;
+  }
+
   on<K extends keyof LoomEvents>(name: K, fn: (p: LoomEvents[K]) => void): () => void {
     return this.events.on(name, fn);
   }
@@ -241,6 +246,7 @@ export class Loom {
     this.hits = [];
     const ctx = this.paintContext(g);
     this.paintBox(this.rootBox, ctx, 1);
+    this.resolveFocus();
     if (this.focus && this.keyboardMode && !this.inspector.inspecting) this.paintFocusRing(g, this.focus.box);
     this.inspector.paintOverlay(g, this.rootBox, this.hits);
     this.inspector.endCapture();
@@ -249,13 +255,26 @@ export class Loom {
     this.events.emit("render", { ...this.metrics });
   }
 
+  /**
+   * Point focus at the hit region painted for it this frame (which may be a
+   * part of an element, like one star of a rating). If nothing was painted
+   * for it, because it was disabled or hidden, drop focus so the keyboard
+   * can't activate it.
+   */
+  private resolveFocus(): void {
+    if (!this.focus) return;
+    const h = this.hits.find((r) => r.focusable && sameRegion(r, this.focus!));
+    this.focus = h ? { node: h.box.node, box: h.box, detail: h.detail } : null;
+  }
+
   private paintContext(g: CanvasRenderingContext2D): PaintContext {
     const theme = this.theme;
     const readers = new WeakMap<LoomNode, PropReader>();
     const scope = this.state.scope;
     const animate = this.opts.animate ?? !(typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
     const t = now();
-    const same = (a: HitTarget | null, n: LoomNode) => !!a && a.node.id === n.id;
+    const same = (a: HitTarget | null, n: LoomNode, detail?: unknown) =>
+      !!a && a.node.id === n.id && (detail === undefined || a.detail === detail);
     return {
       g,
       theme,
@@ -273,9 +292,10 @@ export class Loom {
       font: (w, s) => fontString(w, s, theme.font.family),
       roundRect: (x, y, w, h, r) => roundRectPath(g, x, y, w, h, r),
       addHit: (box, o = {}) => this.hits.push({ box, detail: o.detail, focusable: o.focusable ?? true }),
-      isHovered: (n) => same(this.hover, n),
-      isFocused: (n) => same(this.focus, n),
-      isPressed: (n) => same(this.pressed, n),
+      isHovered: (n, d) => same(this.hover, n, d),
+      isFocused: (n, d) => this.keyboardMode && same(this.focus, n, d),
+      isPressed: (n, d) => same(this.pressed, n, d),
+      motion: animate,
       appear: (n) => {
         if (!animate || n.id === "root") return 1;
         let first = this.seen.get(n.id);
@@ -427,7 +447,7 @@ export class Loom {
       if (e.key === "Tab") {
         const list = this.focusables();
         if (!list.length) return;
-        const idx = this.focus ? list.findIndex((h) => h.box.node.id === this.focus!.node.id) : -1;
+        const idx = this.focus ? list.findIndex((h) => sameRegion(h, this.focus!)) : -1;
         const next = idx < 0 ? (e.shiftKey ? list.length - 1 : 0) : idx + (e.shiftKey ? -1 : 1);
         if (next < 0 || next >= list.length) {
           // Let the browser move focus out of the canvas.
@@ -528,6 +548,11 @@ export class Loom {
     if (this.parsed) walk(this.parsed.root);
     return out;
   }
+}
+
+/** Whether a hit region is the one a target refers to (same element, same part). */
+function sameRegion(h: HitRegion, t: HitTarget): boolean {
+  return h.box.node.id === t.node.id && h.detail === t.detail;
 }
 
 export function roundRectPath(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

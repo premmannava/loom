@@ -3,6 +3,7 @@ import { languageGuide } from "../src/prompt";
 import { Registry } from "../src/registry";
 import { coreComponents } from "../src/components";
 import { parse } from "../src/parser";
+import { exampleSpec } from "./examples";
 
 describe("languageGuide", () => {
   const reg = new Registry(coreComponents);
@@ -22,8 +23,8 @@ describe("languageGuide", () => {
   it("has examples for every component that parse without errors", () => {
     for (const c of coreComponents) {
       if (!c.example) continue;
-      const r = parse(c.example + "\n", reg);
-      expect(r.diagnostics.filter((d) => d.severity === "error"), c.type).toEqual([]);
+      const r = parse(exampleSpec(c, coreComponents), reg);
+      expect(r.diagnostics, c.type).toEqual([]);
     }
   });
 });

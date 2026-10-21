@@ -15,6 +15,10 @@
     "./map": {
       "types": "./dist/types/components/map/index.d.ts",
       "import": "./dist/map.js"
+    },
+    "./testing": {
+      "types": "./dist/types/testing/index.d.ts",
+      "import": "./dist/testing.js"
     }
   },
   "files": [
@@ -28,11 +32,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:world": "node scripts/build-world.mjs",
-    "docs:components": "vite-node scripts/gen-component-docs.ts"
+    "docs:components": "vite-node scripts/gen-component-docs.ts",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:docker": "docker run --rm --ipc=host -v \"$PWD\":/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.56.1-noble /bin/bash -c \"npm ci && npx playwright test $VISUAL_ARGS\"",
+    "bench": "vitest bench --run",
+    "docs:check": "vite-node scripts/gen-component-docs.ts --check",
+    "new:component": "vite-node scripts/new-component.ts --"
   },
   "devDependencies": {
+    "@fontsource/instrument-sans": "5.3.0",
+    "@playwright/test": "1.56.1",
     "@types/node": "22.9.0",
     "d3-geo": "^3.1.1",
+    "fast-check": "4.3.0",
     "topojson-client": "^3.1.0",
     "typescript": "5.6.3",
     "vite": "5.4.10",

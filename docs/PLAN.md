@@ -25,6 +25,8 @@ Time estimates are rough, for one developer working with AI assistance, and will
 
 **Done in 0.1:** the engine pipeline, parser with diagnostics, safe expressions, actions, keyboard focus, inspector, 12 components, 36 unit tests, the playground and the generated model guide.
 
+**Done in Phase 1:** see [its status](#phase-1-testing-and-tooling).
+
 **Missing for real apps:**
 
 | Gap | Why it matters |
@@ -80,6 +82,16 @@ Phases 4 and 5 can overlap with the end of Phase 3. The order follows the origin
 7. **Benchmarks**: a 1,000-node and a 5,000-node spec, with timings recorded per commit.
 
 **Exit criteria:** CI is green and required for merging; adding a component automatically gets it contract-tested and screenshotted.
+
+**Status:** built. `loom-ui/testing`, contract, streaming and fuzz tests, visual regression, benchmarks with base comparison, `docs:check`, `new:component` and CI are in place. Two things remain outside the code: making CI required for merging (a branch protection setting on GitHub), and keeping visual baselines current. They can only be made on Linux, so CI regenerates and commits them when a pull request gets the `update-visual-baselines` label.
+
+What the new tests found on their first runs:
+
+- The expression sandbox let `constructor`, `__lookupGetter__` and other `Object.prototype` names through as functions. A spec could get a native function as a value and redefine `min()` for every Loom instance on the page. Fixed, with regression tests.
+- `evaluate()` accepted non-plain values from object-backed scopes (e.g. `{__proto__}`). It now treats them as unknown state.
+- The `text` component's description had three sentences, against the one-or-two rule.
+- The map can't be reached by keyboard. Recorded as a known gap in the contract tests until Phase 3.
+- Specs nested hundreds of levels deep overflow the engine's recursion. Recorded under Phase 7.
 
 ---
 
@@ -191,6 +203,16 @@ screen name=product title="{product.data.name}"
 
 **Tier C, later:** `date-picker`, `autocomplete`, `file-upload`, virtualized `data-table`, `rich-text`.
 
+**Built so far** (with contract tests, behavior tests, visual baselines and docs), using only what the engine already does: `grid`, `badge`, `stepper`, `radio`, `switch`, `tabs` and `tab`, `list` and `list-item`, `rating`, `skeleton`, `empty`, `link`, pressable `card`, `text strike=` (Tier A), and `accordion`, `avatar`, `pagination`, `breadcrumb`, `code` (Tier B). Where they differ from the sketches above:
+
+- `grid` was pulled forward from Phase 2.3 because it needs no language changes.
+- Inputs write state through `bind=` and then run `on=`, instead of passing `$value` (Phase 2.1). `stepper bind=qty` and `rating bind=stars` work today; `$value` can be added later without breaking them.
+- `radio` is one element per choice sharing a `bind=`, not a group with `option` children, so each choice stays one line.
+- `tabs` holds `tab` children, and only the selected tab's content is laid out.
+- `avatar` shows initials only; photos wait for `image`.
+
+Still waiting on engine capabilities: `input`, `image`, `select`/`option`, `slider` (needs drag), `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 
 ---
@@ -289,6 +311,7 @@ User actions take two different paths:
 
 - **Performance:** repaint only changed regions, cache text layout, virtualize everything that scrolls. Budget: 60 frames per second while scrolling a 5,000-item list on a mid-range phone.
 - **Security review:** the expression sandbox, spec size and depth limits, source and command rate limits, image host allowlists, and content security policy guidance.
+  - Found in Phase 1: the engine overflows the call stack on specs nested somewhere between 500 and 2,000 levels deep, because layout and paint are recursive (the parser itself is fine). A nesting limit in the parser, reported as a diagnostic that skips deeper lines, would turn this into an ordinary error.
 - **Internationalization:** right-to-left layout, number and currency formatting by locale, and font fallback for other scripts.
 - **Native renderer experiment:** run the same engine in Rust with WebAssembly for heavy screens, and as a native app outside the browser (see the speed discussion in the README).
 - **Release:** publish `loom-ui` to npm with semantic versioning and a changelog, and a migration guide for language changes.
@@ -385,3 +408,14 @@ These are decisions to make during the phases above, not now.
 3. **Fixed screens in Loom or in the host framework.** The store plan uses Loom for all screens to prove the engine. A real merchant might keep checkout in their existing framework.
 4. **Server-side rendering.** Search engines can't read a canvas. Options: generate HTML for crawlers from the same tree, or keep indexable pages (catalog, product) outside Loom.
 5. **Native renderer timing.** Only worth it once screens are heavy enough for the browser to be the bottleneck, which the speed measurements say is not yet the case.
+6. **A DOM render target.** A second renderer that builds plain DOM elements (no React or Angular) from the same parsed tree, state and actions. The language, parser, expressions, actions and model guide would be unchanged; only the drawing step would differ. This is not planned: rendering stays on the canvas ([`CLAUDE.md`](../CLAUDE.md), rule 7). It is recorded here so the tradeoff can be measured rather than argued.
+
+   | Gains | Costs |
+   |---|---|
+   | Accessibility, text input, IME, autofill, text selection, copy and browser find come from the browser almost for free | A second implementation (`dom` alongside `layout` and `paint`) for every component, kept in step forever |
+   | Search engines can read the page (see question 4) | Browser layout won't exactly match the canvas layout, so the same spec can look different in each target |
+   | Scrolling, overlays and focus handling are native | The debugging tools (layout boxes, hit regions, inspect mode, frame capture) are built on canvas boxes and don't carry over |
+
+   Updates would also need care. Today the engine doesn't track which expressions read which state: any state change re-lays out the whole tree (`src/engine.ts`, the `state.subscribe` handler calls `invalidate("layout")`). `identifiers()` in `src/expr.ts` can list the names an expression reads, but nothing uses it for dependency tracking yet. A DOM target that updates only changed elements would need that tracking built first. (The canvas engine could use the same tracking to skip re-layout.)
+
+   **Candidate spike after Phase 1:** on a branch, build DOM versions of three components (`text`, `button`, `check`) and record the effort and the code each needs. Compare that with the estimated effort of the accessibility mirror (Phase 3.1) for the same components, then decide whether to go further, stop, or revisit after the mirror exists.

@@ -36,6 +36,29 @@ describe("expressions", () => {
     }
   });
 
+  it("doesn't treat inherited object members as functions", () => {
+    const names = Object.getOwnPropertyNames(Object.prototype);
+    expect(names).toContain("__defineGetter__");
+    for (const name of names) {
+      const r = ev(`${name}('x', 1)`);
+      expect(r.ok, name).toBe(false);
+      if (!r.ok) expect(r.error, name).toMatch(/Unknown function/);
+    }
+  });
+
+  it("can't change the whitelisted functions from a spec", () => {
+    ev("__defineGetter__('min', __lookupGetter__('__proto__'))");
+    expect(ev("min(3, 1, 2)")).toEqual({ ok: true, value: 1 });
+  });
+
+  it("ignores anything a scope returns that isn't a plain value", () => {
+    for (const name of ["__proto__", "constructor", "toString"]) {
+      const r = evaluate(name, (k) => ({} as Record<string, never>)[k]);
+      expect(r.ok, name).toBe(false);
+    }
+    expect(ev("obj", { obj: { a: 1 } }).ok).toBe(false);
+  });
+
   it("reports unknown state instead of guessing", () => {
     const r = ev("missing + 1");
     expect(r.ok).toBe(false);
