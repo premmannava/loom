@@ -1,4 +1,5 @@
 import { literal } from "../actions";
+import { toNumber } from "../data";
 import type { ComponentDef } from "../component";
 import type { Box, Value } from "../types";
 import { fillTint, onProp, partBox, runOn } from "./util";
@@ -208,7 +209,7 @@ function stepperState(p: { num(n: string, f: number): number; has(n: string): bo
   const min = p.num("min", 0);
   const max = p.has("max") ? p.num("max", Infinity) : Infinity;
   const step = Math.abs(p.num("step", 1)) || 1;
-  const raw = Number(scope(p.raw("bind") ?? ""));
+  const raw = toNumber(scope(p.raw("bind") ?? ""));
   const value = Number.isFinite(raw) ? raw : min;
   return { min, max, step, value };
 }
@@ -324,7 +325,7 @@ rating bind=stars`,
     const c = theme.colors;
     const max = Math.max(1, Math.min(10, Math.round(p.num("max", 5))));
     const bind = p.raw("bind");
-    let value = bind ? Number(ctx.scope(bind)) || 0 : p.num("value", 0);
+    let value = bind ? toNumber(ctx.scope(bind)) || 0 : p.num("value", 0);
     if (bind && ctx.hover && ctx.hover.node.id === box.node.id && typeof ctx.hover.detail === "number") value = ctx.hover.detail;
     for (let i = 0; i < max; i++) {
       const x = box.x + i * (STAR + STAR_GAP);
@@ -388,7 +389,7 @@ function sliderState(p: { num(n: string, f: number): number; raw(n: string): str
   const min = p.num("min", 0);
   const max = Math.max(min, p.num("max", 100));
   const step = Math.abs(p.num("step", 1)) || 1;
-  const raw = Number(scope(p.raw("bind") ?? ""));
+  const raw = toNumber(scope(p.raw("bind") ?? ""));
   const value = Number.isFinite(raw) ? Math.min(max, Math.max(min, raw)) : min;
   return { min, max, step, value };
 }

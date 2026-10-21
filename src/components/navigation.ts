@@ -1,4 +1,5 @@
 import { literal } from "../actions";
+import { toNumber } from "../data";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
 import type { Box, LoomNode, Value } from "../types";
 import { wrapText } from "../text";
@@ -201,7 +202,7 @@ export function pageSlots(current: number, pages: number): Array<number | "…">
 
 function pageState(p: PropReader, scope: (k: string) => Value | undefined) {
   const pages = Math.max(1, Math.min(100000, Math.round(p.num("pages", 1))));
-  const raw = Math.round(Number(scope(p.raw("bind") ?? "")));
+  const raw = Math.round(toNumber(scope(p.raw("bind") ?? "")));
   const current = Number.isFinite(raw) ? Math.max(1, Math.min(pages, raw)) : 1;
   return { pages, current };
 }

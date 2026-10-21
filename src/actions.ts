@@ -13,6 +13,7 @@
  * Several actions can run in order, separated by `;`.
  */
 import { checkSyntax, evaluate, interpolate, splitTemplate, type Scope } from "./expr";
+import { toNumber } from "./data";
 import type { Value } from "./types";
 
 export type Action =
@@ -138,8 +139,9 @@ export function runActions(actions: Action[], host: ActionHost): void {
     switch (a.op) {
       case "inc":
       case "dec": {
-        const cur = Number(host.scope(a.key) ?? 0) || 0;
-        const by = Number(resolveArg(a.by, host.scope)) || 0;
+        // toNumber, not Number: a list or record here must count as 0, not crash.
+        const cur = toNumber(host.scope(a.key) ?? 0) || 0;
+        const by = toNumber(resolveArg(a.by, host.scope)) || 0;
         host.set(a.key, a.op === "inc" ? cur + by : Math.max(0, cur - by));
         break;
       }
