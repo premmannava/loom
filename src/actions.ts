@@ -105,6 +105,19 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
   return { actions };
 }
 
+/** The expressions an action list reads: `{…}` arguments and the parts of notify messages. */
+export function actionExpressions(actions: readonly Action[]): string[] {
+  const out: string[] = [];
+  const arg = (a: string | undefined) => { const m = a === undefined ? null : /^\{(.*)\}$/s.exec(a); if (m) out.push(m[1]!); };
+  for (const a of actions) {
+    if (a.op === "inc" || a.op === "dec") arg(a.by);
+    else if (a.op === "set") arg(a.value);
+    else if (a.op === "emit") arg(a.value);
+    else if (a.op === "notify") for (const p of splitTemplate(a.message)) if ("expr" in p) out.push(p.expr);
+  }
+  return out;
+}
+
 /** Resolve an action argument: `{expr}` is evaluated, anything else is a literal. */
 export function resolveArg(arg: string, scope: Scope): Value {
   const m = /^\{(.*)\}$/.exec(arg);

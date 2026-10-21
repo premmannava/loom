@@ -218,7 +218,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 <!-- CATEGORIES:START (generated from src/components) -->
 | Category | Components |
 |---|---|
-| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer) |
+| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider) |
@@ -371,6 +371,26 @@ Empty vertical space.
 
 ```
 spacer size=16
+```
+
+### `each`
+
+Repeats what's inside it once per item of a list, in place, with no look of its own. Inside, the current item is called item (or the name given by as=).
+
+| Prop | Type | Description |
+|---|---|---|
+| `items` | expression, required | The list to repeat over, like todos or {cart}. |
+| `as` | name | Name for the current item, used inside: as=t makes {t.text} work. |
+| `index` | name | Name for the item's position, counting from 0. |
+| `key` | expression | A value unique to each item, like {t.id}, so focus stays with the item when the list changes. Defaults to the position. |
+
+Children: any elements.
+
+```
+state gear=[{name: "Tent", kg: 2.1}, {name: "Stove", kg: 0.4}, {name: "Headlamp", kg: 0.1}]
+column gap=6
+  each items=gear as=g index=i key={g.name}
+    text "{i + 1}. {g.name}, {g.kg} kg"
 ```
 
 ### `text`

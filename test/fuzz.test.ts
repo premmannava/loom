@@ -22,7 +22,7 @@ const opts = { numRuns: RUNS };
 
 // ---------------------------------------------------------------- generators
 
-const names = ["a", "b", "count", "done", "price", "qty", "x", "first", "second", "screen", "todos", "lines"];
+const names = ["a", "b", "count", "done", "price", "qty", "x", "first", "second", "screen", "todos", "lines", "item", "t", "i"];
 const types = [...ALL_COMPONENTS.map((c) => c.type), "state", "sparkle", "Button", "row-x"];
 const propNames = [...new Set(ALL_COMPONENTS.flatMap((c) => Object.keys(c.props))), "if", "colour", "on", "x-y"];
 
@@ -86,6 +86,16 @@ const elementBody = fc
   )
   .map(([type, text, props]) => [type, text ?? "", ...props.map(([k, v]) => `${k}=${v}`)].filter(Boolean).join(" "));
 
+/** each lines, which need list-valued items= to do anything, so they get their own generator. */
+const eachLine = fc
+  .tuple(
+    fc.oneof(fc.constantFrom(...names), exprish.map((e) => `{${e}}`), fc.constantFrom("[1, 2, 3]", "{[{text: 'a'}, {text: 'b'}]}", "{todos}", "{t.lines}")),
+    fc.option(fc.constantFrom(...names, "constructor", "__proto__", "1x")),
+    fc.option(fc.constantFrom(...names)),
+    fc.option(fc.oneof(fc.constantFrom("{t.text}", "{item}", "{i}", "{t}", "t.done"), exprish.map((e) => `{${e}}`))),
+  )
+  .map(([items, as, index, key]) => ["each", `items=${items}`, as && `as=${as}`, index && `index=${index}`, key && `key=${key}`].filter(Boolean).join(" "));
+
 /** List and record literals, well-formed or slightly broken, as a model might write them. */
 const dataLiteral: fc.Arbitrary<string> = fc.letrec<{ d: string }>((tie) => ({
   d: fc.oneof(
@@ -117,7 +127,7 @@ const otherLine = fc.oneof(
  */
 const grammarSpec = fc
   .array(
-    fc.tuple(fc.constantFrom(-3, -1, 0, 0, 1, 1, 1), fc.integer({ min: 0, max: 19 }).map((n) => (n === 0 ? " " : "")), fc.oneof({ weight: 6, arbitrary: elementBody.map((b) => ({ el: b })) }, { weight: 1, arbitrary: otherLine.map((o) => ({ other: o })) })),
+    fc.tuple(fc.constantFrom(-3, -1, 0, 0, 1, 1, 1), fc.integer({ min: 0, max: 19 }).map((n) => (n === 0 ? " " : "")), fc.oneof({ weight: 6, arbitrary: elementBody.map((b) => ({ el: b })) }, { weight: 1, arbitrary: eachLine.map((b) => ({ el: b })) }, { weight: 1, arbitrary: otherLine.map((o) => ({ other: o })) })),
     { maxLength: 40, size: "+1" },
   )
   .map((items) => {

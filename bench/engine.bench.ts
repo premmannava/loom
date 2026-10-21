@@ -69,3 +69,33 @@ for (const size of [1000, 5000]) {
     });
   });
 }
+
+/** A 500-item list (each's limit) of order rows: 500 × 5 copies made and laid out per frame. */
+const orders = Array.from({ length: 500 }, (_, i) => ({ id: i, name: `Order ${i}`, qty: (i % 5) + 1, price: 12 + (i % 9) }));
+const listSpec = `state picked=-1
+card
+  text "{len(orders)} orders, {sum(orders, 'price', 'qty')} total" style=title
+  each items=orders as=o key={o.id}
+    row
+      text "{o.name}" weight=semibold
+      text "{o.qty} × \${o.price}" tone=muted
+      badge "{o.qty * o.price}"
+      button "Pick" variant=secondary on="set:picked:{o.id}"
+`;
+
+describe("each over 500 items", () => {
+  const ui = render(listSpec, { width: 1024 });
+  ui.set("orders", orders as never);
+
+  bench("state change (expand, layout and paint)", () => {
+    ui.loom.state.set("picked", (Number(ui.state.picked) + 1) % 500);
+    ui.loom.renderNow();
+  });
+
+  bench("list change (one item updated)", () => {
+    const i = Math.floor(Math.random() * 500);
+    const next = orders.map((o) => (o.id === i ? { ...o, qty: o.qty + 1 } : o));
+    ui.set("orders", next as never);
+    ui.loom.renderNow();
+  });
+});

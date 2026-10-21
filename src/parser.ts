@@ -12,10 +12,11 @@
  * the offending line (with anything nested under it) is skipped, so a model's
  * mistake costs one element, not the whole screen.
  */
-import { parseActions } from "./actions";
+import { actionExpressions, parseActions } from "./actions";
 import { COMMON_PROPS, type PropDef } from "./component";
 import { looksLikeData, parseData } from "./data";
-import { checkSyntax, splitTemplate } from "./expr";
+import { checkSyntax, identifiers, splitTemplate } from "./expr";
+import { loopNames } from "./each";
 import { literal } from "./actions";
 import type { Registry } from "./registry";
 import type { Diagnostic, LoomNode, Value } from "./types";
@@ -159,6 +160,25 @@ function parseStateLine(body: string, line: number, diags: Diagnostic[]): Array<
   return out;
 }
 
+/** Every expression a line reads, for checking which names it uses. */
+function expressionsOf(text: string | undefined, props: Record<string, string>, defs: Record<string, PropDef>): string[] {
+  const out: string[] = [];
+  const template = (s: string) => { for (const p of splitTemplate(s)) if ("expr" in p) out.push(p.expr); };
+  if (text !== undefined) template(text);
+  for (const [name, raw] of Object.entries(props)) {
+    const def = defs[name] ?? COMMON_PROPS[name];
+    if (!def) continue;
+    const braced = /^\{(.*)\}$/s.exec(raw);
+    if (def.type === "action") {
+      const r = parseActions(raw);
+      if ("actions" in r) out.push(...actionExpressions(r.actions));
+    } else if (braced) out.push(braced[1]!);
+    else if (def.type === "condition" || def.type === "expression") out.push(raw);
+    else if (def.type === "string") template(raw);
+  }
+  return out;
+}
+
 function checkProp(name: string, raw: string, def: PropDef, line: number, diags: Diagnostic[]): void {
   const warn = (message: string) => diags.push({ line, severity: "warning", message });
   const braced = /^\{(.*)\}$/s.exec(raw);
@@ -177,7 +197,8 @@ function checkProp(name: string, raw: string, def: PropDef, line: number, diags:
     case "enum":
       if (def.values && !def.values.includes(raw)) warn(`${name} should be one of ${def.values.join(", ")}; got "${raw}"`);
       break;
-    case "condition": {
+    case "condition":
+    case "expression": {
       const err = checkSyntax(raw);
       if (err) warn(`In ${name}: ${err}`);
       break;
@@ -213,6 +234,9 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
   let nodeCount = 0;
   let skipDeeperThan: number | null = null;
   let last: LoomNode | null = null;
+  // Names each line reads that it isn't inside the each for, checked once every each is known.
+  const outsideUses: Array<{ line: number; names: string[] }> = [];
+  const eaches: LoomNode[] = [];
 
   const lines = src.split("\n");
   if (lines.at(-1) === "") lines.pop();
@@ -259,15 +283,20 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       skipDeeperThan = indent;
       return;
     }
-    const parentDef = parent === root ? registry.get("column") : registry.get(parent.type);
+    // each is transparent: what's inside it is checked against the container around it.
+    let owner = stack.length - 1;
+    while (owner > 0 && stack[owner]!.type === "each") owner--;
+    const container = stack[owner]!;
+    const parentDef = container === root ? registry.get("column") : registry.get(container.type);
     const accepts = parentDef?.children;
-    const parentName = parent === root ? "the top level" : `"${parent.type}" (line ${parent.line})`;
-    if (!accepts || (accepts !== "any" && !accepts.includes(tok.type))) {
+    const parentName = container === root ? "the top level" : `"${container.type}" (line ${container.line})`;
+    const fits = tok.type === "each" ? !!accepts : !!accepts && (accepts === "any" || accepts.includes(tok.type));
+    if (!fits) {
       diagnostics.push({ line: lineNo, severity: "error", message: `${parentName} can't contain "${tok.type}"` });
       skipDeeperThan = indent;
       return;
     }
-    if (def.parents && !def.parents.includes(parent === root ? "root" : parent.type)) {
+    if (def.parents && !def.parents.includes(container === root ? "root" : container.type)) {
       diagnostics.push({ line: lineNo, severity: "error", message: `"${tok.type}" only goes inside ${def.parents.join(" or ")}` });
       skipDeeperThan = indent;
       return;
@@ -298,6 +327,18 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     for (const [name, pdef] of Object.entries(def.props)) {
       if (pdef.required && !(name in tok.props)) diagnostics.push({ line: lineNo, severity: "warning", message: `"${tok.type}" needs ${name}=` });
     }
+    if (tok.type === "each" && tok.props.as !== undefined && tok.props.as === tok.props.index) {
+      diagnostics.push({ line: lineNo, severity: "warning", message: `each uses "${tok.props.as}" for both as= and index=; give them different names` });
+    }
+
+    const inScope = new Set<string>();
+    for (const n of stack) if (n.type === "each") for (const name of loopNames(n)) inScope.add(name);
+    // An each's own items= and key= are read outside and inside it respectively; only check items=.
+    const exprs = tok.type === "each"
+      ? (tok.props.items === undefined ? [] : [tok.props.items.replace(/^\{([\s\S]*)\}$/, "$1")])
+      : expressionsOf(tok.text, tok.props, def.props);
+    const names = [...new Set(exprs.flatMap(identifiers))].filter((n) => !inScope.has(n));
+    if (names.length) outsideUses.push({ line: lineNo, names });
 
     const node: LoomNode = {
       id: `${lineNo}:${tok.type}`,
@@ -311,8 +352,34 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     parent.children.push(node);
     last = node;
     nodeCount++;
+    if (tok.type === "each") eaches.push(node);
     if (def.children) stack.push(node);
   });
 
+  checkLoopNames(outsideUses, eaches, new Set(state.map((s) => s.key)), diagnostics);
+  // Stable sort keeps each line's diagnostics in the order they were found.
+  diagnostics.sort((a, b) => a.line - b.line);
   return { root, state, diagnostics, nodeCount, lines: lines.length };
+}
+
+/**
+ * Warn when a line reads a loop variable outside the each that defines it, a
+ * common slip that would otherwise just show a dash. State of the same name
+ * makes the read fine.
+ */
+function checkLoopNames(uses: Array<{ line: number; names: string[] }>, eaches: LoomNode[], stateKeys: Set<string>, diags: Diagnostic[]): void {
+  if (!eaches.length) return;
+  const defined = new Map<string, { each: LoomNode; prop: string }>();
+  for (const e of eaches) {
+    const as = e.props.as ?? "item";
+    if (!defined.has(as)) defined.set(as, { each: e, prop: e.props.as ? `as=${as}` : `as=item, the default` });
+    if (e.props.index && !defined.has(e.props.index)) defined.set(e.props.index, { each: e, prop: `index=${e.props.index}` });
+  }
+  for (const { line, names } of uses) {
+    for (const name of names) {
+      const d = defined.get(name);
+      if (!d || stateKeys.has(name)) continue;
+      diags.push({ line, severity: "warning", message: `"${name}" only exists inside the each on line ${d.each.line} (${d.prop}). Indent this line under it, or use a state name` });
+    }
+  }
 }

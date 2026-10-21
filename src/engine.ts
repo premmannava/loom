@@ -11,6 +11,7 @@
 import { parseActions, runActions } from "./actions";
 import { PropReader, type ComponentDef, type DragContext, type PaintContext, type PressContext } from "./component";
 import { Emitter } from "./emitter";
+import { scopeOf } from "./each";
 import { createLayoutContext, isVisible } from "./layout";
 import { parse, type ParseResult } from "./parser";
 import { Registry } from "./registry";
@@ -109,6 +110,9 @@ export class Loom {
   pressed: HitTarget | null = null;
   pointer: { x: number; y: number } | null = null;
   private keyboardMode = false;
+  private warn: (message: string) => void;
+  /** Layout warnings already reported for this spec, so a list problem isn't repeated every frame. */
+  private warned = new Set<string>();
 
   metrics: Metrics = { nodes: 0, parseMs: 0, layoutMs: 0, paintMs: 0, width: 0, height: 0, pixelWidth: 0, pixelHeight: 0 };
 
@@ -122,7 +126,7 @@ export class Loom {
     this.measurer = new CanvasMeasurer(g);
     this.theme = this.resolveTheme();
     this.inspector = new Inspector(this);
-    const warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`Loom: ${m}`); });
+    const warn = (this.warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`Loom: ${m}`); }));
     this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now, warn);
 
     canvas.tabIndex = 0;
@@ -236,6 +240,7 @@ export class Loom {
       rootProps: { pad: String(this.opts.padding ?? 20), gap: String(s.md) },
     });
     for (const { key, value } of this.parsed.state) this.state.declare(key, value);
+    this.warned.clear();
     this.syncScreen();
     this.metrics.parseMs = now() - t;
     this.metrics.nodes = this.parsed.nodeCount;
@@ -249,7 +254,8 @@ export class Loom {
     const t = now();
     const width = this.opts.width ?? (this.canvas.parentElement?.clientWidth || 600);
     this.width = width;
-    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope);
+    const warnOnce = (m: string) => { if (!this.warned.has(m)) { this.warned.add(m); this.warn(m); } };
+    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, warnOnce);
     this.rootBox = ctx.layout(this.parsed.root, 0, 0, width);
     const height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
@@ -316,7 +322,7 @@ export class Loom {
       pressed: this.pressed,
       props: (node) => {
         let r = readers.get(node);
-        if (!r) readers.set(node, (r = new PropReader(node, scope)));
+        if (!r) readers.set(node, (r = new PropReader(node, scopeOf(node, scope))));
         return r;
       },
       font: (w, s) => fontString(w, s, theme.font.family),
@@ -463,7 +469,7 @@ export class Loom {
       scope: this.state.scope,
       props: (node) => {
         let r = readers.get(node);
-        if (!r) readers.set(node, (r = new PropReader(node, this.state.scope)));
+        if (!r) readers.set(node, (r = new PropReader(node, scopeOf(node, this.state.scope))));
         return r;
       },
       set: (k, v) => this.state.set(k, v),
@@ -556,7 +562,8 @@ export class Loom {
     const parsed = parseActions(src);
     if ("error" in parsed) return;
     runActions(parsed.actions, {
-      scope: this.state.scope,
+      // Inside each, actions read the item's loop variables first.
+      scope: scopeOf(node, this.state.scope),
       set: (k, v) => this.state.set(k, v),
       emit: (name, value) => this.events.emit("action", { name, value, node }),
       go: (screen) => this.go(screen),
@@ -576,7 +583,7 @@ export class Loom {
       let found: Box | null = null;
       const walk = (b: Box) => { if (found) return; if (b.node.id === t.node.id) found = b; else b.children.forEach(walk); };
       walk(this.rootBox);
-      if (!found || !this.isShown(t.node)) return null;
+      if (!found || !this.isShown((found as Box).node)) return null;
       return { node: (found as Box).node, box: found, detail: t.detail };
     };
     this.focus = find(this.focus);

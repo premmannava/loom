@@ -15,7 +15,8 @@ import type { ComponentDef } from "../component";
 import { coreComponents } from "../components";
 import { Loom, type LoomEvents, type LoomOptions } from "../engine";
 import { interpolate } from "../expr";
-import { walkBoxes } from "../layout";
+import { eachInstances, scopeOf } from "../each";
+import { isVisible, walkBoxes } from "../layout";
 import { lightTheme, type Theme } from "../theme";
 import type { Box, Diagnostic, HitRegion, LoomNode, Value } from "../types";
 import { ensurePath2D, FakeCanvas, type DrawOp } from "./canvas";
@@ -45,6 +46,11 @@ export type Query =
       text?: string | RegExp;
       /** The spec line the element is on. */
       line?: number;
+      /**
+       * The element's id. Inside each, copies share a line, so pick one by its
+       * id: the line, type and item key, like "3:card#2".
+       */
+      id?: string;
     };
 
 export interface Found {
@@ -153,17 +159,20 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     const scope = loom.state.scope;
     const walk = (n: LoomNode) => {
       if (n.id !== "root") {
-        const shownText = n.text === undefined ? undefined : interpolate(n.text, scope);
+        const shownText = n.text === undefined ? undefined : interpolate(n.text, scopeOf(n, scope));
         const textOk =
           q.text === undefined ||
           (q.text instanceof RegExp
             ? (n.text !== undefined && q.text.test(n.text)) || (shownText !== undefined && q.text.test(shownText))
             : n.text === q.text || shownText === q.text);
-        if ((q.type === undefined || n.type === q.type) && (q.line === undefined || n.line === q.line) && textOk) {
+        if ((q.type === undefined || n.type === q.type) && (q.line === undefined || n.line === q.line) && (q.id === undefined || n.id === q.id) && textOk) {
           out.push({ node: n, box: boxes.get(n.id) ?? null, shownText });
         }
       }
-      n.children.forEach(walk);
+      // An each stands for its copies, one set per item; a hidden each shows none.
+      if (n.type === "each") {
+        if (isVisible(n, scope, loom.registry)) eachInstances(n, scopeOf(n, scope)).forEach(walk);
+      } else n.children.forEach(walk);
     };
     if (loom.tree) walk(loom.tree);
     return out;
@@ -173,8 +182,8 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     const all = findAll(query);
     if (all.length === 1) return all[0]!;
     if (!all.length) throw new Error(`No element matches ${describeQuery(query)}`);
-    const where = all.map((f) => `line ${f.node.line}`).join(", ");
-    throw new Error(`${all.length} elements match ${describeQuery(query)} (${where}). Add text or line to the query`);
+    const where = all.map((f) => (f.node.id.includes("#") ? f.node.id : `line ${f.node.line}`)).join(", ");
+    throw new Error(`${all.length} elements match ${describeQuery(query)} (${where}). Add text, line or id to the query`);
   };
 
   const pointer = (type: string, x: number, y: number) => canvas.dispatch(type, { clientX: x, clientY: y, pointerId: 1 });

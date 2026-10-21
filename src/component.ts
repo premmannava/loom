@@ -11,8 +11,11 @@ import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
 import type { Box, HitTarget, LoomNode, Value } from "./types";
 
-/** `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to. */
-export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "action" | "state" | "name";
+/**
+ * `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to.
+ * `condition` and `expression` are read as an expression even without braces (`if=done`, `items=todos`).
+ */
+export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "expression" | "action" | "state" | "name";
 
 export interface PropDef {
   type: PropType;
@@ -34,7 +37,7 @@ export interface LayoutContext {
   props(node: LoomNode): PropReader;
   /** Lay out a child at a position with an available width; returns its box. */
   layout(node: LoomNode, x: number, y: number, width: number): Box;
-  /** Children whose `if` condition currently passes. */
+  /** Children to lay out: those whose `if` passes, with every `each` replaced by its copies. */
   visibleChildren(node: LoomNode): LoomNode[];
   /** Move a box and its whole subtree. */
   shift(box: Box, dx: number, dy: number): void;
