@@ -1,6 +1,6 @@
 # Plan: text input
 
-**Status:** proposed (2026-10-21), waiting for approval. Part of [Phase 3](../PLAN.md#phase-3-components-and-engine) (the text input capability and the `input` component).
+**Status:** done (2026-10-21), steps 1 to 5. What changed along the way is under [Results](#results). Part of [Phase 3](../PLAN.md#phase-3-components-and-engine) (the text input capability and the `input` component).
 **Rough size:** 3 to 4 days, in five steps that each end in a working, tested commit.
 
 ## The problem
@@ -103,3 +103,18 @@ This is the approach the project brief already allows (rule 7: "a temporary nati
 1. **Name and shape:** one `input` element with `kind=` (text, email, number, password, search), rather than separate elements. Multi-line text (`lines=3`) comes later.
 2. **When state changes:** on every keystroke, so filters update live, rather than only when leaving the field.
 3. **Native `<input>` while focused** (the approach in PLAN.md), rather than drawing a caret and handling keys on the canvas, which would lose IME, autofill, password managers and the phone keyboard's features.
+
+## Results
+
+All five steps shipped on `develop`, with Node tests through a fake editor host and Playwright tests with the real `<input>`.
+
+Changes from the design above:
+
+- **Decisions as proposed:** one `input` with `kind=`; state written on every keystroke; a real `<input>` only while typing.
+- **Tabbing onto the canvas** now starts typing when its first element is a field. Before, the engine focused the field without opening it, so typing did nothing.
+- **The input sits right after the canvas** in the page (position: fixed), so Tab past the last element leaves the canvas as it would from a normal field.
+- **What's typed is kept** while the stored value is what it wrote: `1.` in a number field stores `1` without the field losing its dot.
+- **The playground masks password values** in its state panel.
+- **Alignment** is checked in Playwright by comparing the field's text before and while typing; they match to the pixel.
+
+Still to do: multi-line text (`lines=`), validation, and a hand test on a real iPhone and Android phone.

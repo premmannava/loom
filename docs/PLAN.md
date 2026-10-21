@@ -36,7 +36,7 @@ Time estimates are rough, for one developer working with AI assistance, and will
 | No connection to real data | A model must never invent prices or stock |
 | No host commands | "Add to cart" and "checkout" must run trusted app code |
 | One screen per spec | Apps move between catalog, product, cart and checkout |
-| No text input, images, scrolling, overlays | Search, product photos, long lists, dialogs |
+| No ~~text input~~ (done), ~~images~~ (done), scrolling, overlays | Search, product photos, long lists, dialogs |
 | No accessibility layer | Screen readers can't see a canvas |
 | No model connection | Everything is still simulated |
 
@@ -206,7 +206,7 @@ screen name=product title="{product.data.name}"
 
 | Capability | Approach |
 |---|---|
-| **Text input** | While a field is focused, place a real, transparent `<input>` exactly over its box. The browser handles typing, IME for other languages, autocorrect, password managers and mobile keyboards. Loom paints the field and mirrors its value. |
+| **Text input** | While a field is focused, place a real, transparent `<input>` exactly over its box. The browser handles typing, IME for other languages, autocorrect, password managers and mobile keyboards. Loom paints the field and mirrors its value. **Built** (`input`, `src/dom-editor.ts`, [plan](plans/text-input.md)); multi-line text and validation are still to do. |
 | **Images** | Async loading with placeholder and fade-in, a cache, `ratio=` to reserve space before load, and an allowlist of image hosts. CORS-enabled images only, so the canvas stays readable for tests. **Built** (`image`, `imageHosts`, `loadImage`): the page's origin is always allowed, other hosts must be https and listed. |
 | **Scrolling** | Scroll containers that clip children, handle wheel, touch and keyboard scrolling, and only lay out what is visible (virtualization) for long lists. |
 | **Overlays** | A layer above the page for dialogs, dropdowns, tooltips and toasts, with focus trapping and Escape to close. |

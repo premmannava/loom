@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, 34 components, lists and data, a model connection, tests and debugging tools are in place. Text input, accessibility and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, 35 components including text input, lists and data, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -79,7 +79,7 @@ npm run dev        # opens the playground
 | `npm run test:visual` | Runs the visual regression tests (Playwright) |
 | `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
 | `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
-| `npm run eval` | Scores a real model on 39 requests ([Measure it](#measure-it)) |
+| `npm run eval` | Scores a real model on 41 requests ([Measure it](#measure-it)) |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
@@ -931,6 +931,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `imageHosts` | `[]` | Hosts images may load from besides your own site ([Images](#images)) |
 | `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
 | `onWarning` | `console.warn` | Receives problems found while running, like a blocked image |
+| `editor` | an `<input>` over the field | How text fields are typed into ([Typing](#typing)); `loom-ui/testing` passes a fake one |
 
 ### Methods
 
@@ -988,6 +989,18 @@ The canvas is focusable. Tab and Shift+Tab move between interactive elements, En
 
 On touch screens, vertical swipes still scroll the page and pinches still zoom, while horizontal drags go to the canvas, so sliders can be dragged.
 
+### Typing
+
+An `input` field is drawn on the canvas like everything else. While someone types in one, Loom places a real `<input>` exactly over it, with the field's font and colors and a transparent background, so the browser handles typing, selection, copy and paste, undo, input methods for Chinese, Japanese and Korean, autocorrect, password managers, autofill and the phone keyboard. It's removed when they leave the field.
+
+- Clicking or tapping a field, or reaching it with Tab, starts typing there. Tabbing onto the canvas starts typing in its first element if that's a field.
+- Every keystroke writes the field's `bind=`, so filters, counts and greetings update as people type. While an input method is composing, the value is written when the text is finished.
+- Enter runs the field's `on=`. Tab and Shift+Tab move to the next or previous element, typing in it if it's a field. Escape stops typing.
+- `kind=` picks the input type: `email` and `password` get the right autofill, `number` a number keyboard and a number (or `null`) in state, `search` a search field.
+- The `<input>` sits right after the canvas in the page, so Tab from the last element leaves the canvas as it would from any field. It follows the field through scrolling, resizing and layout changes.
+
+A password's value is still state: it reaches your app through `change` events like any form value.
+
 ---
 
 ## Connecting a model
@@ -1017,15 +1030,15 @@ Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their think
 ### Measure it
 
 ```bash
-npm run eval                        # all 39 requests, with the model from .env.local
+npm run eval                        # all 41 requests, with the model from .env.local
 npm run eval -- --model qwen3-14b   # another model on the same server
 npm run eval -- --only data,hard    # some categories or request ids
 npm run eval -- --no-repair         # first tries only
 ```
 
-`eval/cases.ts` holds 39 requests: forms, comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines), harder multi-part requests, and traps like "a big red button" (Loom has no colors) or "a login form" (no text input yet).
+`eval/cases.ts` holds 41 requests: forms (a login and a sign-up among them), comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines, a search that filters as you type), harder multi-part requests, and traps like "a big red button" (Loom has no colors).
 
-Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item. A spec can be valid and still not work, and these catch that.
+Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item, typing in a search must filter the list. A spec can be valid and still not work, and these catch that.
 
 The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
 
@@ -1128,6 +1141,7 @@ expect(ui.text()).toContain("Clicked 1 times");
 |---|---|
 | `find`, `findAll`, `isShown` | Look elements up by `type`, `text` (as written or as shown) and `line` |
 | `press`, `drag`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
+| `type(query, text, { replace? })`, `editor` | Type into a field one character at a time, as a person would; `editor` is the text box over the field being typed in. While typing, `key` goes to the field (Enter, Tab, Escape) |
 | `set`, `setSpec`, `stream` | Change state, replace the spec, or stream one in chunks |
 | `state`, `emitted`, `focused`, `diagnostics`, `warnings` | Read the results |
 | `text`, `drawOps`, `hits` | What the last frame drew, and what is clickable |
@@ -1281,7 +1295,7 @@ docs/images/        README images
 
 Loom draws everything itself, so it gives up what the browser normally provides for free. Today it does **not** have:
 
-- **Text input.** No text fields yet; this is the next priority.
+- **Multi-line text, and form validation** (required fields, email format). A model can show a hint with `if=` for now.
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
 - **Scrolling regions, overlays, dialogs or menus.**
@@ -1296,7 +1310,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, and `if` blocks. Next: text input (a real input positioned over the canvas while typing), scrolling, select, table, chart and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, and text input (a real input placed over the field while typing). Next: scrolling, select, table, chart and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
