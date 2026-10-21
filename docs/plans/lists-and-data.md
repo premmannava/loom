@@ -1,6 +1,6 @@
 # Plan: lists and structured data
 
-**Status:** proposed, not started. Part of [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) (sections 2.1 and 2.2).
+**Status:** design approved (2026-10-21), not started. Part of [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) (sections 2.1 and 2.2).
 **Rough size:** 3 to 5 days, in six steps that each end in a working, tested commit.
 
 ## The problem
@@ -149,12 +149,12 @@ Each step ends with typecheck, tests and build passing, and its own commit.
 - **Performance.** Expand runs on every state change. A benchmark with a 500-item list joins `npm run bench` in step 3, to keep it fast.
 - **Models may not use it well at first.** Small models might still copy elements by hand. The eval numbers will show it, and the guide's examples are the fix.
 
-## Decisions to confirm
+## Decisions (confirmed 2026-10-21)
 
-1. **`each items=todos as=t`**, not `each todos as=t`. It keeps Loom's one rule, "everything after the element name is `name=value`", which is easier for models than a special case. *Recommended.*
-2. **`remove:t`** to remove the current item, with `remove:list:{i}` as the fallback. It's the simplest for models inside `each`. *Recommended.*
-3. **Braces starting with `name:` are a record**, so `add:todos:{text:'Snacks'}` works without extra syntax. *Recommended.*
-4. **A 500-item limit** until scrolling exists. *Recommended.*
+1. **`each items=todos as=t`**, not `each todos as=t`. It keeps Loom's one rule, "everything after the element name is `name=value`", which is easier for models than a special case. *Confirmed.*
+2. **`remove:t`** to remove the current item, with `remove:list:{i}` as the fallback. It's the simplest for models inside `each`. *Confirmed.*
+3. **Braces starting with `name:` are a record**, so `add:todos:{text:'Snacks'}` works without extra syntax. *Confirmed.*
+4. **A 500-item limit** until scrolling exists. *Confirmed.*
 
 ## Not in this plan
 
