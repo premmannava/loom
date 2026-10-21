@@ -105,6 +105,10 @@ describe("the DATA section", () => {
     todo.press({ id: "8:button#0" });
     expect(todo.text()).toContain("1 of 3 packed");
 
+    const orders = render(DATA_EXAMPLES.orders + "\n");
+    expect(orders.diagnostics).toEqual([]);
+    expect(orders.text()).toEqual(expect.arrayContaining(["Tent", "Stove", "Headlamp", "Total $225", "Total $30"]));
+
     const cart = render(DATA_EXAMPLES.cart + "\n");
     expect(cart.diagnostics).toEqual([]);
     expect(cart.text()).toContain("Total $177");

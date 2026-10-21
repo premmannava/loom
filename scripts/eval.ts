@@ -72,6 +72,8 @@ async function main(): Promise<void> {
   for (const r of results) {
     if (r.firstSpec) writeFileSync(resolve(dir, `${r.id}.first.loom`), r.firstSpec);
     if (r.finalSpec && r.finalSpec !== r.firstSpec) writeFileSync(resolve(dir, `${r.id}.final.loom`), r.finalSpec);
+    // Everything the model sent for the first answer, thinking included, to diagnose empty or odd answers.
+    if (r.firstRaw) writeFileSync(resolve(dir, `${r.id}.raw.txt`), r.firstRaw);
   }
   console.log("\n" + md.split("\n| Request |")[0]);
   console.log(`Full report: ${dir}/report.md`);

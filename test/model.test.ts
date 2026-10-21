@@ -150,6 +150,28 @@ describe("streamChat", () => {
 });
 
 describe("generateSpec", () => {
+  it("finds the spec inside thinking that was never closed, when the answer is empty", async () => {
+    const spec = `card\n  text "Tents" style=title\n`;
+    for (const reply of [
+      { reasoning: ["The user wants tents.\n", spec], content: [] },
+      { content: [`<think>\nShort plan.\n${spec}`] },
+    ] as Reply[]) {
+      const { fetch } = fakeModel([reply]);
+      const shown: string[] = [];
+      const r = await generateSpec({ config, registry, request: "tents", fetch, onText: (t) => shown.push(t) });
+      expect(r.spec).toBe(spec);
+      expect(r.first.recovered).toBe(true);
+      expect(shown.join("")).toBe(spec);
+    }
+  });
+
+  it("doesn't recover anything when there was a real answer", async () => {
+    const { fetch } = fakeModel([{ reasoning: ["card\n"], content: [good] }]);
+    const r = await generateSpec({ config, registry, request: "x", fetch });
+    expect(r.spec).toBe(good);
+    expect(r.first.recovered).toBe(false);
+  });
+
   it("streams clean lines and returns a valid spec without repairing", async () => {
     const m = fakeModel([{ content: ["<think>plan</think>\n", "card\n  text \"Ca", "bin\" style=title\n", "  button \"Book\" on=emit:book\n"] }]);
     const texts: string[] = [];

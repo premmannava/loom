@@ -122,3 +122,12 @@ text "{screen}"
     expect(warnings(`text "{products}"\n`, ["products"])).toEqual([]);
   });
 });
+
+describe("code where an element should be", () => {
+  it("says Loom has no JSX and points to each", () => {
+    const r = parse(`state xs=[1]\nlist\n  {xs.map(x => <list-item>{x}</list-item>)}\n  <list-item>One</list-item>\n  list-item "Kept"\n`, new Registry(coreComponents));
+    expect(r.diagnostics.map((d) => d.line)).toEqual([3, 4]);
+    expect(r.diagnostics[0]!.message).toMatch(/no JSX or code; to repeat elements for each item, use each items=list as=x/);
+    expect(r.nodeCount).toBe(2);
+  });
+});

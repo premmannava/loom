@@ -130,6 +130,35 @@ card
   button "Add contact" on=emit:add
 `,
     ],
+    "data-kanban": [
+      `state todo=[{t: "A"}, {t: "B"}, {t: "C"}] doing=[{t: "D"}, {t: "E"}, {t: "F"}] done=[{t: "G"}, {t: "H"}]
+row
+  column
+    text "To do"
+    each items=todo as=c
+      card
+        text "{c.t}"
+  column
+    text "Doing"
+    each items=doing as=c
+      card
+        text "{c.t}"
+  column
+    text "Done"
+    each items=done as=c
+      card
+        text "{c.t}"
+`,
+      // Three items with three texts each: nine texts, but only three items.
+      `state cols=[{name: "To do"}, {name: "Doing"}, {name: "Done"}]
+row
+  each items=cols as=c
+    column
+      text "{c.name}"
+      text "Task one"
+      text "Task two"
+`,
+    ],
     "hard-celebrate": [
       `state chores=[{text: "Dishes", done: false}, {text: "Trash", done: true}, {text: "Laundry", done: false}, {text: "Plants", done: false}]
 card

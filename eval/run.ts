@@ -35,6 +35,10 @@ export interface CaseResult {
   /** Element types the model made up, from the first answer. */
   inventedElements: string[];
   empty: boolean;
+  /** The first answer was empty and its spec was found inside the model's thinking. */
+  recovered: boolean;
+  /** What the model sent for the first answer: thinking (if the server sent it apart), then the text. */
+  firstRaw: string;
   outputTokens: number;
   tokensEstimated: boolean;
   thinkingTokens: number;
@@ -110,6 +114,8 @@ export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): C
     inventedDesign,
     inventedElements,
     empty,
+    recovered: r.first.recovered,
+    firstRaw: [r.first.thinking && `--- thinking\n${r.first.thinking}`, `--- answer\n${r.first.raw}`].filter(Boolean).join("\n"),
     outputTokens: tokens,
     tokensEstimated: estimated,
     thinkingTokens: Math.round((r.first.thinkingChars + (r.repair?.thinkingChars ?? 0)) / 4),
@@ -143,7 +149,7 @@ export async function runEval(list: EvalCase[], o: EvalOptions): Promise<CaseRes
       result = {
         id: c.id, category: c.category, request: c.request, note: c.note, ok: false, error,
         validFirst: false, validFinal: false, problemsFirst: 0, problemsFinal: 0, repaired: false,
-        missing: [], checks: c.checks?.length ?? 0, failedChecks: [], inventedDesign: [], inventedElements: [], empty: true, outputTokens: 0, tokensEstimated: true,
+        missing: [], checks: c.checks?.length ?? 0, failedChecks: [], inventedDesign: [], inventedElements: [], empty: true, recovered: false, firstRaw: "", outputTokens: 0, tokensEstimated: true,
         thinkingTokens: 0, totalMs: 0, elements: 0, firstSpec: "", finalSpec: "", firstProblems: [], finalProblems: [],
       };
     }
@@ -176,6 +182,7 @@ export interface Summary {
   inventedDesign: number;
   inventedElements: number;
   empty: number;
+  recovered: number;
   medianTokens?: number;
   medianFirstLineMs?: number;
   medianTotalMs?: number;
@@ -197,6 +204,7 @@ export function summarize(results: CaseResult[]): Summary {
     inventedDesign: ran.filter((r) => r.inventedDesign.length).length,
     inventedElements: ran.filter((r) => r.inventedElements.length).length,
     empty: ran.filter((r) => r.empty).length,
+    recovered: ran.filter((r) => r.recovered).length,
     medianTokens: median(ran.map((r) => r.outputTokens)),
     medianFirstLineMs: median(ran.flatMap((r) => (r.firstLineMs === undefined ? [] : [r.firstLineMs]))),
     medianTotalMs: median(ran.map((r) => r.totalMs)),
@@ -223,6 +231,7 @@ export function report(results: CaseResult[], meta: { model: string; url: string
     `| Invented design props (color=, font=…) | ${s.inventedDesign} |`,
     `| Invented elements | ${s.inventedElements} |`,
     `| Empty answers | ${s.empty} |`,
+    ...(s.recovered ? [`| Specs found inside unclosed thinking | ${s.recovered} |`] : []),
     `| Output tokens per screen (median) | ${s.medianTokens ?? "—"}${s.tokensEstimated ? " (estimated from length)" : ""} |`,
     `| Thinking tokens before writing (median) | ${s.medianThinkingTokens ?? "—"} |`,
     `| Time to first line (median) | ${secs(s.medianFirstLineMs)} |`,

@@ -20,6 +20,13 @@ export interface Attempt {
   raw: string;
   usage: Usage;
   thinkingChars: number;
+  /** Thinking the server sent separately (reasoning_content), kept for diagnosing empty answers. */
+  thinking: string;
+  /**
+   * True when the answer was empty and the spec was recovered from the
+   * thinking: some models write the spec inside a thinking block they never close.
+   */
+  recovered: boolean;
 }
 
 export interface GenerateResult {
@@ -90,7 +97,7 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
   const run = async (msgs: ChatMessage[]): Promise<Attempt> => {
     const filter = new SpecFilter(isLoomLine);
     const usage: Usage = {};
-    let raw = "", spec = "", reasoning = 0, phase: Phase = "waiting";
+    let raw = "", spec = "", thinking = "", phase: Phase = "waiting";
     const setPhase = (p: Phase) => { if (p !== phase) { phase = p; o.onPhase?.(p); } };
     const emit = (out: { text: string; reset: boolean }) => {
       if (out.reset) { spec = ""; o.onReset?.("thinking"); }
@@ -103,15 +110,23 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
     o.onPhase?.("waiting");
     for await (const part of streamChat(o.config, msgs, { signal: o.signal, fetch: o.fetch, usage })) {
       if (timings.firstTokenMs === undefined) timings.firstTokenMs = now() - start;
-      if (part.kind === "reasoning") { reasoning += part.text.length; setPhase("thinking"); continue; }
+      if (part.kind === "reasoning") { thinking += part.text; setPhase("thinking"); continue; }
       raw += part.text;
       const before = filter.thinkingChars;
       emit(filter.push(part.text));
       if (filter.thinkingChars > before && phase === "waiting") setPhase("thinking");
     }
     emit(filter.end());
+    // Nothing but thinking: look for the spec inside it before giving up.
+    let recovered = false;
+    if (!spec.trim()) {
+      const again = new SpecFilter(isLoomLine);
+      const text = `${thinking}\n${raw}`.replace(/<\/?think>/g, "\n");
+      const found = again.push(text).text + again.end().text;
+      if (found.trim()) { recovered = true; emit({ text: found.trimEnd() + "\n", reset: false }); }
+    }
     const diagnostics = parse(spec, o.registry, { knownNames: o.stateNames }).diagnostics;
-    return { spec, diagnostics, raw, usage, thinkingChars: reasoning + filter.thinkingChars };
+    return { spec, diagnostics, raw, usage, thinkingChars: thinking.length + filter.thinkingChars, thinking, recovered };
   };
 
   const first = await run(messages);

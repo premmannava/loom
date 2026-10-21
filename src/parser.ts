@@ -286,6 +286,13 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       return;
     }
 
+    // JSX or code where an element should be, like {items.map(…)} or <list-item>.
+    if (/^[{<]/.test(body) && !openState) {
+      diagnostics.push({ line: lineNo, severity: "warning", message: `Lines start with an element name. Loom has no JSX or code; to repeat elements for each item, use each items=list as=x and put the elements under it` });
+      skipDeeperThan = indent;
+      return;
+    }
+
     // A prop on a line of its own (`if={…}`), usually meant for the element below it.
     const loneProp = /^([A-Za-z_][\w-]*)=/.exec(body);
     if (loneProp && !openState) {

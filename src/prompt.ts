@@ -102,6 +102,15 @@ card
       text "\${item.price * item.qty}"
   divider
   text "Total \${sum(cart, 'price', 'qty')}" style=title`,
+  orders: `state orders=[{date: "May 2", lines: [{name: "Tent", price: 180}, {name: "Stove", price: 45}]}, {date: "May 9", lines: [{name: "Headlamp", price: 30}]}]
+each items=orders as=o
+  card
+    text "Order of {o.date}" weight=semibold
+    each items=o.lines as=line
+      row
+        text "{line.name}"
+        text "\${line.price}" align=right
+    text "Total \${sum(o.lines, 'price')}" align=right`,
 };
 
 function dataSection(): string {
@@ -116,12 +125,18 @@ function dataSection(): string {
 - Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"
 - Change the list: on="add:todos:{text: 'Map', done: false}", on=remove:t (inside each), on=clear:todos
 - Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}
+- For a list inside each item (an order's lines, a day's activities), put an each inside the each: each items=o.lines as=line
+- Loom has no JSX, HTML or JavaScript. {…} only computes values; it never makes elements. Repeat with each.
+- There are no text fields yet. To let people add an item, add a ready-made one: on="add:contacts:{name: 'New contact', phone: ''}"
 
 A to-do list:
 ${indent(DATA_EXAMPLES.todo)}
 
 A cart whose total follows the quantities:
-${indent(DATA_EXAMPLES.cart)}`;
+${indent(DATA_EXAMPLES.cart)}
+
+Orders, each with its own list of lines:
+${indent(DATA_EXAMPLES.orders)}`;
 }
 
 export function languageGuide(registry: Registry, opts: GuideOptions = {}): string {

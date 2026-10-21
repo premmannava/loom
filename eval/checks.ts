@@ -26,17 +26,27 @@ export const acts = (op: string): Check => ({
   test: (spec) => new RegExp(`(^|[\\s=";])${op}:`, "m").test(spec),
 });
 
-/** At least `n` copies of one repeated element are shown. */
+/**
+ * At least `n` list items are shown, added up across every each: a kanban's
+ * three columns of 3, 3 and 2 cards count as 8.
+ */
 export const repeats = (n: number): Check => ({
-  label: `shows at least ${n} items from a list`,
+  label: `shows at least ${n} items from lists`,
   test: (_spec, ui) => {
-    const counts = new Map<string, number>();
+    // Copies are named after the spec line they repeat: "7:card#3" is a copy of "7:card".
+    const shown = new Map<string, number>();
     for (const f of ui.findAll({})) {
       if (!f.box || !f.node.id.includes("#")) continue;
-      const base = f.node.id.slice(0, f.node.id.indexOf("#"));
-      counts.set(base, (counts.get(base) ?? 0) + 1);
+      const line = f.node.id.slice(0, f.node.id.indexOf("#"));
+      shown.set(line, (shown.get(line) ?? 0) + 1);
     }
-    return Math.max(0, ...counts.values()) >= n;
+    let items = 0;
+    const walk = (node: LoomNode) => {
+      if (node.type === "each") items += Math.max(0, ...node.children.map((c) => shown.get(c.id) ?? 0));
+      node.children.forEach(walk);
+    };
+    if (ui.loom.tree) walk(ui.loom.tree);
+    return items >= n;
   },
 });
 
