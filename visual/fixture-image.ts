@@ -1,9 +1,8 @@
 /**
- * Images for the playground samples and the visual tests, drawn instead of
- * downloaded, so both work offline and screenshots never depend on a server.
- * A real app uses the default loader (or its own) and real URLs.
+ * A drawn stand-in for photos in the visual tests, so screenshots never depend
+ * on a server. The playground itself loads the samples' real photos.
  */
-import { browserImageLoader, type ImageLoader, type LoadedImage } from "../src/images";
+import type { ImageLoader } from "../src/images";
 
 /** A simple trail landscape: sky, sun, two ridges and a path. */
 export function drawLandscape(width = 800, height = 500): HTMLCanvasElement {
@@ -36,14 +35,8 @@ export function drawLandscape(width = 800, height = 500): HTMLCanvasElement {
   return c;
 }
 
-const drawn = (): Promise<LoadedImage> => {
+/** Draws the same landscape for every URL, so visual tests never depend on the network. */
+export const fixtureImageLoader: ImageLoader = () => {
   const c = drawLandscape();
   return Promise.resolve({ source: c, width: c.width, height: c.height });
 };
-
-/** Draws an image for the samples' /samples/… paths; loads everything else normally. */
-export const sampleImageLoader: ImageLoader = (url) =>
-  new URL(url).pathname.startsWith("/samples/") ? drawn() : browserImageLoader(url);
-
-/** Draws an image for every URL (visual tests). */
-export const fixtureImageLoader: ImageLoader = () => drawn();

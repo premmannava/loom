@@ -799,6 +799,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `animate` | `true` | Fade new elements in (off when the user prefers reduced motion) |
 | `imageHosts` | `[]` | Hosts images may load from besides your own site ([Images](#images)) |
 | `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
+| `onWarning` | `console.warn` | Receives problems found while running, like a blocked image |
 
 ### Methods
 
@@ -848,7 +849,7 @@ const loom = new Loom(canvas, {
 });
 ```
 
-Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Access-Control-Allow-Origin`. The space for each image is kept from its `ratio=` while it loads, so the screen doesn't jump.
+Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Access-Control-Allow-Origin` (most image CDNs do). The playground allows `images.unsplash.com`, and its "Trail gear" and "Gear finder" samples use real photos from there. The space for each image is kept from its `ratio=` while it loads, so the screen doesn't jump.
 
 ### Keyboard
 
@@ -950,9 +951,9 @@ expect(ui.text()).toContain("Clicked 1 times");
 | Helper | What it does |
 |---|---|
 | `find`, `findAll`, `isShown` | Look elements up by `type`, `text` (as written or as shown) and `line` |
-| `press`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
+| `press`, `drag`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
 | `set`, `setSpec`, `stream` | Change state, replace the spec, or stream one in chunks |
-| `state`, `emitted`, `focused`, `diagnostics` | Read the results |
+| `state`, `emitted`, `focused`, `diagnostics`, `warnings` | Read the results |
 | `text`, `drawOps`, `hits` | What the last frame drew, and what is clickable |
 
 Map clicks need a real canvas to tell countries apart, so they're covered by the visual tests rather than in Node.

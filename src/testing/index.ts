@@ -70,6 +70,8 @@ export interface Rendered {
   readonly diagnostics: Diagnostic[];
   /** Every `emit:` the screen has sent, oldest first. */
   readonly emitted: Emitted[];
+  /** Warnings from the engine (e.g. a blocked image), oldest first. Collected here instead of the console. */
+  readonly warnings: string[];
   /** Drawing calls from the most recent frame. */
   readonly drawOps: DrawOp[];
   /** Interactive regions from the most recent frame. */
@@ -123,9 +125,11 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     animate: false,
     imageHosts: opts.imageHosts,
     loadImage: opts.loadImage,
+    onWarning: (m) => warnings.push(m),
   });
 
   const emitted: Emitted[] = [];
+  const warnings: string[] = [];
   let drawOps: DrawOp[] = [];
   loom.on("action", (e: LoomEvents["action"]) => emitted.push({ name: e.name, value: e.value }));
   loom.on("render", () => { drawOps = canvas.takeDrawOps(); });
@@ -201,6 +205,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     get state() { return loom.state.snapshot(); },
     get diagnostics() { return loom.diagnostics; },
     get emitted() { return emitted; },
+    get warnings() { return warnings; },
     get drawOps() { return drawOps; },
     get hits() { return loom.hitRegions; },
     get focused() { return loom.focus?.node ?? null; },

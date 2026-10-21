@@ -77,15 +77,16 @@ export class ImageCache {
     private loader: ImageLoader,
     private onSettle: () => void,
     private now: () => number,
+    private warn: (message: string) => void,
     private max = 200,
   ) {}
 
   get(src: string): ImageState {
     const r = resolveImageUrl(src, this.policy());
     if ("blocked" in r) {
-      if (!this.warned.has(src) && typeof console !== "undefined") {
+      if (!this.warned.has(src)) {
         this.warned.add(src);
-        console.warn(`Loom: image "${src}" was not loaded: ${r.blocked}. Allow its host with the imageHosts option.`);
+        this.warn(`Image "${src}" was not loaded: ${r.blocked}. Allow its host with the imageHosts option.`);
       }
       return { status: "blocked" };
     }

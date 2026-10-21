@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fitRect, ratioValue } from "../src/components/media";
 import { resolveImageUrl, type LoadedImage } from "../src/images";
-import { render } from "../src/testing";
+import { coreComponents } from "../src/components";
+import { Loom } from "../src/engine";
+import { FakeCanvas, render } from "../src/testing";
 
 const policy = { origin: "https://shop.example", base: "https://shop.example/products/", hosts: ["cdn.example.com", "*.imgs.example.net"] };
 const allowed = (src: string) => "url" in resolveImageUrl(src, policy);
@@ -83,15 +85,24 @@ describe("image component", () => {
   });
 
   it("never asks the loader for a blocked image, and says why once", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const loadImage = vi.fn(async () => picture);
     const ui = render(`image "Pixel" src="https://tracker.example.org/p.gif"\n`, { loadImage });
     ui.loom.invalidate("paint");
     ui.loom.renderNow();
     expect(loadImage).not.toHaveBeenCalled();
     expect(ui.text()).toEqual(["Pixel"]);
+    expect(ui.warnings).toEqual([expect.stringMatching(/tracker\.example\.org isn't in imageHosts/)]);
+  });
+
+  it("warns on the console by default", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // render() collects warnings itself, so build an engine with the defaults.
+    const loom = new Loom(new FakeCanvas() as unknown as HTMLCanvasElement, { components: coreComponents, width: 400, animate: false });
+    loom.setSpec(`image "Pixel" src="https://tracker.example.org/p.gif"\n`);
+    loom.renderNow();
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]![0])).toMatch(/tracker\.example\.org isn't in imageHosts/);
+    expect(String(warn.mock.calls[0]![0])).toMatch(/^Loom: Image .* isn't in imageHosts/);
+    loom.destroy();
   });
 
   it("loads from hosts the app allows", async () => {

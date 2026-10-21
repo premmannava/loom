@@ -13,7 +13,7 @@ import { Loom } from "../src/engine";
 import { coreComponents } from "../src/components";
 import { mapComponents } from "../src/components/map";
 import { darkTheme, lightTheme } from "../src/theme";
-import { fixtureImageLoader } from "../playground/sample-images";
+import { fixtureImageLoader } from "./fixture-image";
 import { cases } from "./cases";
 
 declare global {
@@ -40,6 +40,9 @@ async function main(): Promise<void> {
     theme,
     width,
     animate: false,
+    // The samples' real photo host, so their images are drawn by the fixture
+    // instead of downloaded; other hosts stay blocked, as in the playground.
+    imageHosts: ["images.unsplash.com"],
     loadImage: fixtureImageLoader,
   });
   loom.setSpec(visual.spec);

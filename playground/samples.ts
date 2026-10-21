@@ -111,21 +111,60 @@ card
   finder: {
     label: "Gear finder",
     prompt: "Help me find trail shoes under a budget, then show me the one I pick.",
-    spec: `state maxPrice=150 picked="Ridgeline" price=128 cart=0
+    spec: `state maxPrice=150 picked="Ridgeline" price=128 photo="photo-1606036525923-525fa3b35465" cart=0
 screen name=browse title="Trail shoes"
   slider "Up to \${maxPrice}" bind=maxPrice min=50 max=200 step=5
   list if={maxPrice >= 95}
-    list-item "Switchback" detail="Light and fast, 240 g" trailing="$95" on="set:picked:Switchback;set:price:95;go:shoe" if={maxPrice >= 95}
-    list-item "Ridgeline" detail="Waterproof, 280 g" trailing="$128" on="set:picked:Ridgeline;set:price:128;go:shoe" if={maxPrice >= 128}
-    list-item "Summit Pro" detail="Rock plate, 310 g" trailing="$175" on="set:picked:Summit Pro;set:price:175;go:shoe" if={maxPrice >= 175}
+    list-item "Switchback" detail="Light and fast, 240 g" trailing="$95" on="set:picked:Switchback;set:price:95;set:photo:photo-1600185365926-3a2ce3cdb9eb;go:shoe" if={maxPrice >= 95}
+    list-item "Ridgeline" detail="Waterproof leather, 480 g" trailing="$128" on="set:picked:Ridgeline;set:price:128;set:photo:photo-1606036525923-525fa3b35465;go:shoe" if={maxPrice >= 128}
+    list-item "Summit Pro" detail="Rock plate, 310 g" trailing="$175" on="set:picked:Summit Pro;set:price:175;set:photo:photo-1655976795374-6b519928f1e1;go:shoe" if={maxPrice >= 175}
   empty "Nothing under \${maxPrice}" detail="Our lightest pair starts at $95." action="Show all" on=set:maxPrice:200 if={maxPrice < 95}
 screen name=shoe title="{picked}"
-  image "{picked} trail shoes, side view" src="/samples/trail-shoe.jpg" ratio=16:9
+  image "{picked} trail shoes" src="https://images.unsplash.com/{photo}?w=1000&q=70&auto=format&fit=crop" ratio=4:3
   row
     rating value=4.6
     text "\${price}" style=title align=right
   button "Add to cart" on="inc:cart;notify:'Added {picked}. {cart} in your cart'"
   button "Back to results" variant=secondary on=back
+  text "Photos from Unsplash" style=caption tone=muted
+`,
+  },
+  gallery: {
+    label: "Trail gear",
+    prompt: "Show me some trail gear with photos.",
+    spec: `state saved=0
+image "Two hikers walking a trail toward snow-capped mountains" src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=1600&q=70&auto=format&fit=crop" ratio=16:9
+text "Gear for the trail" style=title
+text "Tap an item to save it." tone=muted
+grid min=150 gap=12
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Ridge pack'"
+    image "Green and brown backpack on a rock" src="https://images.unsplash.com/photo-1622260614153-03223fb72052?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Ridge 40L pack" weight=semibold
+    text "$149" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Basecamp tent'"
+    image "Orange camping tent near green trees" src="https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Basecamp 2P tent" weight=semibold
+    text "$289" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Ridgeline boots'"
+    image "Brown leather lace-up boots" src="https://images.unsplash.com/photo-1606036525923-525fa3b35465?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Ridgeline boots" weight=semibold
+    text "$128" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Switchback runners'"
+    image "White and orange running shoe on a plain background" src="https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?w=700&q=70&auto=format&fit=crop" ratio=1:1 fit=contain
+    text "Switchback runners" weight=semibold
+    text "$95" tone=muted
+text "{saved} saved" tone=good if={saved > 0}
+divider
+row align=top
+  image "A hiker with a large backpack on a rocky peak at golden hour" src="https://images.unsplash.com/photo-1586022045497-31fcf76fa6cc?w=800&q=70&auto=format&fit=crop" ratio=3:4
+  column gap=6
+    text "Golden hour on the ridge" style=lead weight=semibold
+    text "A tall 3:4 photo beside text. The image keeps its shape at any width." tone=muted
+divider
+text "Blocked on purpose" weight=semibold
+text "This image's host isn't in imageHosts, so it shows its description instead." tone=muted
+image "A photo from a site the app hasn't allowed" src="https://example.org/photo.jpg" ratio=3:2
+text "Photos from Unsplash" style=caption tone=muted
 `,
   },
   habits: {

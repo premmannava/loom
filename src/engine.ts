@@ -68,6 +68,8 @@ export interface LoomOptions {
   imageHosts?: string[];
   /** Custom image loading (server rendering, tests, a CDN signer). Default: an <img> with CORS. */
   loadImage?: ImageLoader;
+  /** Problems found while running, like a blocked image. Default: console.warn with a "Loom:" prefix. */
+  onWarning?: (message: string) => void;
 }
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -120,7 +122,8 @@ export class Loom {
     this.measurer = new CanvasMeasurer(g);
     this.theme = this.resolveTheme();
     this.inspector = new Inspector(this);
-    this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now);
+    const warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`Loom: ${m}`); });
+    this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now, warn);
 
     canvas.tabIndex = 0;
     canvas.style.outline = "none";

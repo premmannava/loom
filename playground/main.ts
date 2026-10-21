@@ -1,6 +1,5 @@
 import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
 import { mapComponents } from "../src/components/map";
-import { sampleImageLoader } from "./sample-images";
 import { samples } from "./samples";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -8,7 +7,8 @@ const ta = $<HTMLTextAreaElement>("spec");
 const gutter = $("gutter");
 const canvas = $<HTMLCanvasElement>("cv");
 
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], loadImage: sampleImageLoader }).expose("loom");
+// The samples use real photos from Unsplash; images from any other host are blocked.
+const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts: ["images.unsplash.com"] }).expose("loom");
 $("guide").textContent = languageGuide(loom.registry);
 
 let current = "map";
