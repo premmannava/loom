@@ -117,7 +117,7 @@ const stateLine = fc
 
 const otherLine = fc.oneof(
   { weight: 2, arbitrary: stateLine },
-  { weight: 1, arbitrary: fc.constantFrom("", "# comment", "\t\tcard", "   ", "\"", "{") },
+  { weight: 1, arbitrary: fc.constantFrom("", "# comment", "\t\tcard", "   ", "\"", "{", "if=done", "if={count > 1}", "if=", "if={t.done} if=a", "  if={item}") },
   { weight: 1, arbitrary: fc.string({ maxLength: 30 }) },
 );
 

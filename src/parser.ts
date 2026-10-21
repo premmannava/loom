@@ -13,7 +13,7 @@
  * mistake costs one element, not the whole screen.
  */
 import { actionExpressions, parseActions } from "./actions";
-import { COMMON_PROPS, type PropDef } from "./component";
+import { COMMON_PROPS, type ComponentDef, type PropDef } from "./component";
 import { looksLikeData, parseData } from "./data";
 import { checkSyntax, identifiers, splitTemplate } from "./expr";
 import { actionTargets } from "./actions";
@@ -41,6 +41,29 @@ export function openBrackets(line: string, depth = 0): number {
     else if (c === "]" || c === "}") depth--;
   }
   return depth;
+}
+
+/**
+ * The condition block, written as a line holding only if={…}. It isn't a
+ * registered component: it never reaches layout, which replaces it with its
+ * children when the condition holds (see shownChildren in layout.ts).
+ */
+export const IF_BLOCK: ComponentDef = {
+  type: "if",
+  category: "layout",
+  description: "Shows the lines indented under it only while its condition is true.",
+  props: {},
+  children: "any",
+  layout(box) {
+    box.h = 0;
+  },
+};
+
+/** Elements with no box of their own, whose children belong to the container around them. */
+export const TRANSPARENT = new Set(["each", "if"]);
+
+function defOf(type: string, registry: Registry): ComponentDef | undefined {
+  return type === "if" ? IF_BLOCK : registry.get(type);
 }
 
 export interface ParseOptions {
@@ -293,15 +316,22 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       return;
     }
 
-    // A prop on a line of its own (`if={…}`), usually meant for the element below it.
+    // A line holding only if={…} is a condition block for the lines under it.
+    // Any other prop on a line of its own was meant for an element.
     const loneProp = /^([A-Za-z_][\w-]*)=/.exec(body);
+    let line = body;
     if (loneProp && !openState) {
-      const name = loneProp[1]!;
-      diagnostics.push({ line: lineNo, severity: "warning", message: `A line can't start with ${name}=, so it was ignored. Put it on the element it's for, like list-item "Milk" ${name}=…` });
-      return;
+      const block = tokenizeLine(`if ${body}`);
+      if (loneProp[1] === "if" && !block.problems.length && block.text === undefined && Object.keys(block.props).join() === "if") {
+        line = `if ${body}`;
+      } else {
+        const name = loneProp[1]!;
+        diagnostics.push({ line: lineNo, severity: "warning", message: `A line can't start with ${name}=, so it was ignored. Put it on the element it's for, like list-item "Milk" ${name}=…` });
+        return;
+      }
     }
 
-    const tok = tokenizeLine(body);
+    const tok = tokenizeLine(line);
     if (!tok.type && openState) {
       if (!openState.reported) {
         openState.reported = true;
@@ -313,14 +343,14 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     for (const p of tok.problems) diagnostics.push({ line: lineNo, severity: "warning", message: p });
     if (!tok.type) { skipDeeperThan = indent; return; }
 
-    const def = registry.get(tok.type);
+    const def = defOf(tok.type, registry);
     if (!def) {
       diagnostics.push({ line: lineNo, severity: "error", message: `Unknown element "${tok.type}". It was skipped, along with anything inside it` });
       skipDeeperThan = indent;
       return;
     }
 
-    if (last && indent > last.indent && !registry.get(last.type)?.children) {
+    if (last && indent > last.indent && !defOf(last.type, registry)?.children) {
       diagnostics.push({ line: lineNo, severity: "error", message: `"${tok.type}" is indented under "${last.type}" (line ${last.line}), which can't contain anything` });
       skipDeeperThan = indent;
       return;
@@ -335,12 +365,12 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     }
     // each is transparent: what's inside it is checked against the container around it.
     let owner = stack.length - 1;
-    while (owner > 0 && stack[owner]!.type === "each") owner--;
+    while (owner > 0 && TRANSPARENT.has(stack[owner]!.type)) owner--;
     const container = stack[owner]!;
     const parentDef = container === root ? registry.get("column") : registry.get(container.type);
     const accepts = parentDef?.children;
     const parentName = container === root ? "the top level" : `"${container.type}" (line ${container.line})`;
-    const fits = tok.type === "each" ? !!accepts : !!accepts && (accepts === "any" || accepts.includes(tok.type));
+    const fits = TRANSPARENT.has(tok.type) ? !!accepts : !!accepts && (accepts === "any" || accepts.includes(tok.type));
     if (!fits) {
       diagnostics.push({ line: lineNo, severity: "error", message: `${parentName} can't contain "${tok.type}"` });
       skipDeeperThan = indent;
@@ -376,6 +406,9 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     }
     for (const [name, pdef] of Object.entries(def.props)) {
       if (pdef.required && !(name in tok.props)) diagnostics.push({ line: lineNo, severity: "warning", message: `"${tok.type}" needs ${name}=` });
+    }
+    if (tok.type === "if" && tok.props.if === undefined) {
+      diagnostics.push({ line: lineNo, severity: "warning", message: `An if block needs a condition, like if={count > 0}; the lines under it always show` });
     }
     if (tok.type === "each" && tok.props.as !== undefined && tok.props.as === tok.props.index) {
       diagnostics.push({ line: lineNo, severity: "warning", message: `each uses "${tok.props.as}" for both as= and index=; give them different names` });

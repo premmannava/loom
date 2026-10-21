@@ -38,6 +38,8 @@ export function shownChildren(node: LoomNode, scope: Scope, registry?: Registry,
     for (const c of kids) {
       if (!isVisible(c, scope, registry)) continue;
       if (c.type === "each") add(eachInstances(c, scopeOf(c, scope), warn, budget));
+      // A passing if= block stands for the lines under it.
+      else if (c.type === "if") add(c.children);
       else out.push(c);
     }
   };
