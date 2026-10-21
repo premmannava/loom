@@ -41,7 +41,7 @@ const expr: fc.Arbitrary<string> = fc.letrec<{ e: string }>((tie) => ({
     fc.tuple(tie("e"), tie("e"), tie("e")).map(([c, a, b]) => `${c} ? ${a} : ${b}`),
     tie("e").map((a) => `(${a})`),
     tie("e").map((a) => `!${a}`),
-    fc.tuple(fc.constantFrom("min", "max", "round", "fixed", "abs", "len", "count", "sum", "avg", "join", "includes", "nope", "valueOf"), fc.array(tie("e"), { maxLength: 3 })).map(([f, args]) => `${f}(${args.join(", ")})`),
+    fc.tuple(fc.constantFrom("min", "max", "round", "fixed", "abs", "len", "count", "sum", "avg", "join", "includes", "filter", "find", "search", "sort", "take", "money", "number", "plural", "lower", "upper", "trim", "nope", "valueOf"), fc.array(tie("e"), { maxLength: 3 })).map(([f, args]) => `${f}(${args.join(", ")})`),
     // Reading inside data, including names that must stay unreadable.
     fc.tuple(tie("e"), fc.constantFrom("text", "done", "price", "length", "lines", "constructor", "__proto__", "prototype", "toString", "map")).map(([o, k]) => `${o}.${k}`),
     fc.tuple(tie("e"), tie("e")).map(([o, k]) => `${o}[${k}]`),

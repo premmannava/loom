@@ -121,7 +121,11 @@ function dataSection(): string {
   each items=todos as=t
 - Inside each, the current item is t (from as=t; item if as= is left out). index=i gives its position from 0. t only exists inside its each.
 - Read fields: {t.text}, {cart[0].price}, {todos.length}
-- Compute numbers from the list instead of writing them yourself: len(list), count(list, 'done') counts items whose field is true, sum(list, 'price'), sum(list, 'price', 'qty') multiplies two fields per item, avg(list, 'field'), join(list, 'name'), includes(list, value)
+- Compute numbers from the list instead of writing them yourself: len(list), count(list, 'done') counts items whose field is true, count(list, 'cat', 'Gas') counts items whose field equals a value, sum(list, 'price'), sum(list, 'price', 'qty') multiplies two fields per item, avg(list, 'field'), min(list, 'field'), max(list, 'field'), join(list, 'name'), includes(list, value)
+- Narrow and order lists: filter(list, 'done'), filter(list, 'cat', 'Gas'), find(list, 'id', picked) for one item, search(list, 'name', query), sort(list, 'price'), sort(list, 'price', 'desc'), take(list, 3). Combine them: sum(filter(tx, 'cat', 'Gas'), 'amount'), find(rooms, 'id', room).rate
+- Use filter() for counts and totals. To hide items that people can still change (bind=t.done), keep each items=todos and put if= on the repeated element
+- To compare two fields of an item (an answer and its correct answer), set a field when choosing, then count it: radio "{o}" bind=q.pick value={o} on="set:q.ok:{o == q.answer}" and later count(qs, 'ok')
+- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()
 - Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"
 - Change the list: on="add:todos:{text: 'Map', done: false}", on=remove:t (inside each), on=clear:todos
 - Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}

@@ -43,13 +43,61 @@ function amounts(v: Value, a?: Value, b?: Value): number[] | null {
   });
 }
 
+/** The items whose field equals a value, or (with no value) whose field is true or not empty. */
+function matches(item: Value, field: Value | undefined, value: Value | undefined): boolean {
+  if (field === undefined) return !!item;
+  const v = fieldOf(item, field);
+  return value === undefined ? !!v : v === value;
+}
+
+/** Order for sort(): numbers by size, text alphabetically, missing values last. */
+function order(a: Value | undefined, b: Value | undefined): number {
+  const missing = (v: Value | undefined) => v === undefined || v === null || (typeof v === "number" && isNaN(v));
+  if (missing(a) || missing(b)) return missing(a) ? (missing(b) ? 0 : 1) : -1;
+  if (typeof a === "string" && typeof b === "string") return a.localeCompare(b);
+  return toNumber(a!) - toNumber(b!);
+}
+
+/** Formatting follows US English for now; a locale option can come with the theme. */
+const LOCALE = "en-US";
+
+/** Text for a value in lower/upper/trim: text as is, numbers as shown, nothing for null. */
+const textOf = (v: Value | undefined): string => (typeof v === "string" ? v : v === undefined || v === null ? "" : formatValue(v));
+
+/** min(3, 5), min(list) or min(list, 'field'). */
+function extreme(pick: (...xs: number[]) => number, a: Value[]): number {
+  if (isList(a[0]) && typeof a[1] === "string") return pick(...(amounts(a[0], a[1]) ?? []));
+  return pick(...spread(a).map(toNumber));
+}
+
 const BUILTINS: Record<string, Fn> = {
-  min: (...a) => Math.min(...spread(a).map(toNumber)),
-  max: (...a) => Math.max(...spread(a).map(toNumber)),
+  min: (...a) => extreme(Math.min, a),
+  max: (...a) => extreme(Math.max, a),
   /** Items in a list, or characters in text. */
   len: (v) => (isList(v) || typeof v === "string" ? v.length : NaN),
-  /** Items that are true, or whose field is true (or not empty). */
-  count: (v, field) => (isList(v) ? v.filter((item) => (field === undefined ? item : fieldOf(item, field))).length : NaN),
+  /** Items that are true, whose field is true (or not empty), or whose field equals a value. */
+  count: (v, field, value) => (isList(v) ? v.filter((item) => matches(item, field, value)).length : NaN),
+  /** The items count() would count, as a list: filter(tx, 'cat', 'Gas'). */
+  filter: (v, field, value) => (isList(v) ? makeList(v.filter((item) => matches(item, field, value))) : NaN),
+  /** The first item whose field equals a value, or null: find(rooms, 'id', room). */
+  find: (v, field, value) => (isList(v) ? v.find((item) => matches(item, field, value)) ?? null : NaN),
+  /** Items whose field contains some text, ignoring case; empty text matches everything. */
+  search: (v, field, text) => {
+    if (!isList(v)) return NaN;
+    const q = textOf(text).trim().toLowerCase();
+    return makeList(q ? v.filter((item) => textOf(fieldOf(item, field)).toLowerCase().includes(q)) : [...v]);
+  },
+  /** sort(list), sort(list, 'price') or sort(list, 'price', 'desc'), and sort(list, 'desc') for plain values. */
+  sort: (v, a, b) => {
+    if (!isList(v)) return NaN;
+    const plainDesc = a === "desc" || a === "asc";
+    const field = plainDesc ? undefined : a;
+    const desc = (plainDesc ? a : b) === "desc";
+    const key = (item: Value) => (field === undefined ? item : fieldOf(item, field));
+    return makeList([...v].sort((x, y) => (desc ? -1 : 1) * order(key(x), key(y))));
+  },
+  /** The first n items: take(sort(players, 'score', 'desc'), 3). */
+  take: (v, n) => (isList(v) ? makeList(v.slice(0, Math.max(0, Math.floor(toNumber(n ?? 0)) || 0))) : NaN),
   sum: (v, a, b) => amounts(v, a, b)?.reduce((t, x) => t + x, 0) ?? NaN,
   avg: (v, a, b) => {
     const xs = amounts(v, a, b);
@@ -73,6 +121,28 @@ const BUILTINS: Record<string, Fn> = {
   ceil: (n) => Math.ceil(toNumber(n)),
   abs: (n) => Math.abs(toNumber(n)),
   fixed: (n, d = 2) => toNumber(n).toFixed(toNumber(d)),
+  /** money(2400) is $2,400.00, money(-84.1) is -$84.10; money(n, 'EUR') for another currency. */
+  money: (n, currency = "USD") => {
+    const x = toNumber(n);
+    if (!isFinite(x)) return NaN;
+    try { return new Intl.NumberFormat(LOCALE, { style: "currency", currency: textOf(currency) }).format(x); } catch { return NaN; }
+  },
+  /** number(37000) is 37,000; number(n, 2) always shows two decimals. */
+  number: (n, d) => {
+    const x = toNumber(n);
+    if (!isFinite(x)) return NaN;
+    const digits = d === undefined ? undefined : Math.min(10, Math.max(0, Math.floor(toNumber(d)) || 0));
+    return new Intl.NumberFormat(LOCALE, digits === undefined ? { maximumFractionDigits: 2 } : { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(x);
+  },
+  /** plural(1, 'item') is "1 item", plural(3, 'item') is "3 items"; plural(n, 'child', 'children') for irregular words. */
+  plural: (n, one, many) => {
+    const x = toNumber(n);
+    const word = textOf(one);
+    return `${isFinite(x) ? new Intl.NumberFormat(LOCALE).format(x) : "—"} ${x === 1 ? word : many === undefined ? word + "s" : textOf(many)}`;
+  },
+  lower: (t) => textOf(t).toLowerCase(),
+  upper: (t) => textOf(t).toUpperCase(),
+  trim: (t) => textOf(t).trim(),
 };
 
 // A frozen copy with no prototype, looked up by own property only, so names

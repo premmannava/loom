@@ -141,7 +141,7 @@ stat label="Each" value={round(price / 3, 2)}
 
 - Operators: `+ - * / %`, `== != < <= > >=`, `&& || !`, and `a ? b : c`
 - Text joins with `+`: `{'$' + price}` (use single quotes inside a quoted prop)
-- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`, and the list functions in [Lists](#lists)
+- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`, and the list and formatting functions in [Lists](#lists)
 - Fields and items: `{order.city}`, `{cart[0].price}`, `{todos.length}`
 - Words inside `{…}` are state names, so quote text: `{done ? 'Packed' : 'To pack'}`
 - There is no assignment, no calling methods and no global access, and `__proto__`, `constructor` and `prototype` can't be read. Anything that can't be read shows as `—` rather than guessing, and the parser warns about names nothing defines.
@@ -219,7 +219,26 @@ List functions, for computing instead of typing numbers:
 | `avg(list, 'field')` | Average |
 | `join(list)`, `join(list, 'name', ' / ')` | Text listing the items or a field |
 | `includes(list, value)` | Whether a value is in the list |
-| `min(list)`, `max(list)` | Smallest and largest |
+| `min(list)`, `max(list)`, `min(list, 'price')`, `max(list, 'price')` | Smallest and largest, of the items or of a field |
+| `count(list, 'cat', 'Gas')` | Items whose field equals a value |
+| `filter(list, 'done')`, `filter(list, 'cat', 'Gas')` | The items whose field is true, or equals a value, as a list |
+| `find(list, 'id', picked)` | The first item whose field equals a value, or `null`: `{find(rooms, 'id', room).rate}` |
+| `search(list, 'name', query)` | Items whose field contains some text, ignoring case (all of them for empty text) |
+| `sort(list, 'price')`, `sort(list, 'price', 'desc')`, `sort(list)` | The list in order, by a field or by value |
+| `take(list, 3)` | The first items |
+
+They combine: `{money(sum(filter(tx, 'cat', 'Gas'), 'amount'))}`, `{take(sort(runners, 'miles', 'desc'), 3)}`. Use them for counts and totals. To hide items people can still change (`bind=t.done`), keep `each items=todos` and put `if=` on the repeated element, because a filtered list is a copy and can't be written to.
+
+Formatting, for text people read:
+
+| Function | Result |
+|---|---|
+| `money(2400)`, `money(-84.1)`, `money(n, 'EUR')` | `$2,400.00`, `-$84.10`, `€…` |
+| `number(37000)`, `number(n, 2)` | `37,000`; always two decimals |
+| `plural(n, 'item')`, `plural(n, 'child', 'children')` | `1 item`, `3 items`, `2 children` |
+| `lower(text)`, `upper(text)`, `trim(text)` | Text in lower or upper case, or without spaces at the ends |
+
+Numbers and money are formatted in US English for now.
 
 Your app can pass its own data, which is copied into plain, frozen Loom data (functions, class instances and cycles are refused with a clear error):
 
