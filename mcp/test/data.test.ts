@@ -114,7 +114,7 @@ describe("the data tools", () => {
     expect(without).not.toContain("query_data");
     const withData = await connect();
     const tools = (await withData.listTools()).tools;
-    expect(tools.map((t) => t.name).sort()).toEqual(["describe_data", "fetch_dataset", "query_data", "sayshape_guide", "show_interface"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["describe_data", "fetch_dataset", "query_data", "sayshape_docs", "show_interface"]);
     // fetch_dataset is for the interface only: hosts hide it from the model.
     expect((tools.find((t) => t.name === "fetch_dataset")!._meta as { ui: { visibility: string[] } }).ui.visibility).toEqual(["app"]);
     expect(withData.getInstructions()).toMatch(/query_data/);
@@ -156,10 +156,10 @@ describe("the data tools", () => {
     expect(textOf(r)).toMatch(/didn't run: Only SELECT/);
   });
 
-  it("add the data notes to the guide only when there's a database", async () => {
-    const withData = textOf(await (await connect()).callTool({ name: "sayshape_guide", arguments: {} }));
-    const without = textOf(await (await connect(false)).callTool({ name: "sayshape_guide", arguments: {} }));
+  it("offer the database topic only when there's a database", async () => {
+    const withData = textOf(await (await connect()).callTool({ name: "sayshape_docs", arguments: { topics: ["database"] } }));
+    const without = textOf(await (await connect(false)).callTool({ name: "sayshape_docs", arguments: { topics: ["database"] } }));
     expect(withData).toMatch(/DATA FROM THE DATABASE/);
-    expect(without).not.toMatch(/DATA FROM THE DATABASE/);
+    expect(without).toMatch(/No topic called database/);
   });
 });
