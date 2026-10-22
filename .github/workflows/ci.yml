@@ -43,6 +43,27 @@ jobs:
       - run: npm run docs:check
       - run: npm run build:playground
 
+  mcp:
+    name: MCP server (mcp/)
+    runs-on: ubuntu-latest
+    if: github.event.action != 'labeled'
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
   fuzz:
     name: Long fuzz run
     runs-on: ubuntu-latest
