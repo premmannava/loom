@@ -94,7 +94,7 @@ EVERY ELEMENT ACCEPTS
 ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
 - content: text, image, code, badge, avatar
-- data: stat, rating, map, pin
+- data: stat, rating, chart, map, pin
 - input: button, link, check, switch, radio, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
 - feedback: progress, skeleton, empty
@@ -190,6 +190,14 @@ ELEMENTS
     max=<number>  How many stars (default 5).
     bind=<state>  A number state the user sets by pressing a star.
     on=<action>  Actions to run after the user picks a rating, e.g. emit:changed. Separate several with ;
+
+  chart "<text>"  — A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.
+    "<text>"  A title above the chart.
+    kind=<bar|line>  bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values.
+    items=<expression, required>  The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}.
+    x=<name, required>  The field holding each item's label, e.g. x=month.
+    y=<name, required>  The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero.
+    format=<number|money>  How values on the axis read: number (37K) or money ($37K).
 
   button "<text>"  — A pressable button that runs actions. Use emit: to tell the app what the user chose.
     "<text>" (required)  The button label.

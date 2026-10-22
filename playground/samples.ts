@@ -244,4 +244,25 @@ card
   button "Check out" on="emit:checkout:{cart}" disabled={len(cart) == 0}
 `,
   },
+charts: {
+    label: "Charts",
+    prompt: "A store dashboard: a bar chart of units by department I can adjust, and a line chart of monthly visits.",
+    spec: `state depts=[{name: "Footwear", units: 610}, {name: "Outdoor", units: 420}, {name: "Apparel", units: 380}, {name: "Camping", units: 270}] months=[{month: "May", visits: 8200}, {month: "Jun", visits: 9600}, {month: "Jul", visits: 11800}, {month: "Aug", visits: 10900}, {month: "Sep", visits: 12700}, {month: "Oct", visits: 14100}]
+card
+  text "Store this month" style=title
+  text "{number(sum(depts, 'units'))} units sold" tone=muted
+  chart "Units by department" kind=bar items=depts x=name y=units
+  each items=depts as=d key={d.name}
+    row align=center
+      text "{d.name}"
+      stepper bind=d.units min=0 max=2000 step=10
+card
+  text "Visits" style=title
+  text "{number(sum(months, 'visits'))} over {len(months)} months" tone=muted
+  chart "Visits per month" kind=line items=months x=month y=visits
+  row
+    button "Add November" on="add:months:{month: 'Nov', visits: 15200}" disabled={len(months) > 6}
+    button "Drop oldest" variant=secondary on=remove:months:0 disabled={len(months) < 2}
+`,
+  },
 };

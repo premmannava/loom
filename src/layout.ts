@@ -73,6 +73,7 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
       return k;
     },
     shift: shiftBox,
+    warn,
   };
   return ctx;
 }

@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, 35 components including text input, lists and data, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, 36 components including text input, lists and data, bar and line charts, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -248,6 +248,25 @@ loom.state.set("products", await fetchProducts());
 loom.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
 ```
 
+#### Charts
+
+`chart` draws a list of records as bars or a line, and redraws whenever the list changes, from state, the screen's own controls or the host:
+
+```
+state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
+chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+chart "Revenue trend" kind=line items=sales x=month y=revenue format=money
+```
+
+`x=` and `y=` name fields, as `sum(list, 'price')` does, so they're written without quotes; `items=` is any expression that gives a list, like `items={filter(sales, 'open')}`. The props are in the [reference](#chart). How it treats data:
+
+- Each item is one category, in list order, evenly spaced. Line charts don't treat x as dates or numbers.
+- A value must be a number. A missing field, `null`, or text (even `"12"`) is a gap: no bar, and the line breaks there instead of joining across it. Nothing is turned into 0. A missing label shows as "—".
+- Bars always include 0, with negative values below it. A line is scaled from its lowest to its highest value, rounded out to whole ticks; a constant line gets room above and below.
+- Labels are thinned out evenly when they'd overlap. Bars and points never are.
+- An empty list, a value that isn't a list, or no numbers at all shows "No data to chart" or "No numbers to chart". More than 200 items, or too little width for them, shows a message saying so instead of a partial chart.
+- Problems a model can fix (items that aren't a list, gaps, too little room) are reported once through the engine's `onWarning`, not on every frame.
+
 ### Screens
 
 A spec can hold several screens. Only one shows at a time: the first, until a button moves to another with `go:name`. `back` returns to the previous one, and the visible screen's name is in `{screen}`.
@@ -308,7 +327,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 |---|---|
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
-| Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
+| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
@@ -588,6 +607,24 @@ A star rating. Shows value= as stars, or with bind= lets the user pick a rating.
 state stars=4
 rating value=4.5
 rating bind=stars
+```
+
+### `chart`
+
+A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | A title above the chart. |
+| `kind` | `bar` / `line` | bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values. |
+| `items` | expression, required | The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}. |
+| `x` | name, required | The field holding each item's label, e.g. x=month. |
+| `y` | name, required | The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero. |
+| `format` | `number` / `money` | How values on the axis read: number (37K) or money ($37K). |
+
+```
+state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
+chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
 ```
 
 ### `button`
@@ -1380,6 +1417,7 @@ Loom draws everything itself, so it gives up what the browser normally provides 
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
 - **Scrolling regions, overlays, dialogs or menus.**
+- **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
 
 Don't use Loom where accessibility is required until the accessibility layer lands.
@@ -1391,7 +1429,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, and text input (a real input placed over the field while typing). Next: scrolling, select, table, chart and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), and bar and line charts. Next: scrolling, select, table and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

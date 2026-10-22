@@ -42,6 +42,11 @@ export interface LayoutContext {
   visibleChildren(node: LoomNode): LoomNode[];
   /** Move a box and its whole subtree. */
   shift(box: Box, dx: number, dy: number): void;
+  /**
+   * Report a problem in the data a model can fix (not a list, a missing
+   * field). The engine shows each message once per spec, not every frame.
+   */
+  warn?(message: string): void;
 }
 
 export interface PaintContext {
@@ -207,6 +212,18 @@ export class PropReader {
   bool(name: string, fallback = false): boolean {
     const v = this.value(name);
     return v === undefined ? fallback : !!v;
+  }
+
+  /**
+   * Read an expression prop, with or without braces (`items=sales` or
+   * `items={filter(sales, 'open')}`), as each does. Undefined when missing or
+   * when it can't be evaluated.
+   */
+  expr(name: string): Value | undefined {
+    const raw = this.node.props[name];
+    if (raw === undefined) return undefined;
+    const r = evaluate(bareExpression(raw), this.scope);
+    return r.ok ? r.value : undefined;
   }
 
   /** Read a condition prop (`disabled=done` or `disabled={count>3}`) as a boolean. */
