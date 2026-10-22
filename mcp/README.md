@@ -21,6 +21,8 @@ you: "Compare the three phone plans I pasted"
 
 In chat apps that stream tool input, the interface builds line by line while the model is still writing it. When the person presses a button with `on=emit:name`, the view sends a message into the conversation naming the action, its value and the interface's current values. The model can then reply or show an updated interface. That's the only way anything leaves an interface: specs can't run code, open links or make requests.
 
+Interfaces match the chat app they're in. The view follows its light or dark mode, and when the app shares its design tokens (MCP Apps hosts pass them as CSS variables) it takes the app's background, text, border and status colors, its fonts and its corner radii. The accent stays SayShape's teal, because hosts don't send one.
+
 ## Install
 
 You need Node.js 20 or later. There's nothing to download yourself: your chat app runs the server with `npx`.
