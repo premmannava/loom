@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-**Website:** [premmannava.github.io/loom](https://premmannava.github.io/loom/) has a playground, interactive examples and the documentation, all rendered by this engine.
+**Website:** [premmannava.github.io/sayshape](https://premmannava.github.io/sayshape/) has a playground, interactive examples and the documentation, all rendered by this engine.
 
 > **Name:** SayShape was called Loom while it was being built. The package (`loom-ui`), CSS variables (`--loom-*`) and the model guide still use that name; they'll be renamed before the first npm release.
 
@@ -70,8 +70,8 @@ Four ideas drive the design:
 Requires Node.js 18 or newer.
 
 ```bash
-git clone https://github.com/premmannava/loom.git
-cd loom
+git clone https://github.com/premmannava/sayshape.git
+cd sayshape
 npm install
 npm run dev        # opens the playground
 ```
@@ -92,7 +92,7 @@ npm run dev        # opens the playground
 | `npm run docs:check` | Fails if the component reference is out of date |
 | `npm run new:component -- <name>` | Scaffolds a component and its test file, and registers it |
 | `npm run build:world` | Regenerates the map's country outlines |
-| `npm run site:dev` / `site:build` / `site:check` | The website in `site/` (VitePress): develop, build, and check the build ([publishing it](https://premmannava.github.io/loom/docs/contributing/website.html)) |
+| `npm run site:dev` / `site:build` / `site:check` | The website in `site/` (VitePress): develop, build, and check the build ([publishing it](https://premmannava.github.io/sayshape/docs/contributing/website.html)) |
 
 The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels. **Appearance**, at the top, previews the screen in other styles ([Theming](#theming)).
 

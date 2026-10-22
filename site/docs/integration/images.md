@@ -19,7 +19,7 @@ Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Ac
 ```loom live warns
 card
   text "Same-origin image" weight=semibold
-  image "Screenshot of the development playground: a spec on the left, a world map rendered on the right" src="/loom/images/playground.png" ratio=16:9 fit=contain
+  image "Screenshot of the development playground: a spec on the left, a world map rendered on the right" src="/sayshape/images/playground.png" ratio=16:9 fit=contain
   image "This one is blocked: its host isn't allowed" src="https://example.com/photo.jpg" ratio=3:2
 ```
 

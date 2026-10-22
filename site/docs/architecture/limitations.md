@@ -48,4 +48,4 @@ SayShape hasn't been benchmarked against other UI approaches, so nothing here sa
 
 ## Roadmap
 
-The phase plan is in [`docs/PLAN.md`](https://github.com/premmannava/loom/blob/main/docs/PLAN.md) in the repository: scrolling and dialogs plus the accessibility layer next, then the model server and an app built on top.
+The phase plan is in [`docs/PLAN.md`](https://github.com/premmannava/sayshape/blob/main/docs/PLAN.md) in the repository: scrolling and dialogs plus the accessibility layer next, then the model server and an app built on top.
