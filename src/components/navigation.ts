@@ -1,6 +1,7 @@
-import { literal } from "../actions";
+import { toNumber } from "../data";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
 import type { Box, LoomNode, Value } from "../types";
+import { wrapText } from "../text";
 import { chevron, fillTint, gapProp, onProp, partBox, runOn, stack, themeFont } from "./util";
 
 // ---------------------------------------------------------------- tabs
@@ -10,7 +11,7 @@ const BAR_H = 42, TAB_PAD = 16;
 /** The value a tab stands for: its value= prop, or its label. */
 function tabValue(node: LoomNode, props: (n: LoomNode) => PropReader): Value {
   const p = props(node);
-  return p.has("value") ? literal(p.raw("value")!) : p.text();
+  return p.has("value") ? (p.value("value") ?? "") : p.text();
 }
 
 /** Which visible tab is selected: the one matching bind=, or the first. */
@@ -38,7 +39,7 @@ tabs bind=view
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const kids = ctx.visibleChildren(box.node);
-    const current = ctx.scope(p.raw("bind") ?? "");
+    const current = p.bound();
     const selected = selectedTab(kids, current, ctx.props);
     const font = themeFont(ctx.theme, 600, 14);
     const natural = kids.map((k) => ctx.measure.width(ctx.props(k).text(), font) + TAB_PAD * 2);
@@ -198,9 +199,9 @@ export function pageSlots(current: number, pages: number): Array<number | "…">
   return [1, "…", current - 1, current, current + 1, "…", pages];
 }
 
-function pageState(p: PropReader, scope: (k: string) => Value | undefined) {
+function pageState(p: PropReader) {
   const pages = Math.max(1, Math.min(100000, Math.round(p.num("pages", 1))));
-  const raw = Math.round(Number(scope(p.raw("bind") ?? "")));
+  const raw = Math.round(toNumber(p.bound()));
   const current = Number.isFinite(raw) ? Math.max(1, Math.min(pages, raw)) : 1;
   return { pages, current };
 }
@@ -223,7 +224,7 @@ pagination bind=page pages=12`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { pages, current } = pageState(p, ctx.scope);
+    const { pages, current } = pageState(p);
     const slots: Array<{ kind: "prev" | "next" | "page" | "gap"; page?: number }> = [
       { kind: "prev" },
       ...pageSlots(current, pages).map((s) => (s === "…" ? { kind: "gap" as const } : { kind: "page" as const, page: s })),
@@ -264,10 +265,67 @@ pagination bind=page pages=12`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    const { pages, current } = pageState(p, ctx.scope);
+    const { pages, current } = pageState(p);
     const d = ctx.target.detail;
     const next = d === "prev" ? current - 1 : d === "next" ? current + 1 : typeof d === "number" ? d : current;
     ctx.set(key, Math.max(1, Math.min(pages, next)));
     runOn(ctx);
+  },
+};
+
+// ---------------------------------------------------------------- screen
+
+/** The state name holding the visible screen (kept in sync by the engine). */
+const SCREEN_STATE = "screen";
+
+export const screen: ComponentDef = {
+  type: "screen",
+  category: "navigation",
+  description: "One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.",
+  props: {
+    name: { type: "name", required: true, description: "The screen's name, used by go:name. The visible screen's name is in {screen}." },
+    title: { type: "string", description: "A heading shown at the top of the screen." },
+    gap: gapProp(14),
+  },
+  children: "any",
+  parents: ["root"],
+  example: `screen name=cart title="Your cart"
+  text "2 items"
+  button "Checkout" on=go:checkout
+screen name=checkout title="Checkout"
+  text "Pay with card"
+  button "Back to cart" variant=secondary on=back`,
+  visible(node, scope) {
+    return scope(SCREEN_STATE) === node.props.name;
+  },
+  layout(box, ctx) {
+    const p = ctx.props(box.node);
+    const gap = Math.max(0, p.num("gap", 14));
+    const t = ctx.theme;
+    let y = box.y;
+    if (p.has("title")) {
+      const font = themeFont(t, 700, t.text.title);
+      const lh = Math.round(t.text.title * 1.35);
+      const lines = wrapText(p.str("title"), box.w, font, ctx.measure);
+      box.data = { lines, font, lh };
+      y += lines.length * lh + gap;
+    }
+    ctx.visibleChildren(box.node).forEach((k, i) => {
+      if (i) y += gap;
+      const kb = ctx.layout(k, box.x, y, box.w);
+      box.children.push(kb);
+      y += kb.h;
+    });
+    box.h = y - box.y;
+  },
+  paint(box, ctx) {
+    const d = box.data as { lines: string[]; font: string; lh: number } | undefined;
+    if (!d) return;
+    const { g, theme } = ctx;
+    g.font = d.font;
+    g.fillStyle = theme.colors.ink;
+    g.textAlign = "left";
+    g.textBaseline = "middle";
+    d.lines.forEach((l, i) => g.fillText(l, box.x, box.y + d.lh * i + d.lh / 2 + 1));
   },
 };

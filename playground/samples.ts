@@ -108,6 +108,65 @@ card
     text "Free shipping over $100. Free returns within 30 days."
 `,
   },
+  finder: {
+    label: "Gear finder",
+    prompt: "Help me find trail shoes under a budget, then show me the one I pick.",
+    spec: `state maxPrice=150 picked="Ridgeline" price=128 photo="photo-1606036525923-525fa3b35465" cart=0
+screen name=browse title="Trail shoes"
+  slider "Up to \${maxPrice}" bind=maxPrice min=50 max=200 step=5
+  list if={maxPrice >= 95}
+    list-item "Switchback" detail="Light and fast, 240 g" trailing="$95" on="set:picked:Switchback;set:price:95;set:photo:photo-1600185365926-3a2ce3cdb9eb;go:shoe" if={maxPrice >= 95}
+    list-item "Ridgeline" detail="Waterproof leather, 480 g" trailing="$128" on="set:picked:Ridgeline;set:price:128;set:photo:photo-1606036525923-525fa3b35465;go:shoe" if={maxPrice >= 128}
+    list-item "Summit Pro" detail="Rock plate, 310 g" trailing="$175" on="set:picked:Summit Pro;set:price:175;set:photo:photo-1655976795374-6b519928f1e1;go:shoe" if={maxPrice >= 175}
+  empty "Nothing under \${maxPrice}" detail="Our lightest pair starts at $95." action="Show all" on=set:maxPrice:200 if={maxPrice < 95}
+screen name=shoe title="{picked}"
+  image "{picked} trail shoes" src="https://images.unsplash.com/{photo}?w=1000&q=70&auto=format&fit=crop" ratio=4:3
+  row
+    rating value=4.6
+    text "\${price}" style=title align=right
+  button "Add to cart" on="inc:cart;notify:'Added {picked}. {cart} in your cart'"
+  button "Back to results" variant=secondary on=back
+  text "Photos from Unsplash" style=caption tone=muted
+`,
+  },
+  gallery: {
+    label: "Trail gear",
+    prompt: "Show me some trail gear with photos.",
+    spec: `state saved=0
+image "Two hikers walking a trail toward snow-capped mountains" src="https://images.unsplash.com/photo-1551632811-561732d1e306?w=1600&q=70&auto=format&fit=crop" ratio=16:9
+text "Gear for the trail" style=title
+text "Tap an item to save it." tone=muted
+grid min=150 gap=12
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Ridge pack'"
+    image "Green and brown backpack on a rock" src="https://images.unsplash.com/photo-1622260614153-03223fb72052?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Ridge 40L pack" weight=semibold
+    text "$149" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Basecamp tent'"
+    image "Orange camping tent near green trees" src="https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Basecamp 2P tent" weight=semibold
+    text "$289" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Ridgeline boots'"
+    image "Brown leather lace-up boots" src="https://images.unsplash.com/photo-1606036525923-525fa3b35465?w=700&q=70&auto=format&fit=crop" ratio=1:1
+    text "Ridgeline boots" weight=semibold
+    text "$128" tone=muted
+  card pad=12 gap=8 on="inc:saved;notify:'Saved the Switchback runners'"
+    image "White and orange running shoe on a plain background" src="https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?w=700&q=70&auto=format&fit=crop" ratio=1:1 fit=contain
+    text "Switchback runners" weight=semibold
+    text "$95" tone=muted
+text "{saved} saved" tone=good if={saved > 0}
+divider
+row align=top
+  image "A hiker with a large backpack on a rocky peak at golden hour" src="https://images.unsplash.com/photo-1586022045497-31fcf76fa6cc?w=800&q=70&auto=format&fit=crop" ratio=3:4
+  column gap=6
+    text "Golden hour on the ridge" style=lead weight=semibold
+    text "A tall 3:4 photo beside text. The image keeps its shape at any width." tone=muted
+divider
+text "Blocked on purpose" weight=semibold
+text "This image's host isn't in imageHosts, so it shows its description instead." tone=muted
+image "A photo from a site the app hasn't allowed" src="https://example.org/photo.jpg" ratio=3:2
+text "Photos from Unsplash" style=caption tone=muted
+`,
+  },
   habits: {
     label: "Habit tracker",
     prompt: "Make me a tracker for three daily habits with a streak.",
@@ -122,6 +181,175 @@ card
   text "All three done. Log today to extend the streak." tone=good if={read && walk && drink}
   sparkle "Unknown elements are reported and skipped"
   button "Log today" on="inc:streak;set:read:false;set:walk:false;set:drink:false" disabled={!(read && walk && drink)}
+`,
+  },
+  packing: {
+    label: "Packing list",
+    prompt: "A packing list for a weekend hike where I can tick things off, hide what's packed, and add or remove items.",
+    spec: `state hide=false item="" gear=[{id: 1, text: "Water, 3 L", kg: 3, done: true}, {id: 2, text: "Headlamp", kg: 0.1, done: false}, {id: 3, text: "Rain shell", kg: 0.4, done: false}, {id: 4, text: "First aid kit", kg: 0.3, done: true}, {id: 5, text: "Trail snacks", kg: 0.6, done: false}]
+card
+  text "Weekend packing list" style=title
+  text "{count(gear, 'done')} of {len(gear)} packed · {round(sum(gear, 'kg'), 1)} kg in total" tone=muted
+  progress value={count(gear, 'done')} max={len(gear)}
+  switch "Hide packed items" bind=hide
+  each items=gear as=g key={g.id}
+    row if={!(hide && g.done)}
+      check "{g.text}" bind=g.done
+      text "{g.kg} kg" tone=muted
+      button "Remove" variant=secondary on="remove:g;notify:'Removed {g.text}'"
+  text "Everything's packed. Have a great hike!" tone=good if={len(gear) > 0 && count(gear, 'done') == len(gear)}
+  row
+    input bind=item placeholder="Add an item, e.g. Sunscreen" on="add:gear:{id: len(gear) + 100, text: trim(item), kg: 0, done: false};set:item:''"
+    button "Add" variant=secondary on="add:gear:{id: len(gear) + 100, text: trim(item), kg: 0, done: false};set:item:''" disabled={trim(item) == ''}
+  button "Clear list" variant=danger on=clear:gear
+`,
+  },
+  search: {
+    label: "Search",
+    prompt: "Hiking trails near Phoenix with a search box that filters them as I type.",
+    spec: `state query="" trails=[{name: "Camelback Mountain", area: "Phoenix", miles: 2.5, level: "Hard"}, {name: "Piestewa Peak", area: "Phoenix", miles: 2.1, level: "Hard"}, {name: "Flatiron", area: "Apache Junction", miles: 6.2, level: "Hard"}, {name: "Wind Cave", area: "Mesa", miles: 3, level: "Moderate"}, {name: "Hieroglyphic Trail", area: "Gold Canyon", miles: 3, level: "Moderate"}, {name: "Holbert Trail", area: "South Mountain", miles: 5, level: "Moderate"}, {name: "Siphon Draw", area: "Lost Dutchman", miles: 4, level: "Hard"}, {name: "Lost Dog Wash", area: "Scottsdale", miles: 4.3, level: "Easy"}]
+card
+  text "Trails near Phoenix" style=title
+  input bind=query kind=search placeholder="Search trails"
+  text "{plural(len(search(trails, 'name', query)), 'trail')}" tone=muted
+  list
+    each items=trails as=t key={t.name}
+      list-item "{t.name}" detail="{t.area} · {t.miles} mi" trailing="{t.level}" on="emit:open_trail:{t.name}" if={includes(lower(t.name), lower(trim(query)))}
+  empty "No trails match {query}" detail="Try a shorter name." action="Clear search" on="set:query:''" if={len(search(trails, 'name', query)) == 0}
+`,
+  },
+  cart: {
+    label: "Cart",
+    prompt: "A shopping cart with quantities I can change, a way to remove items, and totals that update.",
+    spec: `state cart=[{sku: "SOCK", name: "Trail socks", detail: "Merino, size M", price: 24, qty: 2}, {sku: "SHELL", name: "Rain shell", detail: "Packs into its pocket", price: 129, qty: 1}, {sku: "LAMP", name: "Headlamp", detail: "400 lumens", price: 45, qty: 1}]
+card
+  text "Your cart" style=title
+  text "{sum(cart, 'qty')} items" tone=muted
+  each items=cart as=item key={item.sku}
+    row align=top
+      column gap=2
+        text "{item.name}" weight=semibold
+        text "{item.detail}" tone=muted
+        link "Remove" on=remove:item
+      stepper bind=item.qty min=1 max=9
+      text "\${item.price * item.qty}" weight=semibold align=right
+  empty "Your cart is empty" detail="Add something to see it here." if={len(cart) == 0}
+  divider
+  row
+    text "Shipping" tone=muted
+    text "{sum(cart, 'price', 'qty') >= 100 ? 'Free' : '$8'}" align=right
+  row
+    text "Total" style=title
+    text "\${sum(cart, 'price', 'qty') + (sum(cart, 'price', 'qty') >= 100 ? 0 : 8)}" style=title align=right
+  button "Check out" on="emit:checkout:{cart}" disabled={len(cart) == 0}
+`,
+  },
+charts: {
+    label: "Charts",
+    prompt: "A store dashboard: a bar chart of units by department I can adjust, and a line chart of monthly visits.",
+    spec: `state depts=[{name: "Footwear", units: 610}, {name: "Outdoor", units: 420}, {name: "Apparel", units: 380}, {name: "Camping", units: 270}] months=[{month: "May", visits: 8200}, {month: "Jun", visits: 9600}, {month: "Jul", visits: 11800}, {month: "Aug", visits: 10900}, {month: "Sep", visits: 12700}, {month: "Oct", visits: 14100}]
+card
+  text "Store this month" style=title
+  text "{number(sum(depts, 'units'))} units sold" tone=muted
+  chart "Units by department" kind=bar items=depts x=name y=units
+  each items=depts as=d key={d.name}
+    row align=center
+      text "{d.name}"
+      stepper bind=d.units min=0 max=2000 step=10
+card
+  text "Visits" style=title
+  text "{number(sum(months, 'visits'))} over {len(months)} months" tone=muted
+  chart "Visits per month" kind=line items=months x=month y=visits
+  row
+    button "Add November" on="add:months:{month: 'Nov', visits: 15200}" disabled={len(months) > 6}
+    button "Drop oldest" variant=secondary on=remove:months:0 disabled={len(months) < 2}
+`,
+  },
+  inventory: {
+    label: "Inventory",
+    prompt: "An equipment inventory table I can sort by any column, where picking a row shows that item's details.",
+    spec: `state equipment=[{id: "laptop", name: "Laptop", category: "Computers", price: 1200, stock: 12}, {id: "monitor", name: "27-inch monitor", category: "Displays", price: 350, stock: 24}, {id: "dock", name: "USB-C dock", category: "Accessories", price: 189.5, stock: 0}, {id: "keyboard", name: "Keyboard", category: "Accessories", price: 79, stock: 41}, {id: "headset", name: "Headset", category: "Audio", price: 129, stock: 7}, {id: "webcam", name: "Webcam", category: "Video", price: 95, stock: 3}] selected="laptop" sortField="name" sortDirection="asc"
+card
+  text "Equipment" style=title
+  text "{len(equipment)} items, sorted by {sortField} ({sortDirection == 'asc' ? 'low to high' : 'high to low'})" tone=muted
+  table items=equipment key=id bind=selected sort=sortField direction=sortDirection on="emit:selected:{selected}"
+    table-column "Equipment" field=name
+    table-column "Price" field=price format=money
+    table-column "In stock" field=stock format=number
+  if={selected != ''}
+    card
+      text "{find(equipment, 'id', selected).name}" weight=semibold
+      text "{find(equipment, 'id', selected).category}" tone=muted
+      list
+        list-item "Price" trailing="{money(find(equipment, 'id', selected).price)}"
+        list-item "In stock" trailing="{find(equipment, 'id', selected).stock}"
+        list-item "Stock value" trailing="{money(find(equipment, 'id', selected).price * find(equipment, 'id', selected).stock)}"
+      button "Request one" on="emit:request:{selected}" disabled={find(equipment, 'id', selected).stock == 0}
+`,
+  },
+  directory: {
+    label: "Directory",
+    prompt: "A team directory with a department picker that filters the people shown.",
+    spec: `state department="" departments=[{id: "", name: "All departments"}, {id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}, {id: "design", name: "Design"}, {id: "support", name: "Support"}, {id: "legal", name: "Legal (moving teams)", moving: true}] people=[{name: "Ada Park", dept: "eng", role: "Staff engineer"}, {name: "Ben Ortiz", dept: "sales", role: "Account lead"}, {name: "Chloe Wu", dept: "design", role: "Product designer"}, {name: "Dev Rao", dept: "eng", role: "Engineer"}, {name: "Ella Kim", dept: "support", role: "Support lead"}, {name: "Finn Hale", dept: "sales", role: "Sales rep"}]
+card
+  text "Team directory" style=title
+  select "Department" items=departments value=id label=name unavailable=moving bind=department on="emit:filter:{department}"
+  text "{plural(department == '' ? len(people) : len(filter(people, 'dept', department)), 'person', 'people')}" tone=muted
+  table items={department == '' ? people : filter(people, 'dept', department)} key=name
+    table-column "Name" field=name
+    table-column "Role" field=role
+  empty "Nobody in this department yet" if={department != '' && len(filter(people, 'dept', department)) == 0}
+`,
+  },
+  order: {
+    label: "Order",
+    prompt: "An equipment order calculator: change quantities and unit prices, filter by category, and see subtotal, tax and total, with a table and a chart of the lines.",
+    spec: `state category="all" taxRate=0.08 categories=[{id: "all", name: "All categories"}, {id: "computers", name: "Computers"}, {id: "displays", name: "Displays"}, {id: "accessories", name: "Accessories"}] lines=[{id: "laptop", name: "Laptop", category: "computers", price: 1200, qty: 2}, {id: "monitor", name: "Monitor", category: "displays", price: 350, qty: 3}, {id: "dock", name: "USB-C dock", category: "accessories", price: 190, qty: 2}, {id: "keyboard", name: "Keyboard", category: "accessories", price: 80, qty: 4}]
+derive shown={category == 'all' ? lines : filter(lines, 'category', category)}
+derive subtotal={sum(shown, 'price', 'qty')}
+derive tax={round(subtotal * taxRate, 2)}
+derive total={subtotal + tax}
+card
+  text "Equipment order" style=title
+  select "Category" items=categories value=id label=name bind=category
+  each items=lines as=line key={line.id}
+    column gap=6 if={category == 'all' || line.category == category}
+      text "{line.name}" weight=semibold
+      row
+        column gap=2
+          text "Quantity" style=caption tone=muted
+          stepper bind=line.qty min=0 max=20
+        column gap=2
+          text "Unit price ($)" style=caption tone=muted
+          stepper bind=line.price min=0 max=5000 step=10
+  table items=shown key=id
+    table-column "Item" field=name
+    table-column "Qty" field=qty format=number
+    table-column "Unit price" field=price format=money
+  chart "Units by item" kind=bar items=shown x=name y=qty
+  list
+    list-item "Subtotal" trailing="{money(subtotal)}"
+    list-item "Tax ({taxRate * 100}%)" trailing="{money(tax)}"
+    list-item "Total" trailing="{money(total)}"
+  button "Place order" on="emit:order:{shown}" disabled={total == 0}
+`,
+  },
+  request: {
+    label: "Request",
+    prompt: "An equipment request form with an item, a quantity, a delivery date and a summary of the request.",
+    spec: `state item="" qty=1 needBy="" note="" items=[{id: "laptop", name: "Laptop"}, {id: "monitor", name: "27-inch monitor"}, {id: "headset", name: "Headset"}, {id: "chair", name: "Desk chair", backordered: true}]
+card
+  text "Request equipment" style=title
+  select "Item" items=items value=id label=name unavailable=backordered bind=item placeholder="Choose equipment"
+  stepper "Quantity" bind=qty min=1 max=10
+  date-picker "Delivery date" bind=needBy min="2026-11-02" max="2027-12-31" placeholder="Choose a delivery date"
+  input "Note" bind=note placeholder="What is it for?"
+  card if={item != ''}
+    text "Summary" weight=semibold
+    text "{plural(qty, find(items, 'id', item).name)}"
+    text "{needBy == '' ? 'Pick a delivery date' : 'Delivered by ' + needBy}" tone={needBy == '' ? 'warn' : 'muted'}
+    text "{note}" tone=muted if={trim(note) != ''}
+  button "Send request" on="emit:request:{item}" disabled={item == '' || needBy == ''}
 `,
   },
 };

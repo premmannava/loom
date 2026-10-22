@@ -6,19 +6,58 @@
  *   toggle:key          flip true/false
  *   set:key:value       set a literal or {expression}
  *   emit:name[:value]   send an event to the host app (e.g. to ask the model)
+ *   go:screen           show another screen, remembering this one
+ *   back                return to the previous screen
+ *   notify:'message'    show a short message; may include {expressions}
+ *   add:list:value      add an item to the end of a list
+ *   remove:t            remove the item t points at (inside each)
+ *   remove:list:index   remove the item at a position
+ *   clear:list          empty a list
  *
- * Several actions can run in order, separated by `;`.
+ * Several actions can run in order, separated by `;`. Targets may be paths
+ * into data, like toggle:t.done inside each.
  */
-import { checkSyntax, evaluate, type Scope } from "./expr";
+import { checkSyntax, evaluate, interpolate, splitTemplate, wholeExpression, type Scope } from "./expr";
+import { isList, makeList, toNumber } from "./data";
+import { PATH } from "./paths";
 import type { Value } from "./types";
 
 export type Action =
   | { op: "inc" | "dec"; key: string; by: string }
   | { op: "toggle"; key: string }
   | { op: "set"; key: string; value: string }
-  | { op: "emit"; name: string; value?: string };
+  | { op: "emit"; name: string; value?: string }
+  | { op: "go"; screen: string }
+  | { op: "back" }
+  | { op: "notify"; message: string }
+  | { op: "add"; key: string; value: string }
+  | { op: "remove"; key: string; at?: string }
+  | { op: "clear"; key: string };
 
-export const ACTION_OPS = ["inc", "dec", "toggle", "set", "emit"] as const;
+export const ACTION_OPS = ["inc", "dec", "toggle", "set", "emit", "go", "back", "notify", "add", "remove", "clear"] as const;
+
+/** How each action is written, for the model guide and error messages. */
+export const ACTION_SYNTAX: Record<(typeof ACTION_OPS)[number], string> = {
+  inc: "inc:key[:by]",
+  dec: "dec:key[:by] (never below 0)",
+  toggle: "toggle:key",
+  set: "set:key:value or set:key:{expr}",
+  emit: "emit:name[:value] tells the app what the user chose",
+  go: "go:screen shows another screen (see screen)",
+  back: "back returns to the previous screen",
+  notify: "notify:'Saved {n} items' shows a short message",
+  add: "add:list:value adds an item to the end, e.g. add:todos:{text: 'Snacks', done: false}",
+  remove: "remove:t removes the current item inside each as=t; remove:list:index removes by position",
+  clear: "clear:list empties a list",
+};
+
+const NAME = /^[A-Za-z_]\w*$/;
+
+/** The message of a notify action: drop one pair of surrounding quotes. */
+function unquote(s: string): string {
+  const t = s.trim();
+  return t.length >= 2 && (t[0] === "'" || t[0] === '"') && t.at(-1) === t[0] ? t.slice(1, -1) : t;
+}
 
 /** Parse an action string. Returns the actions, or an error message. */
 export function parseActions(src: string): { actions: Action[] } | { error: string } {
@@ -26,14 +65,31 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
   for (const raw of splitTopLevel(src, ";")) {
     const part = raw.trim();
     if (!part) continue;
+    if (part === "back") { actions.push({ op: "back" }); continue; }
     const first = part.indexOf(":");
     if (first < 0) return { error: `Action "${part}" needs a target, like inc:count` };
     const op = part.slice(0, first);
     const rest = part.slice(first + 1);
+
+    if (op === "back") return { error: `back takes no target; write just back` };
+    if (op === "notify") {
+      const message = unquote(rest);
+      if (!message.trim()) return { error: `notify needs a message, like notify:'Saved'` };
+      for (const p of splitTemplate(message)) {
+        if ("expr" in p) { const err = checkSyntax(p.expr); if (err) return { error: `In action "${part}": ${err}` }; }
+      }
+      actions.push({ op, message });
+      continue;
+    }
+
     const second = rest.indexOf(":");
     const key = second < 0 ? rest : rest.slice(0, second);
     const arg = second < 0 ? undefined : rest.slice(second + 1);
-    if (!/^[A-Za-z_][\w]*$/.test(key)) return { error: `"${key}" is not a valid name in action "${part}"` };
+    // State-changing actions take paths (t.done); names elsewhere are plain.
+    const writes = op === "inc" || op === "dec" || op === "toggle" || op === "set" || op === "add" || op === "remove" || op === "clear";
+    if (!(writes ? PATH : NAME).test(key)) {
+      return { error: `"${key}" is not a valid ${writes ? "state name or path, like count or t.done," : "name"} in action "${part}"` };
+    }
     switch (op) {
       case "inc":
       case "dec":
@@ -49,29 +105,83 @@ export function parseActions(src: string): { actions: Action[] } | { error: stri
       case "emit":
         actions.push(arg === undefined ? { op, name: key } : { op, name: key, value: arg });
         break;
+      case "go":
+        if (arg !== undefined) return { error: `go takes one screen name, like go:${key}` };
+        actions.push({ op, screen: key });
+        break;
+      case "add":
+        if (arg === undefined) return { error: `add needs a value, like add:${key}:{text: 'New', done: false}` };
+        actions.push({ op, key, value: arg });
+        break;
+      case "remove":
+        actions.push(arg === undefined ? { op, key } : { op, key, at: arg });
+        break;
+      case "clear":
+        if (arg !== undefined) return { error: `clear takes just the list, like clear:${key}` };
+        actions.push({ op, key });
+        break;
       default:
         return { error: `Unknown action "${op}". Use ${ACTION_OPS.join(", ")}` };
     }
-    const exprArg = arg && /^\{.*\}$/.test(arg) ? arg.slice(1, -1) : undefined;
-    if (exprArg !== undefined) {
-      const err = checkSyntax(exprArg);
+    const exprArg = arg === undefined ? null : wholeExpression(arg);
+    for (const src of exprArg !== null ? [exprArg] : arg?.includes("{") ? splitTemplate(literalText(arg)).flatMap((p) => ("expr" in p ? [p.expr] : [])) : []) {
+      const err = checkSyntax(src);
       if (err) return { error: `In action "${part}": ${err}` };
     }
   }
   return { actions };
 }
 
-/** Resolve an action argument: `{expr}` is evaluated, anything else is a literal. */
+/** The expressions an action list reads: `{…}` arguments and the parts of notify messages. */
+export function actionExpressions(actions: readonly Action[]): string[] {
+  const out: string[] = [];
+  const arg = (a: string | undefined) => {
+    if (a === undefined) return;
+    const whole = wholeExpression(a);
+    if (whole !== null) out.push(whole);
+    else for (const p of splitTemplate(literalText(a))) if ("expr" in p) out.push(p.expr);
+  };
+  for (const a of actions) {
+    // Write targets (t.done) read their first name like an expression does.
+    if ("key" in a) out.push(a.key);
+    if (a.op === "inc" || a.op === "dec") arg(a.by);
+    else if (a.op === "set" || a.op === "add") arg(a.value);
+    else if (a.op === "remove") arg(a.at);
+    else if (a.op === "emit") arg(a.value);
+    else if (a.op === "notify") for (const p of splitTemplate(a.message)) if ("expr" in p) out.push(p.expr);
+  }
+  return out;
+}
+
+/** The state names an action list writes: the first name of each target (todos for add:todos, t for toggle:t.done). */
+export function actionTargets(actions: readonly Action[]): string[] {
+  return actions.flatMap((a) => ("key" in a ? [a.key.split(".")[0]!] : []));
+}
+
+/**
+ * Resolve an action argument: a whole `{expr}` is evaluated, text with
+ * `{expressions}` in it is filled in ('Hi {name}'), anything else is a literal.
+ */
 export function resolveArg(arg: string, scope: Scope): Value {
-  const m = /^\{(.*)\}$/.exec(arg);
-  if (m) {
-    const r = evaluate(m[1]!, scope);
+  const whole = wholeExpression(arg);
+  if (whole !== null) {
+    const r = evaluate(whole, scope);
     return r.ok ? r.value : null;
   }
-  return literal(arg);
+  const v = literal(arg);
+  return typeof v === "string" && v.includes("{") ? interpolate(v, scope) : v;
+}
+
+/** An argument's text without one pair of surrounding quotes. */
+function literalText(arg: string): string {
+  const v = literal(arg);
+  return typeof v === "string" ? v : arg;
 }
 
 export function literal(s: string): Value {
+  // A quoted value is that text: set:msg:'Hi there', add:tags:"7" (stays text).
+  const quoted = /^(['"])([\s\S]*)\1$/.exec(s);
+  if (quoted) return quoted[2]!;
   if (s === "true") return true;
   if (s === "false") return false;
   if (s === "null") return null;
@@ -81,8 +191,18 @@ export function literal(s: string): Value {
 
 export interface ActionHost {
   scope: Scope;
-  set(key: string, value: Value): void;
+  /** Change the value at a state name or path (t.done inside each). */
+  set(path: string, value: Value): void;
+  /** Remove the list item a path points at (remove:t). Hosts without each can leave it out. */
+  removeAt?(path: string): void;
+  /** Hear about actions that couldn't run, like add: on something that isn't a list. */
+  warn?(message: string): void;
   emit(name: string, value: Value | undefined): void;
+  /** Show a screen. Hosts without screens can leave these out; the actions then do nothing. */
+  go?(screen: string): void;
+  back?(): void;
+  /** Show a short message, already filled in from state. */
+  notify?(message: string): void;
 }
 
 export function runActions(actions: Action[], host: ActionHost): void {
@@ -90,13 +210,14 @@ export function runActions(actions: Action[], host: ActionHost): void {
     switch (a.op) {
       case "inc":
       case "dec": {
-        const cur = Number(host.scope(a.key) ?? 0) || 0;
-        const by = Number(resolveArg(a.by, host.scope)) || 0;
+        // toNumber, not Number: a list or record here must count as 0, not crash.
+        const cur = toNumber(read(a.key, host.scope) ?? 0) || 0;
+        const by = toNumber(resolveArg(a.by, host.scope)) || 0;
         host.set(a.key, a.op === "inc" ? cur + by : Math.max(0, cur - by));
         break;
       }
       case "toggle":
-        host.set(a.key, !host.scope(a.key));
+        host.set(a.key, !read(a.key, host.scope));
         break;
       case "set":
         host.set(a.key, resolveArg(a.value, host.scope));
@@ -104,17 +225,61 @@ export function runActions(actions: Action[], host: ActionHost): void {
       case "emit":
         host.emit(a.name, a.value === undefined ? undefined : resolveArg(a.value, host.scope));
         break;
+      case "go":
+        host.go?.(a.screen);
+        break;
+      case "back":
+        host.back?.();
+        break;
+      case "notify":
+        host.notify?.(interpolate(a.message, host.scope));
+        break;
+      case "add":
+      case "clear":
+      case "remove": {
+        if (a.op === "remove" && a.at === undefined) {
+          if (host.removeAt) host.removeAt(a.key);
+          continue;
+        }
+        const cur = read(a.key, host.scope);
+        if (cur !== undefined && cur !== null && !isList(cur)) {
+          host.warn?.(`${a.op}:${a.key} needs a list, but ${a.key} isn't one`);
+          continue;
+        }
+        const items = cur ?? [];
+        if (a.op === "clear") host.set(a.key, makeList([]));
+        else if (a.op === "add") host.set(a.key, makeList([...items, resolveArg(a.value, host.scope)]));
+        else {
+          const at = toNumber(resolveArg(a.at!, host.scope));
+          if (Number.isInteger(at) && at >= 0 && at < items.length) host.set(a.key, makeList(items.filter((_, i) => i !== at)));
+        }
+        break;
+      }
     }
   }
 }
 
+/** The current value at a path: a state name, or a path like t.done read through the scope. */
+function read(path: string, scope: Scope): Value | undefined {
+  const r = evaluate(path, scope);
+  return r.ok ? r.value : undefined;
+}
+
+/**
+ * Split on `sep` outside braces and quoted arguments, so `notify:'a; b'` and
+ * `{x ? 1 : 2}` stay whole. A quote only opens right after a colon, so an
+ * apostrophe inside a value (`set:msg:it's`) is just a character.
+ */
 function splitTopLevel(s: string, sep: string): string[] {
   const out: string[] = [];
-  let depth = 0, buf = "";
+  let depth = 0, quote = "", buf = "", prev = "";
   for (const c of s) {
-    if (c === "{") depth++;
-    if (c === "}") depth--;
-    if (c === sep && depth === 0) { out.push(buf); buf = ""; } else buf += c;
+    if (quote) { if (c === quote) quote = ""; }
+    else if ((c === "'" || c === '"') && prev === ":") quote = c;
+    else if (c === "{") depth++;
+    else if (c === "}") depth--;
+    if (c === sep && depth === 0 && !quote) { out.push(buf); buf = ""; } else buf += c;
+    prev = c;
   }
   out.push(buf);
   return out;

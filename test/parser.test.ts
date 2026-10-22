@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parse, tokenizeLine } from "../src/parser";
+import { MAX_DEPTH, parse, tokenizeLine } from "../src/parser";
 import { Registry } from "../src/registry";
 import { coreComponents } from "../src/components";
 
@@ -80,8 +80,54 @@ describe("parse", () => {
     expect(r.diagnostics).toEqual([]);
   });
 
+  it("skips elements nested more than MAX_DEPTH levels, and only those", () => {
+    const lines = Array.from({ length: MAX_DEPTH + 5 }, (_, i) => " ".repeat(i * 2) + "column");
+    const r = p([...lines, 'text "Still here"', ""].join("\n"));
+    expect(r.nodeCount).toBe(MAX_DEPTH + 1);
+    expect(r.diagnostics).toEqual([
+      { line: MAX_DEPTH + 1, severity: "error", message: expect.stringMatching(/Nested too deeply \(more than 100 levels\)/) },
+    ]);
+    expect(r.root.children.at(-1)!.text).toBe("Still here");
+  });
+
+  it("counts nesting levels, not indentation width", () => {
+    const lines = Array.from({ length: MAX_DEPTH }, (_, i) => " ".repeat(i * 7) + "column");
+    expect(p(lines.join("\n") + "\n").diagnostics).toEqual([]);
+  });
+
   it("gives nodes stable ids from line and type", () => {
     const r = p(`card\n  text "A"\n`);
     expect(r.root.children[0]!.children[0]!.id).toBe("2:text");
+  });
+});
+
+describe("names nothing defines", () => {
+  const reg = new Registry(coreComponents);
+  const warnings = (spec: string, knownNames?: string[]) => parse(spec, reg, { knownNames }).diagnostics.map((d) => d.message);
+
+  it("warns about a word meant as text but left unquoted", () => {
+    expect(warnings(`state late=true\nbadge "Late" tone={late ? bad : 'good'}\n`)).toEqual([
+      `"bad" isn't state or a loop variable, so it shows as nothing. To show it as text, quote it: 'bad'. To use state, declare it: state bad=…`,
+    ]);
+  });
+
+  it("accepts state that is declared, written by bind= or an action, set by the engine, or supplied by the app", () => {
+    expect(warnings(`text "Picked: {picked}" if=picked
+button "Pick" on="set:picked:'x'"
+accordion "More" bind=open
+  text "{open}"
+text "{screen}"
+`)).toEqual([]);
+    expect(warnings(`text "{products}"\n`)).toHaveLength(1);
+    expect(warnings(`text "{products}"\n`, ["products"])).toEqual([]);
+  });
+});
+
+describe("code where an element should be", () => {
+  it("says Loom has no JSX and points to each", () => {
+    const r = parse(`state xs=[1]\nlist\n  {xs.map(x => <list-item>{x}</list-item>)}\n  <list-item>One</list-item>\n  list-item "Kept"\n`, new Registry(coreComponents));
+    expect(r.diagnostics.map((d) => d.line)).toEqual([3, 4]);
+    expect(r.diagnostics[0]!.message).toMatch(/no JSX or code; to repeat elements for each item, use each items=list as=x/);
+    expect(r.nodeCount).toBe(2);
   });
 });

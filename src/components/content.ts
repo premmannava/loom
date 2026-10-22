@@ -16,7 +16,8 @@ export const text: ComponentDef = {
     align: { type: "enum", values: ALIGN, default: "left", description: "left, center or right." },
     strike: { type: "boolean", default: false, description: "Draw a line through the text, e.g. for an old price." },
   },
-  example: `text "Weekend in Yosemite" style=title
+  example: `state guests=2 nights=3
+text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
 text "$160" tone=muted strike=true`,
   layout(box, ctx) {
@@ -58,7 +59,8 @@ export const stat: ComponentDef = {
     tone: toneProp,
     align: { type: "enum", values: ["left", "center"], default: "left", description: "left or center." },
   },
-  example: `stat label="Total" value="\${price*qty}"`,
+  example: `state price=24 qty=2
+stat label="Total" value="\${price*qty}"`,
   layout(box) {
     box.h = 54;
   },
@@ -90,7 +92,8 @@ export const progress: ComponentDef = {
     label: { type: "string", description: "Optional caption above the bar." },
     tone: toneProp,
   },
-  example: `progress value={done} max=5 label="{done} of 5 steps"`,
+  example: `state done=3
+progress value={done} max=5 label="{done} of 5 steps"`,
   layout(box, ctx) {
     box.h = ctx.props(box.node).has("label") ? 30 : 10;
   },

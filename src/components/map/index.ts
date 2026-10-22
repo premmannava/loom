@@ -6,8 +6,7 @@
  * pre-projected with the Natural Earth I projection by scripts/build-world.mjs.
  */
 import type { ComponentDef } from "../../component";
-import { isVisible } from "../../layout";
-import type { Box } from "../../types";
+import type { Box, LoomNode } from "../../types";
 import world from "./world.json";
 
 interface WorldData { w: number; h: number; k: number; t: [number, number]; c: Array<[string, string]> }
@@ -54,10 +53,11 @@ export const map: ComponentDef = {
   example: `state picked=none
 map highlight="Japan,Kenya" bind=picked
   pin "Tokyo" lat=35.68 lon=139.69`,
-  layout(box) {
+  layout(box, ctx) {
     const s = box.w / WORLD.w;
     box.h = WORLD.h * s;
-    box.data = { scale: s };
+    // Pins are drawn over the map rather than laid out, but come from visibleChildren so each= works.
+    box.data = { scale: s, pins: ctx.visibleChildren(box.node).filter((k) => k.type === "pin") };
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
@@ -66,7 +66,7 @@ map highlight="Japan,Kenya" bind=picked
     const s = (box.data as { scale: number }).scale;
     const highlighted = new Set(list(p.str("highlight")));
     const bind = p.raw("bind");
-    const selected = bind ? ctx.scope(bind) : null;
+    const selected = bind ? p.bound() : null;
     const hovered = ctx.hover && ctx.hover.node.id === box.node.id ? (ctx.hover.detail as string | undefined) : undefined;
     g.save();
     g.translate(box.x, box.y);
@@ -85,9 +85,8 @@ map highlight="Japan,Kenya" bind=picked
   paintOver(box, ctx) {
     const { g, theme } = ctx;
     const c = theme.colors;
-    const s = (box.data as { scale: number }).scale;
-    for (const pin of box.node.children) {
-      if (pin.type !== "pin" || !isVisible(pin, ctx.scope)) continue;
+    const { scale: s, pins } = box.data as { scale: number; pins: LoomNode[] };
+    for (const pin of pins) {
       const pp = ctx.props(pin);
       g.globalAlpha = ctx.appear(pin);
       const [px, py] = project(pp.num("lon", 0), pp.num("lat", 0));

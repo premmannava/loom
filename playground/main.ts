@@ -1,14 +1,37 @@
 import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
 import { mapComponents } from "../src/components/map";
+import { setupAppearance } from "./appearance/panel";
+import { setupAsk } from "./ask";
 import { samples } from "./samples";
+import { playgroundGuide } from "./model-guide";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ta = $<HTMLTextAreaElement>("spec");
 const gutter = $("gutter");
 const canvas = $<HTMLCanvasElement>("cv");
 
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents] }).expose("loom");
-$("guide").textContent = languageGuide(loom.registry);
+// The samples use real photos from Unsplash; images from any other host are blocked.
+const imageHosts = ["images.unsplash.com"];
+const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts }).expose("loom");
+// Style presets, light/dark/system and a custom accent, through loom.setTheme.
+setupAppearance(loom);
+// The same guide a model gets from "Ask a model", so copying it into a chat app works the same way.
+// Leave room for the request, generated spec and a repair on local 8K models.
+// Keep the library default unchanged; this is the playground's configuration.
+const guideOptions = playgroundGuide(imageHosts);
+const guideText = languageGuide(loom.registry, guideOptions);
+$("guide").textContent = guideText;
+$("copyGuide").addEventListener("click", async (e) => {
+  e.preventDefault(); // inside <summary>: don't toggle the panel
+  const b = e.currentTarget as HTMLButtonElement;
+  try {
+    await navigator.clipboard.writeText(guideText);
+    b.textContent = "Copied";
+  } catch {
+    b.textContent = "Couldn't copy";
+  }
+  setTimeout(() => { b.textContent = "Copy guide"; }, 1500);
+});
 
 let current = "map";
 let streamId = 0;
@@ -172,10 +195,14 @@ loom.on("diagnostics", (d) => {
 
 const stateBody = $("state").querySelector("tbody")!;
 let flashKey = "";
+/** State bound to password fields, shown masked: typed passwords shouldn't sit on screen in plain text. */
+const passwordKeys = () => new Set(loom.find("input").filter((n) => n.props.kind === "password" && n.props.bind).map((n) => n.props.bind!.split(".")[0]!));
 function renderState() {
   const snap = loom.state.snapshot();
+  const secret = passwordKeys();
   stateBody.innerHTML = "";
-  for (const [k, v] of Object.entries(snap)) {
+  for (const [k, v0] of Object.entries(snap)) {
+    const v = secret.has(k) && typeof v0 === "string" ? "•".repeat(v0.length) : v0;
     const tr = document.createElement("tr");
     if (k === flashKey) tr.className = "flash";
     tr.innerHTML = `<td></td><td></td>`;
@@ -185,11 +212,14 @@ function renderState() {
   }
 }
 loom.on("change", ({ key }) => { flashKey = key; queueMicrotask(renderState); });
-loom.on("action", ({ name, value }) => {
+function logEvent(text: string) {
   const li = document.createElement("li");
-  li.textContent = `emit ${name}${value === undefined ? "" : " → " + JSON.stringify(value)}`;
+  li.textContent = text;
   $("events").prepend(li);
-});
+}
+loom.on("action", ({ name, value }) => logEvent(`emit ${name}${value === undefined ? "" : " → " + JSON.stringify(value)}`));
+loom.on("navigate", ({ screen, from }) => logEvent(`screen ${from ?? "—"} → ${screen}`));
+loom.on("notify", ({ text }) => logEvent(`notify "${text}"`));
 
 loom.on("render", (m) => {
   $("mNodes").textContent = String(m.nodes);
@@ -202,3 +232,22 @@ loom.on("render", (m) => {
 
 const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
 fontsReady.then(() => stream("map"));
+
+// ------------------------------------------------------------ ask a model
+
+setupAsk({
+  loom,
+  guide: guideOptions,
+  stopSample: () => {
+    streamId++;
+    nav.querySelectorAll<HTMLButtonElement>(".chip").forEach((c) => c.setAttribute("aria-pressed", "false"));
+  },
+  setEditor: (text, o = {}) => {
+    ta.value = o.append ? ta.value + text : text;
+    ta.readOnly = !!o.readOnly;
+    if (o.append) ta.scrollTop = ta.scrollHeight;
+    renderGutter();
+  },
+  setPrompt: (text) => { $("promptText").textContent = text; },
+  setStatus,
+});

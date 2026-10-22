@@ -13,10 +13,11 @@ import { Loom } from "../src/engine";
 import { coreComponents } from "../src/components";
 import { mapComponents } from "../src/components/map";
 import { darkTheme, lightTheme } from "../src/theme";
+import { fixtureImageLoader } from "./fixture-image";
 import { cases } from "./cases";
 
 declare global {
-  interface Window { __loomReady?: boolean; __loomError?: string }
+  interface Window { __loomReady?: boolean; __loomError?: string; __loom?: Loom }
 }
 
 async function main(): Promise<void> {
@@ -39,9 +40,18 @@ async function main(): Promise<void> {
     theme,
     width,
     animate: false,
+    // The samples' real photo host, so their images are drawn by the fixture
+    // instead of downloaded; other hosts stay blocked, as in the playground.
+    imageHosts: ["images.unsplash.com"],
+    loadImage: fixtureImageLoader,
+    // A fixed today, so calendars look the same whenever the screenshots are taken.
+    today: () => "2026-10-21",
   });
+  // Interaction tests (typing.spec.ts) drive the engine directly.
+  window.__loom = loom;
   loom.setSpec(visual.spec);
   loom.renderNow();
+  await loom.imagesLoaded();
   window.__loomReady = true;
 }
 

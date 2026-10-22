@@ -36,6 +36,28 @@ export const row: ComponentDef = {
   },
 };
 
+export const each: ComponentDef = {
+  type: "each",
+  category: "layout",
+  description: "Repeats what's inside it once per item of a list, in place, with no look of its own. Inside, the current item is called item (or the name given by as=).",
+  props: {
+    items: { type: "expression", required: true, description: "The list to repeat over, like todos or {cart}." },
+    as: { type: "name", default: "item", description: "Name for the current item, used inside: as=t makes {t.text} work." },
+    index: { type: "name", description: "Name for the item's position, counting from 0." },
+    key: { type: "expression", description: "A value unique to each item, like {t.id}, so focus stays with the item when the list changes. Defaults to the position." },
+  },
+  children: "any",
+  example: `state gear=[{name: "Tent", kg: 2.1}, {name: "Stove", kg: 0.4}, {name: "Headlamp", kg: 0.1}]
+column gap=6
+  each items=gear as=g index=i key={g.name}
+    text "{i + 1}. {g.name}, {g.kg} kg"`,
+  // Containers replace each with its copies before laying out, so this only
+  // runs if an each is laid out directly; it takes no space then.
+  layout(box) {
+    box.h = 0;
+  },
+};
+
 export const card: ComponentDef = {
   type: "card",
   category: "layout",
@@ -240,7 +262,7 @@ accordion "Shipping" bind=shipping
   text "Ships in two business days."`,
   layout(box, ctx) {
     const p = ctx.props(box.node);
-    const open = !!ctx.scope(p.raw("bind") ?? "");
+    const open = !!p.bound();
     const t = ctx.theme;
     const font = themeFont(t, 600, t.text.body);
     const lines = wrapText(p.text(), Math.max(40, box.w - 32), font, ctx.measure);
@@ -281,7 +303,7 @@ accordion "Shipping" bind=shipping
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
     if (!key) return;
-    ctx.set(key, !ctx.scope(key));
+    ctx.set(key, !ctx.props(ctx.target.node).bound());
     runOn(ctx);
   },
 };

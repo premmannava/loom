@@ -31,12 +31,12 @@ Time estimates are rough, for one developer working with AI assistance, and will
 
 | Gap | Why it matters |
 |---|---|
-| State holds only single values | Products, carts and orders are lists of records |
-| No way to repeat an element over a list | A catalog can't be written without it |
+| ~~State holds only single values~~ (done: lists and records, Phase 2.1) | Products, carts and orders are lists of records |
+| ~~No way to repeat an element over a list~~ (done: `each`, Phase 2.2) | A catalog can't be written without it |
 | No connection to real data | A model must never invent prices or stock |
 | No host commands | "Add to cart" and "checkout" must run trusted app code |
 | One screen per spec | Apps move between catalog, product, cart and checkout |
-| No text input, images, scrolling, overlays | Search, product photos, long lists, dialogs |
+| No ~~text input~~ (done), ~~images~~ (done), scrolling, overlays | Search, product photos, long lists, dialogs |
 | No accessibility layer | Screen readers can't see a canvas |
 | No model connection | Everything is still simulated |
 
@@ -91,13 +91,15 @@ What the new tests found on their first runs:
 - `evaluate()` accepted non-plain values from object-backed scopes (e.g. `{__proto__}`). It now treats them as unknown state.
 - The `text` component's description had three sentences, against the one-or-two rule.
 - The map can't be reached by keyboard. Recorded as a known gap in the contract tests until Phase 3.
-- Specs nested hundreds of levels deep overflow the engine's recursion. Recorded under Phase 7.
+- Specs nested hundreds of levels deep overflowed the engine's recursion. Fixed after Phase 1 with a parser limit of 100 levels (`MAX_DEPTH`); deeper lines are skipped with an error diagnostic.
 
 ---
 
 ## Phase 2: Language 0.2 (data, lists, screens)
 
 **Goal:** make the language able to describe real applications, while keeping the three guarantees: streamable, safe, and design-free.
+
+**Status:** 2.1 and 2.2 are done ([details](#status-of-21-and-22)), along with screens (2.6). Data sources (2.4) and host commands (2.5) come next.
 
 ### 2.1 Structured data and property access
 
@@ -115,6 +117,8 @@ text "{len(cart.items)} items"
 
 ### 2.2 Lists: `each`
 
+The detailed plan for 2.1 and 2.2, including the design, steps, risks and decisions to confirm, is in [`plans/lists-and-data.md`](plans/lists-and-data.md).
+
 ```
 each items={products.data.items} as=p key={p.id}
   card
@@ -123,6 +127,16 @@ each items={products.data.items} as=p key={p.id}
 
 - `each` repeats its children once per item, with the item available under the `as` name. `key` keeps state and fade-in stable when the list changes.
 - Streaming still works, because `each` is a normal container line.
+
+### Status of 2.1 and 2.2
+
+Built as planned in [`plans/lists-and-data.md`](plans/lists-and-data.md), with these differences:
+
+- Copies are made inside layout (`shownChildren`), where containers ask for their children, rather than in a separate expand step. Same result, fewer moving parts.
+- Besides the 500-item limit per `each`, a screen copies at most 10,000 elements, because nested lists multiply.
+- Inputs write items through `bind=t.done` and path actions; `$value` and `money`, `lower`, `upper` aren't built yet.
+- From testing with Qwen3 14B: a line holding only `if=` is now a condition block (models write it naturally), multi-line state lists from a model are joined back into one line by `loom-ui/model`, a spec written inside unclosed thinking is recovered, and names nothing defines are warnings that go to the repair pass.
+- `npm run eval` gained "data" and "hard" categories and behavior checks that use the rendered screen.
 
 ### 2.3 Grid layout
 
@@ -172,9 +186,13 @@ screen name=product title="{product.data.name}"
 - Actions `go:product` and `back` switch screens, with history. The current screen is available as `{screen}`.
 - Only the active screen is laid out and painted. The first screen is shown by default.
 
+**Status: built.** `screen name= title=`, `go:`, `back` and `{screen}` work, and the host can call `loom.go()` / `loom.back()` and listen to `navigate`. Two decisions made while building it: `go:` to an unknown screen does nothing rather than being a diagnostic (a parse-time check would break streaming, because the target screen may arrive later), and while streaming, the first screen to arrive is shown, so models should write the starting screen first.
+
 ### 2.7 Notifications
 
 `notify:'Added {p.name} to your cart'` shows a short toast message. The text, position and look are controlled by the engine.
+
+**Status: built**, drawn by the engine at the bottom of the visible part of the canvas for three seconds, with a `notify` event for the host. Screen readers won't hear it until the accessibility mirror adds a live region (Phase 3.1).
 
 **Exit criteria:** the catalog and product screens in [the ecommerce example](examples/ecommerce.md) parse, render (with placeholder components where Phase 3 hasn't landed) and pass streaming tests. The model guide documents sources and commands generated from their registrations.
 
@@ -188,12 +206,12 @@ screen name=product title="{product.data.name}"
 
 | Capability | Approach |
 |---|---|
-| **Text input** | While a field is focused, place a real, transparent `<input>` exactly over its box. The browser handles typing, IME for other languages, autocorrect, password managers and mobile keyboards. Loom paints the field and mirrors its value. |
-| **Images** | Async loading with placeholder and fade-in, a cache, `ratio=` to reserve space before load, and an allowlist of image hosts. CORS-enabled images only, so the canvas stays readable for tests. |
+| **Text input** | While a field is focused, place a real, transparent `<input>` exactly over its box. The browser handles typing, IME for other languages, autocorrect, password managers and mobile keyboards. Loom paints the field and mirrors its value. **Built** (`input`, `src/dom-editor.ts`, [plan](plans/text-input.md)); multi-line text and validation are still to do. |
+| **Images** | Async loading with placeholder and fade-in, a cache, `ratio=` to reserve space before load, and an allowlist of image hosts. CORS-enabled images only, so the canvas stays readable for tests. **Built** (`image`, `imageHosts`, `loadImage`): the page's origin is always allowed, other hosts must be https and listed. |
 | **Scrolling** | Scroll containers that clip children, handle wheel, touch and keyboard scrolling, and only lay out what is visible (virtualization) for long lists. |
 | **Overlays** | A layer above the page for dialogs, dropdowns, tooltips and toasts, with focus trapping and Escape to close. |
 | **Accessibility mirror** | A hidden DOM tree that mirrors the canvas: a role, a label and a state for each element, focus kept in sync, and live regions so screen readers hear updates. Same idea as Flutter's semantics tree. |
-| **Pointer gestures** | Drag for sliders and scroll areas, long press, and touch targets at least 44 px. |
+| **Pointer gestures** | Drag for sliders and scroll areas, long press, and touch targets at least 44 px. **Drag built** (`drag` and `key` hooks, pointer capture, `touch-action: pan-y pinch-zoom`) and used by `slider`. Long press and a 44 px minimum for every target are still to do. |
 
 ### 3.2 Components
 
@@ -211,7 +229,9 @@ screen name=product title="{product.data.name}"
 - `tabs` holds `tab` children, and only the selected tab's content is laid out.
 - `avatar` shows initials only; photos wait for `image`.
 
-Still waiting on engine capabilities: `input`, `image`, `select`/`option`, `slider` (needs drag), `table` and `chart` (need lists of data), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+Since then: `image` and `slider` (with the engine's images and dragging), `screen` (Phase 2.6), `input`, `chart` (bar and line, one series, read-only; no scrolling needed since it fits its width), and `table` (up to 200 rows and 8 columns, sorting and single-row selection through state; no scrolling, so long lists are paged with `take()` or `pagination`). `select` came with the first piece of the overlay work: a popup layer for one element's own panel (placed in the visible area, on top for drawing, pointer and keys); `dialog`, `menu` and `tooltip` still need a general overlay element.
+
+Still waiting on engine capabilities: a scrolling or virtualized table for long lists, `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
 
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 
@@ -267,6 +287,15 @@ User actions take two different paths:
 | Call registered commands through buttons | Skip confirmation on money-moving commands |
 | Ask for the user's next choice with `emit` | Generate payment or login forms (those are fixed, reviewed screens) |
 
+**Status: started.** Built so far, and tested end to end against a fake OpenAI-compatible server (the real runs happen on a developer's machine):
+
+- `loom-ui/model`: streaming from any OpenAI-compatible endpoint (LM Studio, Ollama, vLLM, DeepSeek, OpenRouter…), removing reasoning (`<think>` blocks, or a separate reasoning field) and code fences, checking with the parser and one repair that lists the problems by line.
+- The playground's Ask a model box, through the dev server, which adds any key so the browser never sees it. Refining sends the clean conversation, not the repair turns.
+- `languageGuide(registry, options)`: a one-line index first, then each element with its example; image hosts, the app's own `emit:` actions and notes about the app.
+- `npm run eval` with 30 requests (`eval/cases.ts`), reporting validity before and after repair, expected elements, invented props and elements, tokens and timings.
+
+Still to do from the list above: the production server package (rate limits, sessions), commerce rules, patches, templates, and comparing token counts with JSON formats.
+
 **Exit criteria:** on the evaluation set, at least 95% of generated specs have no errors after one repair, the first line is on screen within about a second of the model starting to answer, and token counts are measured against JSON-based formats (A2UI, json-render) for the same screens.
 
 ---
@@ -311,7 +340,7 @@ User actions take two different paths:
 
 - **Performance:** repaint only changed regions, cache text layout, virtualize everything that scrolls. Budget: 60 frames per second while scrolling a 5,000-item list on a mid-range phone.
 - **Security review:** the expression sandbox, spec size and depth limits, source and command rate limits, image host allowlists, and content security policy guidance.
-  - Found in Phase 1: the engine overflows the call stack on specs nested somewhere between 500 and 2,000 levels deep, because layout and paint are recursive (the parser itself is fine). A nesting limit in the parser, reported as a diagnostic that skips deeper lines, would turn this into an ordinary error.
+  - Done: nesting depth. The engine overflowed the call stack on specs nested between 500 and 2,000 levels deep, because layout and paint are recursive. The parser now stops at 100 levels (`MAX_DEPTH`) and reports deeper lines as errors. Still to decide: limits on total spec size and element count.
 - **Internationalization:** right-to-left layout, number and currency formatting by locale, and font fallback for other scripts.
 - **Native renderer experiment:** run the same engine in Rust with WebAssembly for heavy screens, and as a native app outside the browser (see the speed discussion in the README).
 - **Release:** publish `loom-ui` to npm with semantic versioning and a changelog, and a migration guide for language changes.

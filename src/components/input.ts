@@ -1,7 +1,8 @@
-import { literal } from "../actions";
-import type { ComponentDef } from "../component";
-import type { Value } from "../types";
-import { fillTint, onProp, partBox, runOn } from "./util";
+import { toNumber } from "../data";
+import type { ComponentDef, PropReader } from "../component";
+import type { Box } from "../types";
+import { INPUT_KINDS } from "../editor";
+import { fillTint, onProp, partBox, runOn, themeFont } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
 
@@ -70,8 +71,7 @@ check "I agree to the terms" bind=agreed`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const key = p.raw("bind") ?? "";
-    const on = !!ctx.scope(key);
+    const on = !!p.bound();
     const hot = ctx.isHovered(box.node);
     ctx.roundRect(box.x + 0.5, box.y + 4.5, 18, 18, theme.radius.sm);
     if (on) {
@@ -102,7 +102,7 @@ check "I agree to the terms" bind=agreed`,
   },
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
-    if (key) ctx.set(key, !ctx.scope(key));
+    if (key) ctx.set(key, !ctx.props(ctx.target.node).bound());
   },
 };
 
@@ -124,7 +124,7 @@ switch "Email me order updates" bind=updates`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const on = !!ctx.scope(p.raw("bind") ?? "");
+    const on = !!p.bound();
     const tw = 40, th = 24, tx = box.x + box.w - tw, ty = box.y + (box.h - th) / 2;
     g.font = ctx.font(400, theme.text.body);
     g.fillStyle = c.ink;
@@ -144,7 +144,7 @@ switch "Email me order updates" bind=updates`,
   press(ctx) {
     const key = ctx.props(ctx.target.node).raw("bind");
     if (!key) return;
-    ctx.set(key, !ctx.scope(key));
+    ctx.set(key, !ctx.props(ctx.target.node).bound());
     runOn(ctx);
   },
 };
@@ -170,7 +170,7 @@ radio "Large" bind=size value=l`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const chosen = ctx.scope(p.raw("bind") ?? "") === literal(p.raw("value") ?? "");
+    const chosen = p.bound() === (p.value("value") ?? "");
     const cx = box.x + 9.5, cy = box.y + box.h / 2;
     g.beginPath();
     g.arc(cx, cy, 9, 0, Math.PI * 2);
@@ -196,7 +196,7 @@ radio "Large" bind=size value=l`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    ctx.set(key, literal(p.raw("value") ?? ""));
+    ctx.set(key, p.value("value") ?? "");
     runOn(ctx);
   },
 };
@@ -204,11 +204,11 @@ radio "Large" bind=size value=l`,
 const STEP_W = 42, VALUE_W = 52;
 
 /** A stepper's limits and current value, read the same way when painting and pressing. */
-function stepperState(p: { num(n: string, f: number): number; has(n: string): boolean; raw(n: string): string | undefined }, scope: (k: string) => Value | undefined) {
+function stepperState(p: PropReader) {
   const min = p.num("min", 0);
   const max = p.has("max") ? p.num("max", Infinity) : Infinity;
   const step = Math.abs(p.num("step", 1)) || 1;
-  const raw = Number(scope(p.raw("bind") ?? ""));
+  const raw = toNumber(p.bound());
   const value = Number.isFinite(raw) ? raw : min;
   return { min, max, step, value };
 }
@@ -234,7 +234,7 @@ stepper "Quantity" bind=qty min=1 max=10`,
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { min, max, value } = stepperState(p, ctx.scope);
+    const { min, max, value } = stepperState(p);
     const total = STEP_W * 2 + VALUE_W;
     const label = p.text();
     const x0 = label ? box.x + Math.max(0, box.w - total) : box.x;
@@ -282,7 +282,7 @@ stepper "Quantity" bind=qty min=1 max=10`,
     const p = ctx.props(ctx.target.node);
     const key = p.raw("bind");
     if (!key) return;
-    const { min, max, step, value } = stepperState(p, ctx.scope);
+    const { min, max, step, value } = stepperState(p);
     const next = ctx.target.detail === "inc" ? value + step : value - step;
     ctx.set(key, Math.round(Math.min(max, Math.max(min, next)) * 1e6) / 1e6);
     runOn(ctx);
@@ -324,7 +324,7 @@ rating bind=stars`,
     const c = theme.colors;
     const max = Math.max(1, Math.min(10, Math.round(p.num("max", 5))));
     const bind = p.raw("bind");
-    let value = bind ? Number(ctx.scope(bind)) || 0 : p.num("value", 0);
+    let value = bind ? toNumber(p.bound()) || 0 : p.num("value", 0);
     if (bind && ctx.hover && ctx.hover.node.id === box.node.id && typeof ctx.hover.detail === "number") value = ctx.hover.detail;
     for (let i = 0; i < max; i++) {
       const x = box.x + i * (STAR + STAR_GAP);
@@ -379,4 +379,220 @@ export const link: ComponentDef = {
     if (ctx.isHovered(box.node)) g.fillRect(box.x, box.y + box.h - 3, w, 1.5);
     ctx.addHit(partBox(box, box.x, box.y, w, box.h));
   },
+};
+
+const THUMB_R = 10, TRACK_H = 6, SLIDER_AREA = 32;
+
+/** A slider's range and current value, read the same way when painting, dragging and on keys. */
+function sliderState(p: PropReader) {
+  const min = p.num("min", 0);
+  const max = Math.max(min, p.num("max", 100));
+  const step = Math.abs(p.num("step", 1)) || 1;
+  const raw = toNumber(p.bound());
+  const value = Number.isFinite(raw) ? Math.min(max, Math.max(min, raw)) : min;
+  return { min, max, step, value };
+}
+
+/** Snap to the nearest step from min, keep within range, and drop float noise. */
+function snap(v: number, min: number, max: number, step: number): number {
+  const stepped = min + Math.round((v - min) / step) * step;
+  return Math.round(Math.min(max, Math.max(min, stepped)) * 1e6) / 1e6;
+}
+
+/** Where the thumb's centre may travel: inset by its radius so it never pokes out. */
+function travel(box: Box) {
+  return { left: box.x + THUMB_R, width: Math.max(1, box.w - THUMB_R * 2) };
+}
+
+export const slider: ComponentDef = {
+  type: "slider",
+  category: "input",
+  description: "Picks a number in a range by dragging a handle, or with the arrow keys. Good for prices, distances and amounts.",
+  text: { description: "An optional label above the slider. Show the value with an {expression}." },
+  props: {
+    bind: { type: "state", required: true, description: "The number state this slider reads and writes." },
+    min: { type: "number", default: 0, description: "Smallest value (default 0)." },
+    max: { type: "number", default: 100, description: "Largest value (default 100)." },
+    step: { type: "number", default: 1, description: "The value moves in steps of this size (default 1)." },
+    on: onProp("after the user lets go, or after each arrow key"),
+  },
+  example: `state maxPrice=120
+slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
+  layout(box, ctx) {
+    const label = ctx.props(box.node).text();
+    box.h = (label ? Math.round(ctx.theme.text.body * 1.35) + 4 : 0) + SLIDER_AREA;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const { min, max, value } = sliderState(p);
+    const label = p.text();
+    let y = box.y;
+    if (label) {
+      const lh = Math.round(theme.text.body * 1.35);
+      g.font = ctx.font(400, theme.text.body);
+      g.fillStyle = c.ink;
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      g.fillText(label, box.x, y + lh / 2 + 1, box.w);
+      y += lh + 4;
+    }
+    const area = partBox(box, box.x, y, box.w, SLIDER_AREA);
+    const { left, width } = travel(area);
+    const frac = max > min ? (value - min) / (max - min) : 0;
+    const cx = left + frac * width, cy = y + SLIDER_AREA / 2;
+    ctx.roundRect(box.x, cy - TRACK_H / 2, box.w, TRACK_H, TRACK_H / 2);
+    g.fillStyle = c.line;
+    g.fill();
+    ctx.roundRect(box.x, cy - TRACK_H / 2, Math.max(TRACK_H, cx - box.x), TRACK_H, TRACK_H / 2);
+    g.fillStyle = c.accent;
+    g.fill();
+    const active = ctx.isPressed(box.node) || ctx.isHovered(box.node);
+    if (active) {
+      g.beginPath();
+      g.arc(cx, cy, THUMB_R + 6, 0, Math.PI * 2);
+      fillTint(g, c.accent, 0.14);
+    }
+    g.beginPath();
+    g.arc(cx, cy, THUMB_R, 0, Math.PI * 2);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = c.accent;
+    g.lineWidth = 2;
+    g.stroke();
+    ctx.addHit(area, { detail: "track" });
+  },
+  cursor: () => "grab",
+  drag(ctx) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return;
+    const { min, max, step, value } = sliderState(p);
+    const { left, width } = travel(ctx.target.box);
+    const frac = Math.min(1, Math.max(0, (ctx.x - left) / width));
+    const next = snap(min + frac * (max - min), min, max, step);
+    if (next !== value) ctx.set(key, next);
+    if (ctx.phase === "end") runOn(ctx);
+  },
+  key(ctx, k) {
+    const p = ctx.props(ctx.target.node);
+    const key = p.raw("bind");
+    if (!key) return false;
+    const { min, max, step, value } = sliderState(p);
+    const big = Math.max(step, snap((max - min) / 10, 0, Infinity, step));
+    const moves: Record<string, number> = {
+      ArrowRight: value + step, ArrowUp: value + step, ArrowLeft: value - step, ArrowDown: value - step,
+      PageUp: value + big, PageDown: value - big, Home: min, End: max,
+    };
+    if (!(k in moves)) return false;
+    ctx.set(key, snap(moves[k]!, min, max, step));
+    runOn(ctx);
+    return true;
+  },
+};
+
+/** Field text size: at least 16 px, or phones zoom the page when the field is focused. */
+export const FIELD_TEXT = 16;
+export const FIELD_PAD = 12;
+export const LABEL_SIZE = 13;
+const LABEL_GAP = 6;
+
+/** The field's box, under its label if it has one. */
+export function fieldBox(box: Box, p: PropReader, controlHeight: number): Box {
+  const top = p.text() ? LABEL_SIZE + 4 + LABEL_GAP : 0;
+  return partBox(box, box.x, box.y + top, box.w, controlHeight);
+}
+
+/** The bound value as text for editing: numbers plainly, nothing for null. */
+function fieldValue(p: PropReader): string {
+  const v = p.bound();
+  return v === undefined || v === null ? "" : typeof v === "object" ? "" : String(v);
+}
+
+/** Cut text to fit a width, ending with an ellipsis. */
+export function fitText(g: CanvasRenderingContext2D, text: string, width: number): string {
+  if (g.measureText(text).width <= width) return text;
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (g.measureText(text.slice(0, mid) + "…").width <= width) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo) + "…";
+}
+
+export const input: ComponentDef = {
+  type: "input",
+  category: "input",
+  description: "A text field people type into, such as a name, an email, a search or a new item. Each keystroke writes its bind= state.",
+  text: { description: "The label above the field. Leave it out only when the screen makes the purpose obvious." },
+  props: {
+    bind: { type: "state", required: true, description: "The state name or path it reads and writes, like task or t.title." },
+    placeholder: { type: "string", description: "A hint shown while the field is empty, like e.g. Sunscreen." },
+    kind: { type: "enum", values: INPUT_KINDS, default: "text", description: "text, email, number, password or search. Picks the phone keyboard and autofill; number writes a number, or null while empty." },
+    on: onProp("when Enter is pressed, after the value is written"),
+    disabled: { type: "condition", description: "Expression; when true the field is greyed out and can't be typed in." },
+    max: { type: "number", default: 500, description: "Longest value in characters (at most 10000)." },
+  },
+  example: `state task="" todos=[]
+input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
+text "{plural(len(todos), 'item')}" tone=muted`,
+  layout(box, ctx) {
+    const p = ctx.props(box.node);
+    box.h = fieldBox(box, p, ctx.theme.control.height).y - box.y + ctx.theme.control.height;
+  },
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const { g, theme } = ctx;
+    const c = theme.colors;
+    const disabled = p.cond("disabled");
+    const field = fieldBox(box, p, theme.control.height);
+    const editing = ctx.isEditing(box.node);
+    const hot = !disabled && ctx.isHovered(box.node);
+    g.save();
+    if (disabled) g.globalAlpha *= 0.45;
+    const label = p.text();
+    if (label) {
+      g.font = ctx.font(600, LABEL_SIZE);
+      g.textAlign = "left";
+      g.textBaseline = "top";
+      g.fillStyle = c.ink;
+      g.fillText(label, box.x, box.y, box.w);
+    }
+    ctx.roundRect(field.x + 0.5, field.y + 0.5, field.w - 1, field.h - 1, theme.radius.md);
+    g.fillStyle = c.surface;
+    g.fill();
+    g.strokeStyle = editing ? c.accent : hot ? c.muted : c.line;
+    g.lineWidth = editing ? 1.5 : 1;
+    g.stroke();
+    if (!editing) {
+      const value = fieldValue(p);
+      const kind = p.oneOf("kind", INPUT_KINDS, "text");
+      const shown = value ? (kind === "password" ? "•".repeat(value.length) : value) : p.str("placeholder");
+      g.font = ctx.font(400, FIELD_TEXT);
+      g.textBaseline = "middle";
+      g.fillStyle = value ? c.ink : c.muted;
+      g.fillText(fitText(g, shown, field.w - FIELD_PAD * 2), field.x + FIELD_PAD, field.y + field.h / 2 + 1);
+    }
+    g.restore();
+    if (!disabled) ctx.addHit(field);
+  },
+  editor(box, p, theme) {
+    const field = fieldBox(box, p, theme.control.height);
+    const max = Math.min(10_000, Math.max(1, Math.round(p.num("max", 500))));
+    return {
+      rect: { x: field.x + FIELD_PAD, y: field.y + 1, w: Math.max(0, field.w - FIELD_PAD * 2), h: field.h - 2 },
+      font: themeFont(theme, 400, FIELD_TEXT),
+      color: theme.colors.ink,
+      accent: theme.colors.accent,
+      muted: theme.colors.muted,
+      kind: p.oneOf("kind", INPUT_KINDS, "text"),
+      value: fieldValue(p).slice(0, max),
+      placeholder: p.str("placeholder"),
+      label: p.text() || p.str("placeholder"),
+      max,
+    };
+  },
+  cursor: () => "text",
 };

@@ -5,3 +5,6 @@ dist-playground/
 .DS_Store
 test-results/
 playwright-report/
+eval/results/
+.env.local
+.env.*.local

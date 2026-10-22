@@ -16,7 +16,7 @@ export interface DrawOp {
 }
 
 /** Calls that mark pixels. Everything else (paths, transforms, state) only prepares. */
-const DRAWING_OPS = new Set(["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText"]);
+const DRAWING_OPS = new Set(["fill", "stroke", "fillRect", "strokeRect", "fillText", "strokeText", "drawImage"]);
 const USES_FILL = new Set(["fill", "fillRect", "fillText"]);
 
 interface Style {
@@ -66,11 +66,12 @@ export function createRecordingContext(): { context: CanvasRenderingContext2D; t
       return (...args: unknown[]) => {
         if (!DRAWING_OPS.has(prop)) return undefined;
         const fill = USES_FILL.has(prop);
+        const colored = prop !== "drawImage";
         log.push({
           op: prop,
           args,
-          fillStyle: fill ? style.fillStyle : "",
-          strokeStyle: fill ? "" : style.strokeStyle,
+          fillStyle: colored && fill ? style.fillStyle : "",
+          strokeStyle: colored && !fill ? style.strokeStyle : "",
           font: prop.endsWith("Text") ? style.font : "",
           globalAlpha: style.globalAlpha,
         });
@@ -138,6 +139,14 @@ export class FakeCanvas {
     for (const fn of [...(this.listeners.get(type) ?? [])]) fn(event);
     return prevented;
   }
+
+  setPointerCapture(_id: number): void {}
+
+  /** Whether the canvas itself has keyboard focus (rather than a text box over a field). */
+  focused = false;
+  focus(): void { this.focused = true; }
+  blur(): void { this.focused = false; }
+  releasePointerCapture(_id: number): void {}
 
   getBoundingClientRect() {
     return { left: 0, top: 0, x: 0, y: 0, right: this.width, bottom: this.height, width: this.width, height: this.height };

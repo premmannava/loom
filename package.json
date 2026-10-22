@@ -19,6 +19,10 @@
     "./testing": {
       "types": "./dist/types/testing/index.d.ts",
       "import": "./dist/testing.js"
+    },
+    "./model": {
+      "types": "./dist/types/model/index.d.ts",
+      "import": "./dist/model.js"
     }
   },
   "files": [
@@ -38,7 +42,9 @@
     "test:visual:docker": "docker run --rm --ipc=host -v \"$PWD\":/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.56.1-noble /bin/bash -c \"npm ci && npx playwright test $VISUAL_ARGS\"",
     "bench": "vitest bench --run",
     "docs:check": "vite-node scripts/gen-component-docs.ts --check",
-    "new:component": "vite-node scripts/new-component.ts --"
+    "new:component": "vite-node scripts/new-component.ts --",
+    "eval": "vite-node scripts/eval.ts --",
+    "guide:size": "vite-node scripts/guide-size.ts"
   },
   "devDependencies": {
     "@fontsource/instrument-sans": "5.3.0",

@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, a first set of components, tests and debugging tools are in place. Text input, accessibility and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -79,6 +79,8 @@ npm run dev        # opens the playground
 | `npm run test:visual` | Runs the visual regression tests (Playwright) |
 | `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
 | `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
+| `npm run eval` | Scores a real model on 41 requests ([Measure it](#measure-it)) |
+| `npm run guide:size` | Measures the model guide by section, per mode and profile |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
@@ -87,7 +89,7 @@ npm run dev        # opens the playground
 | `npm run new:component -- <name>` | Scaffolds a component and its test file, and registers it |
 | `npm run build:world` | Regenerates the map's country outlines |
 
-The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels.
+The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels. **Appearance**, at the top, previews the screen in other styles ([Theming](#theming)).
 
 ---
 
@@ -117,27 +119,54 @@ card
 
 ### State
 
-Declare state on unindented `state` lines, usually at the top. Values are numbers, `true`/`false`, `null` or text.
+Declare state on unindented `state` lines, usually at the top. Values are numbers, `true`/`false`, `null`, text, lists `[…]` and records `{name: value}`.
 
 ```
 state qty=2 price=24 gift=false name="Ada"
+state todos=[{text: "Pack water", done: false}, {text: "Snacks", done: true}]
 ```
 
-State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed.
+A value must fit on one line, however long, so a streamed spec can render line by line. Lists and records hold data only: they're parsed, never run, and are limited to 20 levels deep and 10,000 values.
+
+State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere). When a new spec declares a different starting value, such as a refined screen with new data, the new value replaces the old one. Values your app set itself are never replaced by a declaration. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
+
+### Derived values
+
+A `derive` line works a value out from state and keeps it up to date, so a total, a filtered list or a chart's data is written once and every element reads the same thing:
+
+```
+state quantity=2 price=350 taxRate=0.08
+derive subtotal={quantity * price}
+derive tax={subtotal * taxRate}
+derive total={subtotal + tax}
+stat label="Total" value={total}
+```
+
+- **Grammar.** `derive name={expression}`, unindented, at the top level of the spec; several pairs may share a line, as with `state`. The expression is the same safe kind as everywhere else in Loom, with the same functions; there are no functions of your own, callbacks or side effects.
+- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. Its expression can read state, data your app sets with `loom.state.set`, and other derived values.
+- **Order.** Declarations can come in any order: a value is worked out from whatever it reads, wherever that's declared. While a spec streams in, a value whose inputs haven't arrived yet shows as nothing (—) until they do.
+- **Updates.** A value is worked out the first time it's read and kept until something it reads changes, directly or through other derived values; then it's worked out again the next time it's read. Changes to state it doesn't read leave it alone, and a render reads each value at most once per change.
+- **Failures.** If a value can't be worked out (it reads an item that's gone, say), it's nothing (—), never the last good result, and so is everything derived from it. The reason is reported once through `onWarning`, and the value comes back when what it reads is fixed.
+- **Read-only.** Derived values aren't state. `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change one, nor items of a derived list (`each items=open` with `bind=t.done`): the parser reports it, and the engine refuses with a warning. `loom.state.set` throws a `DerivedWriteError`. To let people change items, loop over the list in state and hide items with `if=`. `loom.state.snapshot()` holds state only; `loom.state.derivedSnapshot()` has the derived values.
+- **Problems the parser reports**, each skipping only that value: an expression not in braces or with a syntax error, a name used twice, a name that's already state, a name expressions can't read (`__proto__`, `constructor`, `prototype`) or the engine uses (`screen`), a name nothing defines, and cycles, direct (`derive x={x + 1}`) or through others (`p` → `q` → `p`), which are left out with the loop named. A spec can derive at most 200 values.
+- Lists that derived values hold are new, frozen lists: filtering or sorting never changes the list in state.
 
 ### Expressions
 
 Anything inside `{…}` is evaluated against state.
 
 ```
+state qty=2 price=24 gift=true
 text "Total: ${qty * price + (gift ? 4 : 0)}"
 stat label="Each" value={round(price / 3, 2)}
 ```
 
 - Operators: `+ - * / %`, `== != < <= > >=`, `&& || !`, and `a ? b : c`
 - Text joins with `+`: `{'$' + price}` (use single quotes inside a quoted prop)
-- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`
-- There is no property access, assignment or global access. An unknown name shows as `—` rather than guessing.
+- Functions: `min`, `max`, `round(n, digits)`, `floor`, `ceil`, `abs`, `fixed(n, digits)`, and the list and formatting functions in [Lists](#lists)
+- Fields and items: `{order.city}`, `{cart[0].price}`, `{todos.length}`
+- Words inside `{…}` are state names, so quote text: `{done ? 'Packed' : 'To pack'}`
+- There is no assignment, no calling methods and no global access, and `__proto__`, `constructor` and `prototype` can't be read. Anything that can't be read shows as `—` rather than guessing, and the parser warns about names nothing defines.
 
 ### Actions
 
@@ -150,22 +179,204 @@ Interactive elements run actions from their `on=` prop.
 | `toggle:key` | Flip true/false |
 | `set:key:value` | Set a literal, or an expression: `set:total:{a + b}` |
 | `emit:name` or `emit:name:value` | Tell the host app what the user chose |
+| `go:screen` | Show another screen ([Screens](#screens)) |
+| `back` | Return to the previous screen |
+| `notify:'message'` | Show a short message for a few seconds; it can include `{expressions}` |
+| `add:list:value` | Add an item to the end of a list: `add:todos:{text: 'Map', done: false}` |
+| `remove:t` or `remove:list:index` | Remove the current item inside `each`, or the item at a position |
+| `clear:list` | Empty a list |
+
+The key of `inc`, `dec`, `toggle` and `set` can be a path into data, like `toggle:t.done` ([Lists](#lists)). A quoted value is text: `set:msg:'Hi there'`.
 
 Run several in order with `;`:
 
 ```
+state qty=2 placed=false
 button "Place order" on="set:placed:true;emit:order:{qty}"
 ```
 
 `emit` is how a generated screen talks back to your app, for example to send the user's choice to the model for the next step.
+
+`notify` shows a message at the bottom of the visible area, drawn by the engine in the theme's colors, and fires a `notify` event so your app can also announce it. Quote the message when it has spaces or `;`:
+
+```
+button "Add to cart" on="inc:items;notify:'Added. {items} in your cart'"
+```
+
+### Lists
+
+`each` repeats what's indented under it once per item of a list. It has no look of its own: the copies sit in the container around it, so `each` inside a `row`, `grid`, `list` or `tabs` makes one cell, row or tab per item.
+
+```
+state todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}]
+card
+  text "{count(todos, 'done')} of {len(todos)} packed" tone=muted
+  each items=todos as=t
+    row
+      check "{t.text}" bind=t.done
+      button "Remove" variant=secondary on=remove:t
+  button "Add snacks" on="add:todos:{text: 'Snacks', done: false}"
+```
+
+| Prop | Meaning |
+|---|---|
+| `items` | The list: a state name, a field (`o.lines`) or an `{expression}` |
+| `as` | Name of the current item inside (default `item`) |
+| `index` | Name of its position, from 0 |
+| `key` | A value unique to each item, like `{t.id}`, so focus stays with the item when the list changes (default: the position) |
+
+- **Reading:** `{t.text}` inside the `each`. A loop variable only exists inside its `each`; using it outside is a warning.
+- **Changing an item:** `bind=t.done`, `toggle:t.done`, `inc:item.qty`. This works only when `items=` names a list in state, not a computed one. Changes never edit data in place: the whole list is replaced, so the `change` event reports it (`todos`) and your app can save it.
+- **Changing the list:** `add`, `remove` and `clear` (see [Actions](#actions)).
+- **Lists in lists:** put an `each` inside an `each`, as in `each items=o.lines as=line`. Inner items can read outer ones.
+- **Limits:** at most 500 items per `each`, and 10,000 repeated elements per screen however lists nest. Past either, the rest are left out with a warning.
+
+List functions, for computing instead of typing numbers:
+
+| Function | Result |
+|---|---|
+| `len(list)` | Number of items |
+| `count(list, 'done')` | Items whose field is true |
+| `sum(list)`, `sum(list, 'price')`, `sum(list, 'price', 'qty')` | Total of the items, of a field, or of two fields multiplied per item (cart totals). Only numbers count: a missing field, `null`, `true`/`false` or text (even `"12"`) makes the total — rather than being read as a number; an empty list totals 0. `avg`, `min` and `max` of a field work the same way |
+| `avg(list, 'field')` | Average |
+| `join(list)`, `join(list, 'name', ' / ')` | Text listing the items or a field |
+| `includes(list, value)` | Whether a value is in the list |
+| `min(list)`, `max(list)`, `min(list, 'price')`, `max(list, 'price')` | Smallest and largest, of the items or of a field |
+| `count(list, 'cat', 'Gas')` | Items whose field equals a value |
+| `filter(list, 'done')`, `filter(list, 'cat', 'Gas')` | The items whose field is true, or equals a value, as a list |
+| `find(list, 'id', picked)` | The first item whose field equals a value, or `null`: `{find(rooms, 'id', room).rate}` |
+| `search(list, 'name', query)` | Items whose field contains some text, ignoring case (all of them for empty text) |
+| `sort(list, 'price')`, `sort(list, 'price', 'desc')`, `sort(list)` | The list in order, by a field or by value |
+| `take(list, 3)` | The first items |
+
+They combine: `{money(sum(filter(tx, 'cat', 'Gas'), 'amount'))}`, `{take(sort(runners, 'miles', 'desc'), 3)}`. Use them for counts and totals. To hide items people can still change (`bind=t.done`), keep `each items=todos` and put `if=` on the repeated element, because a filtered list is a copy and can't be written to.
+
+Formatting, for text people read:
+
+| Function | Result |
+|---|---|
+| `money(2400)`, `money(-84.1)`, `money(n, 'EUR')` | `$2,400.00`, `-$84.10`, `€…` |
+| `number(37000)`, `number(n, 2)` | `37,000`; always two decimals |
+| `plural(n, 'item')`, `plural(n, 'child', 'children')` | `1 item`, `3 items`, `2 children` |
+| `lower(text)`, `upper(text)`, `trim(text)` | Text in lower or upper case, or without spaces at the ends |
+
+Numbers and money are formatted in US English for now.
+
+Your app can pass its own data, which is copied into plain, frozen Loom data (functions, class instances and cycles are refused with a clear error):
+
+```ts
+loom.state.set("products", await fetchProducts());
+loom.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
+```
+
+#### Charts
+
+`chart` draws a list of records as bars or a line, and redraws whenever the list changes, from state, the screen's own controls or the host:
+
+```
+state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
+chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+chart "Revenue trend" kind=line items=sales x=month y=revenue format=money
+```
+
+`x=` and `y=` name fields, as `sum(list, 'price')` does, so they're written without quotes; `items=` is any expression that gives a list, like `items={filter(sales, 'open')}`. The props are in the [reference](#chart). How it treats data:
+
+- Each item is one category, in list order, evenly spaced. Line charts don't treat x as dates or numbers.
+- A value must be a number. A missing field, `null`, or text (even `"12"`) is a gap: no bar, and the line breaks there instead of joining across it. Nothing is turned into 0. A missing label shows as "—".
+- Bars always include 0, with negative values below it. A line is scaled from its lowest to its highest value, rounded out to whole ticks; a constant line gets room above and below.
+- Labels are thinned out evenly when they'd overlap. Bars and points never are.
+- An empty list, a value that isn't a list, or no numbers at all shows "No data to chart" or "No numbers to chart". More than 200 items, or too little width for them, shows a message saying so instead of a partial chart.
+- Problems a model can fix (items that aren't a list, gaps, too little room) are reported once through the engine's `onWarning`, not on every frame.
+
+#### Selects
+
+`select` picks one option from a list, in a field that opens the list in a [popup](#popups):
+
+```
+state departments=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}, {id: "legal", name: "Legal", full: true}] department=""
+select "Department" items=departments value=id label=name unavailable=full bind=department placeholder="Choose a department"
+```
+
+`items=` is a list of records, with `value=` naming the field to store and `label=` the field to show, or a plain list of text or numbers, each its own value and label. `bind=` holds the chosen value, and `on=` runs after it's stored. The props are in the [reference](#select). How it treats options:
+
+- A value is text or a number, 0 included; `0` and `"0"` are different options. Items with no usable value, or repeating an earlier option's value, aren't offered.
+- `unavailable=` names a field that, when `true`, greys an option out; it can't be chosen by pointer or keyboard.
+- A `bind=` value no option has shows the placeholder, and the state keeps its value. To offer "all", add an option for it, like `{id: "", name: "All departments"}`.
+- With no options, items that aren't a list, or more than 200 options, the field says so ("No options", "Too many options") and doesn't open. Narrow a long list with `filter()` or `search()`.
+- Long labels are cut with an ellipsis, in the field and in the list.
+- Problems a model can fix (no value field, repeated values, a chosen value no option has, too many options) are reported once through `onWarning`.
+
+#### Dates
+
+`date-picker` picks one calendar day, in a field that opens a month calendar in a [popup](#popups):
+
+```
+state due=""
+date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"
+```
+
+The props are in the [reference](#date-picker). How it treats dates:
+
+- **The value** is text, `YYYY-MM-DD`, or `""` for no date: a day on the calendar with no time and no time zone. Loom works dates out itself (leap years, month lengths, weekdays) instead of using JavaScript's `Date`, so a date never shifts by a day across time zones and text like `2026-02-30` is never quietly read as March 2.
+- **Limits.** `min=` and `max=` are inclusive. Days outside them are greyed out and can't be chosen, and paging stops at them. A limit that isn't a real date is ignored, and if `min` is after `max` both are, each with a warning.
+- **Values it can't use.** A bound value that isn't a real date shows "Invalid date"; one outside the limits is still shown but can't be chosen again. Both are reported once through `onWarning`. Drawing never changes state.
+- **Opening.** The calendar opens on the chosen date's month, or else on today's, moved inside the limits. Today is the device's local day, or the engine's `today` option, which tests and screenshots use to fix it.
+- **Choosing** a day, or Today, writes `bind=`, closes the calendar and runs `on=` if the date changed. Clear, and Delete or Backspace on the field, write `""`, unless `required=true`.
+- **Locale.** Month and day names are US English, weeks start on Sunday, and the field shows dates like "Tue, Mar 3, 2026". There's no other locale yet.
+
+#### Tables
+
+`table` shows a list of records as rows, with one `table-column` line per field, in the order written:
+
+```
+state equipment=[{id: "laptop", name: "Laptop", price: 1200, stock: 12}, {id: "monitor", name: "Monitor", price: 350, stock: 24}] selected="" sortField="name" sortDirection="asc"
+table "Available equipment" items=equipment key=id bind=selected sort=sortField direction=sortDirection
+  table-column "Equipment" field=name
+  table-column "Price" field=price format=money
+  table-column "In stock" field=stock format=number
+```
+
+Everything beyond showing rows is opt-in through state, so it can be read, shown and changed like any other state: `sort=` and `direction=` make the headers pressable (press to sort, press again to flip), and `bind=` with `key=` makes the rows pressable (`on=` runs after the selection is stored). The props are in the [reference](#table). How it treats data:
+
+- **Cells.** Text columns show text as written, numbers like `1,200.5` and true/false as Yes/No. `number` and `money` columns (US dollars, as `money()`) show only numbers, right-aligned; text like `"12"` is never read as a number. Missing fields, `null`, lists, records and values a column can't show appear as `—`. `0` and `false` are values, not missing. Very large or small numbers use scientific form (`1E300`) instead of being cut short.
+- **Sorting.** The list itself is never reordered: the table shows a sorted copy. Ascending puts numbers by value, then text alphabetically (ignoring case, with numbers in text compared as numbers, so "Item 2" comes before "Item 10"), then false and true; descending reverses that. Missing values always go last, and equal values keep their list order. A sort state naming no column leaves the list in order.
+- **Selection.** `bind=` holds the selected row's `key=` value, text or a number (0 included), so the selection stays with its record when the table is sorted or the list changes. Rows with no key, or a key an earlier row already has, can't be selected. A selected key no row has selects nothing; the state keeps its value until something changes it.
+- **Space.** Columns get their natural width, and spare room goes to text columns. When space is short, text columns are narrowed with an ellipsis, but never below a minimum, and numbers are never cut. If the columns still don't fit, or there are more than 200 rows or 8 columns, the table shows a message saying so instead of a cut-down table. Show a page of a long list with `take()` or `pagination`.
+- **Keyboard.** Pressable headers and rows are each a Tab stop and work with Enter and Space. A table with no `sort=` or `bind=` adds no Tab stops.
+- Problems a model can fix (items that aren't a list, missing or repeated keys, cells their column can't show, too many rows or columns, too little room) are reported once through `onWarning`. While a spec streams in, a table whose columns haven't arrived shows "No columns yet".
+
+### Screens
+
+A spec can hold several screens. Only one shows at a time: the first, until a button moves to another with `go:name`. `back` returns to the previous one, and the visible screen's name is in `{screen}`.
+
+```
+state qty=1
+screen name=product title="Trail socks"
+  stepper "Quantity" bind=qty min=1
+  button "Add to cart" on=go:cart
+screen name=cart title="Your cart"
+  text "{qty} pairs"
+  button "Keep shopping" variant=secondary on=back
+```
+
+State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. Your app can move between screens too, with `loom.go("cart")` and `loom.back()`, and hears every move through the `navigate` event.
 
 ### Conditions
 
 Every element accepts `if=`. The element (and everything inside it) is shown only while the condition is true.
 
 ```
+state water=true read=false walk=true drink=true
 text "Packed!" tone=good if=water
 text "All done" if={read && walk && drink}
+```
+
+To show several lines under one condition, put them under a line holding only `if=`. Like `each`, it has no look of its own:
+
+```
+if={count(todos, 'done') == len(todos)}
+  text "All done!" tone=good
+  button "Start over" on=clear:todos
 ```
 
 ### Comments
@@ -176,8 +387,8 @@ Lines starting with `#` are ignored.
 
 Loom never stops on a mistake. Each problem becomes a diagnostic with a line number:
 
-- **Errors** (unknown element, element in the wrong place): that line and anything nested under it are skipped.
-- **Warnings** (unknown prop, bad value, broken expression): the element still renders, and the bad part is ignored.
+- **Errors** (unknown element, element in the wrong place, nesting more than 100 levels deep): that line and anything nested under it are skipped.
+- **Warnings** (unknown prop, bad value, broken expression, a name nothing defines, a loop variable outside its `each`): the element still renders, and the bad part is ignored.
 
 ```
 L10  Unknown element "sparkle". It was skipped, along with anything inside it
@@ -192,11 +403,11 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 <!-- CATEGORIES:START (generated from src/components) -->
 | Category | Components |
 |---|---|
-| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer) |
-| Content | [`text`](#text), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
-| Data | [`stat`](#stat), [`rating`](#rating), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper) |
-| Navigation | [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
+| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
+| Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
+| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`date-picker`](#date-picker), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
+| Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
 
@@ -347,6 +558,26 @@ Empty vertical space.
 spacer size=16
 ```
 
+### `each`
+
+Repeats what's inside it once per item of a list, in place, with no look of its own. Inside, the current item is called item (or the name given by as=).
+
+| Prop | Type | Description |
+|---|---|---|
+| `items` | expression, required | The list to repeat over, like todos or {cart}. |
+| `as` | name | Name for the current item, used inside: as=t makes {t.text} work. |
+| `index` | name | Name for the item's position, counting from 0. |
+| `key` | expression | A value unique to each item, like {t.id}, so focus stays with the item when the list changes. Defaults to the position. |
+
+Children: any elements.
+
+```
+state gear=[{name: "Tent", kg: 2.1}, {name: "Stove", kg: 0.4}, {name: "Headlamp", kg: 0.1}]
+column gap=6
+  each items=gear as=g index=i key={g.name}
+    text "{i + 1}. {g.name}, {g.kg} kg"
+```
+
 ### `text`
 
 A paragraph or heading that wraps to the available width. Use {expressions} to show state.
@@ -361,9 +592,25 @@ A paragraph or heading that wraps to the available width. Use {expressions} to s
 | `strike` | boolean | Draw a line through the text, e.g. for an old price. |
 
 ```
+state guests=2 nights=3
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
 text "$160" tone=muted strike=true
+```
+
+### `image`
+
+A picture, such as a product photo. The quoted text says what it shows, and is displayed if the image can't load.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | What the image shows, e.g. Blue trail runners from the side. |
+| `src` | string, required | The image URL. Only the app's own site and hosts it allows will load. |
+| `ratio` | `16:9` / `4:3` / `3:2` / `1:1` / `2:3` / `3:4` | Width to height: 16:9, 4:3, 3:2, 1:1, 2:3 or 3:4. The space is kept while the image loads. |
+| `fit` | `cover` / `contain` | cover fills the space and crops the edges; contain shows the whole image. |
+
+```
+image "Ridgeline trail runners, side view" src="/images/ridgeline.jpg" ratio=4:3
 ```
 
 ### `code`
@@ -419,6 +666,7 @@ A labelled number, for key figures like totals or counts.
 | `align` | `left` / `center` | left or center. |
 
 ```
+state price=24 qty=2
 stat label="Total" value="${price*qty}"
 ```
 
@@ -437,6 +685,64 @@ A star rating. Shows value= as stars, or with bind= lets the user pick a rating.
 state stars=4
 rating value=4.5
 rating bind=stars
+```
+
+### `chart`
+
+A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | A title above the chart. |
+| `kind` | `bar` / `line` | bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values. |
+| `items` | expression, required | The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}. |
+| `x` | name, required | The field holding each item's label, e.g. x=month. |
+| `y` | name, required | The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero. |
+| `format` | `number` / `money` | How values on the axis read: number (37K) or money ($37K). |
+
+```
+state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
+chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+```
+
+### `table`
+
+Rows of a list of records, one table-column per field, for things like inventory, orders or expenses. With sort= and direction=, pressing a header sorts by it; with bind= and key=, pressing a row selects it.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | A title above the table. |
+| `items` | expression, required | The list of records, e.g. items=equipment. At most 200 rows; show a page of a longer list with take() or pagination. |
+| `key` | name | The field that identifies each row, e.g. key=id. Needed for bind=. |
+| `bind` | state | State that holds the selected row's key. Pressing a row sets it. |
+| `sort` | state | State that holds the field to sort by. Pressing a header sets it; missing values sort last. |
+| `direction` | state | State that holds asc or desc. Pressing the sorted header again flips it. |
+| `on` | action | Actions to run after a row is selected, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+Children: `table-column`.
+
+```
+state gear=[{id: "tent", name: "Tent", price: 180}, {id: "stove", name: "Stove", price: 45}] picked="" by="name" dir="asc"
+table items=gear key=id bind=picked sort=by direction=dir
+  table-column "Item" field=name
+  table-column "Price" field=price format=money
+```
+
+### `table-column`
+
+One column of a table: its header and the field it shows.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The header. Defaults to the field name. |
+| `field` | name, required | The field of each record to show, e.g. field=price. |
+| `format` | `text` / `number` / `money` | text, number (1,200.5) or money ($1,200.00, US dollars). number and money show only numbers; other values show —. |
+| `align` | `left` / `right` | left or right. Default: right for number and money, left for text. |
+
+Only inside: `table`.
+
+```
+table-column "Price" field=price format=money
 ```
 
 ### `button`
@@ -515,6 +821,47 @@ radio "Medium" bind=size value=m
 radio "Large" bind=size value=l
 ```
 
+### `select`
+
+A field that opens a list to pick one option from, for choices like a department, status or filter; compact where radio buttons would take too much room. bind= holds the chosen option's value.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. |
+| `items` | expression, required | The options: a list of records, or of text or numbers. At most 200. |
+| `value` | name | For records, the field holding each option's value (text or a number), e.g. value=id. Options without one, or repeating one, are left out. |
+| `label` | name | For records, the field shown for each option, e.g. label=name. Default: the value. |
+| `bind` | state, required | State that holds the chosen value, like department or t.status. |
+| `placeholder` | string | Shown while nothing (or a value no option has) is chosen. |
+| `unavailable` | name | A field that, when true, greys an option out so it can't be chosen, e.g. unavailable=full. |
+| `disabled` | condition | Expression; when true the field is greyed out and doesn't open. |
+| `on` | action | Actions to run after an option is chosen, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+```
+state teams=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}] team=""
+select "Team" items=teams value=id label=name bind=team placeholder="Choose a team"
+```
+
+### `date-picker`
+
+A field that opens a month calendar to pick one date, kept in bind= as YYYY-MM-DD text ("" for none). For deadlines, bookings or report filters.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. |
+| `bind` | state, required | State that holds the date as YYYY-MM-DD, like due or t.date. Start it as "" for no date. |
+| `min` | string | The earliest date that can be chosen, YYYY-MM-DD, included. |
+| `max` | string | The latest date that can be chosen, YYYY-MM-DD, included. |
+| `placeholder` | string | Shown while no date is chosen. |
+| `required` | boolean | When true, the calendar has no Clear button. |
+| `disabled` | condition | Expression; when true the field is greyed out and doesn't open. |
+| `on` | action | Actions to run after the date changes, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+```
+state due=""
+date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"
+```
+
 ### `stepper`
 
 A number with minus and plus buttons, for small counts like a quantity.
@@ -531,6 +878,67 @@ A number with minus and plus buttons, for small counts like a quantity.
 ```
 state qty=2
 stepper "Quantity" bind=qty min=1 max=10
+```
+
+### `slider`
+
+Picks a number in a range by dragging a handle, or with the arrow keys. Good for prices, distances and amounts.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | An optional label above the slider. Show the value with an {expression}. |
+| `bind` | state, required | The number state this slider reads and writes. |
+| `min` | number | Smallest value (default 0). |
+| `max` | number | Largest value (default 100). |
+| `step` | number | The value moves in steps of this size (default 1). |
+| `on` | action | Actions to run after the user lets go, or after each arrow key, e.g. emit:changed. Separate several with ; |
+
+```
+state maxPrice=120
+slider "Up to ${maxPrice}" bind=maxPrice min=20 max=300 step=10
+```
+
+### `input`
+
+A text field people type into, such as a name, an email, a search or a new item. Each keystroke writes its bind= state.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. Leave it out only when the screen makes the purpose obvious. |
+| `bind` | state, required | The state name or path it reads and writes, like task or t.title. |
+| `placeholder` | string | A hint shown while the field is empty, like e.g. Sunscreen. |
+| `kind` | `text` / `email` / `number` / `password` / `search` | text, email, number, password or search. Picks the phone keyboard and autofill; number writes a number, or null while empty. |
+| `on` | action | Actions to run when Enter is pressed, after the value is written, e.g. emit:changed. Separate several with ; |
+| `disabled` | condition | Expression; when true the field is greyed out and can't be typed in. |
+| `max` | number | Longest value in characters (at most 10000). |
+
+```
+state task="" todos=[]
+input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
+text "{plural(len(todos), 'item')}" tone=muted
+```
+
+### `screen`
+
+One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.
+
+| Prop | Type | Description |
+|---|---|---|
+| `name` | name, required | The screen's name, used by go:name. The visible screen's name is in {screen}. |
+| `title` | string | A heading shown at the top of the screen. |
+| `gap` | number | Space between children in pixels (default 14). |
+
+Children: any elements.
+
+Only inside: `root`.
+
+```
+screen name=cart title="Your cart"
+  text "2 items"
+  button "Checkout" on=go:checkout
+screen name=checkout title="Checkout"
+  text "Pay with card"
+  button "Back to cart" variant=secondary on=back
 ```
 
 ### `tabs`
@@ -614,6 +1022,7 @@ A horizontal bar showing how far a value is toward a maximum.
 | `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
 
 ```
+state done=3
 progress value={done} max=5 label="{done} of 5 steps"
 ```
 
@@ -716,6 +1125,12 @@ The canvas fills its parent's width and grows to fit its content.
 | `minHeight` | `0` | Minimum canvas height |
 | `padding` | `20` | Space around the whole screen |
 | `animate` | `true` | Fade new elements in (off when the user prefers reduced motion) |
+| `imageHosts` | `[]` | Hosts images may load from besides your own site ([Images](#images)) |
+| `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
+| `onWarning` | `console.warn` | Receives problems found while running, like a blocked image |
+| `editor` | an `<input>` over the field | How text fields are typed into ([Typing](#typing)); `loom-ui/testing` passes a fake one |
+| `today` | the device's local day | Today's date as `() => "YYYY-MM-DD"`, for date pickers; fix it in tests and screenshots |
+| `viewport` | from the window | The part of the canvas people can see, `() => ({ top, bottom })` in canvas pixels, for placing a select's list ([Popups](#popups)) |
 
 ### Methods
 
@@ -727,6 +1142,10 @@ The canvas fills its parent's width and grows to fit its content.
 | `endStream()` | Finish the stream and render the last line |
 | `on(event, handler)` | Subscribe to an event; returns an unsubscribe function |
 | `state.get(key)` / `state.set(key, value)` | Read or change state from your app |
+| `go(screen)` / `back()` | Show another screen, or the previous one |
+| `screens` / `currentScreen` / `canGoBack` | The spec's screen names, the visible one, and whether `back()` can move |
+| `notify(text)` | Show a short message, as `notify:` does |
+| `imagesLoaded()` | A promise that resolves once every requested image has loaded or failed |
 | `setTheme(theme)` | Switch themes |
 | `find(type)` | All nodes of a type, e.g. `loom.find("button")` |
 | `expose(name?)` | Put the instance on `window` for the console (default `window.loom`) |
@@ -741,6 +1160,8 @@ The canvas fills its parent's width and grows to fit its content.
 | `diagnostics` | `Diagnostic[]` | The spec's problems changed |
 | `render` | `Metrics` | A frame was painted (node count and timings) |
 | `inspect` | `{ node, box }` or `null` | Inspect mode selected something |
+| `navigate` | `{ screen, from }` | The visible screen changed |
+| `notify` | `{ text }` | A message was shown |
 
 ```ts
 loom.on("action", ({ name, value }) => {
@@ -748,33 +1169,199 @@ loom.on("action", ({ name, value }) => {
 });
 ```
 
+### Images
+
+A spec can name any image URL, and a model writes specs, so Loom only loads images from your own site (the page's origin) and from hosts you list. Anything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and the console says which host to allow.
+
+```ts
+const loom = new Loom(canvas, {
+  components: coreComponents,
+  imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
+});
+```
+
+Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Access-Control-Allow-Origin` (most image CDNs do). The playground allows `images.unsplash.com`, and its "Trail gear" and "Gear finder" samples use real photos from there. The space for each image is kept from its `ratio=` while it loads, so the screen doesn't jump.
+
 ### Keyboard
 
-The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas.
+The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End. A focused `select` or `date-picker` opens with Enter, Space or the up and down arrows; its popup then takes the keys (see [Popups](#popups)). Delete or Backspace clears a focused `date-picker` unless it has `required=true`.
+
+On touch screens, vertical swipes still scroll the page and pinches still zoom, while horizontal drags go to the canvas, so sliders can be dragged.
+
+### Popups
+
+A `select` shows its options, and a `date-picker` its calendar, in a popup: a panel the engine draws on the canvas above everything else, owned by the element that opened it. One can be open at a time.
+
+- **On top.** It's drawn last, and only its own options can be hovered or pressed while it's open. A press anywhere outside it (on the canvas or elsewhere on the page) closes it and does nothing else, so a button underneath isn't pressed by the same click.
+- **Keys.** While it's open, keys go to it. In a select's list, up and down move the highlight (skipping unavailable options), Home and End jump to the ends, Page Up and Page Down move a page. In a calendar, the arrows move by a day or a week, Page Up and Page Down by a month, Home and End to the start and end of the week, staying within `min=` and `max=`. Enter or Space chooses, Escape closes, and Tab closes it and moves on. Focus goes back to the field when it closes.
+- **Placement.** It opens below the field, or above it when only that fits in the visible part of the window, lining up with the field and staying inside the canvas. A canvas can't draw outside itself, so when the list needs more room than the screen has, the canvas grows while the list is open and shrinks back after.
+- **Long lists** show 8 options at a time. They scroll with the wheel, the keyboard (the highlight stays in view), or the arrows at the top and bottom of the list, so every option can be reached by pointer as well as keyboard.
+- **Closing.** It also closes when an option is chosen, when the select is hidden, disabled or left with no options, when the canvas loses focus, and when the spec is replaced.
+- What's highlighted, how far a list is scrolled and which month a calendar shows belong to the popup, not to state: they're forgotten when it closes. Only choosing changes `bind=`.
+
+### Typing
+
+An `input` field is drawn on the canvas like everything else. While someone types in one, Loom places a real `<input>` exactly over it, with the field's font and colors and a transparent background, so the browser handles typing, selection, copy and paste, undo, input methods for Chinese, Japanese and Korean, autocorrect, password managers, autofill and the phone keyboard. It's removed when they leave the field.
+
+- Clicking or tapping a field, or reaching it with Tab, starts typing there. Tabbing onto the canvas starts typing in its first element if that's a field.
+- Every keystroke writes the field's `bind=`, so filters, counts and greetings update as people type. While an input method is composing, the value is written when the text is finished.
+- Enter runs the field's `on=`. Tab and Shift+Tab move to the next or previous element, typing in it if it's a field. Escape stops typing.
+- `kind=` picks the input type: `email` and `password` get the right autofill, `number` a number keyboard and a number (or `null`) in state, `search` a search field.
+- The `<input>` sits right after the canvas in the page, so Tab from the last element leaves the canvas as it would from any field. It follows the field through scrolling, resizing and layout changes.
+
+A password's value is still state: it reaches your app through `change` events like any form value.
 
 ---
 
 ## Connecting a model
 
-`languageGuide()` builds the system prompt that teaches a model Loom. It's generated from the registered components, so it always matches what the engine supports.
+### Try it in the playground
 
-```ts
-import { languageGuide } from "loom-ui";
+The playground's **Ask a model** box sends your request to a real model and streams the screen in as the model writes it. It works with any server that speaks the OpenAI chat format: LM Studio, Ollama, vLLM and llama.cpp on your own machine, or DeepSeek, OpenAI, OpenRouter and others in the cloud.
 
-const system = languageGuide(loom.registry);
+1. Start a model server. With **LM Studio**: load a model (Qwen3 14B works well), open the Developer tab and start the server. It listens on `http://localhost:1234/v1`, which is the default, so no settings are needed.
+2. For anything else, copy `.env.example` to `.env.local` and fill it in. `.env.local` is never committed.
+3. Run `npm run dev`, pick the model in the box, describe a screen and press **Ask**.
+
+```bash
+# .env.local
+LOOM_MODEL_URL=http://localhost:1234/v1   # LM Studio (default); Ollama: http://localhost:11434/v1
+LOOM_MODEL=                               # optional: the model to preselect
+LOOM_API_KEY=                             # only for servers that need one
+LOOM_USER_SUFFIX=                         # optional: added to every request, e.g. /no_think for Qwen3
 ```
 
-Stream the model's response straight into the engine:
+The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether Loom's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one. It sends the first request, the changes since and the screen as it is now, including your own edits (see [Changing a screen](#changing-a-screen)).
+
+Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their thinking is hidden from the screen, but it delays the first line. With Qwen3, `LOOM_USER_SUFFIX=/no_think` skips it.
+
+**Copy guide**, under the model guide at the bottom of the playground, copies the same instructions the model gets, for trying Loom in any chat app.
+
+The playground uses the compact guide with equipment-order and numeric-calculator examples, plus short binding reminders. The calculator demonstrates numeric state, automatic control bindings, and derived totals without JavaScript event handlers. This leaves more room for a request and repair on local models loaded with an 8K context window. The library's default remains the full guide. A request can still exceed the model's context with a large spec or refinement; guide token estimates are not exact tokenizer counts.
+
+### Measure it
+
+```bash
+npm run eval                        # all 41 requests, with the model from .env.local
+npm run eval -- --model qwen3-14b   # another model on the same server
+npm run eval -- --only data,hard    # some categories or request ids
+npm run eval -- --no-repair         # first tries only
+```
+
+`eval/cases.ts` holds 41 requests: forms (a login and a sign-up among them), comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines, a search that filters as you type), harder multi-part requests, and traps like "a big red button" (Loom has no colors).
+
+Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item, typing in a search must filter the list. A spec can be valid and still not work, and these catch that.
+
+The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, input and output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
+
+Token counts are the server's own when it reports them, and "unknown" when it doesn't; they're never filled in with zero. Estimates (characters divided by 4) are labelled as estimates. Reasoning tokens a server reports are part of its output tokens and aren't added again. The time to the first Loom line is when something could be shown, not when the screen is usable.
+
+To compare ways of prompting, give variants. Each request runs once per variant, one after another, with the same model and settings:
+
+```bash
+npm run eval -- --guide full,compact                      # the full guide against the compact one
+npm run eval -- --guide full,compact --profile shop       # both, describing only the shop profile's elements
+npm run eval -- --guide compact --repair-guide same,full  # does repairing with the full guide help?
+npm run eval -- --enforce-profile                         # elements outside the profile count as problems
+npm run eval -- --stream-usage                            # ask the server for token usage (if it supports it)
+npm run guide:size                                        # guide size by section, and what refinement sends
+```
+
+The report starts with a side-by-side table on the requests every variant can build. A request that needs an element a profile doesn't have (by its expected elements) isn't sent for that profile; it's listed as not supported. `results.json` records each result's guide mode, profile, repair guide and context policy.
+
+### In your own app
+
+`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with Loom's parser, and asks once for a fix.
 
 ```ts
+import { generateSpec } from "loom-ui/model";
+
 loom.beginStream();
-for await (const chunk of streamFromYourServer(userPrompt)) {
-  loom.push(chunk);
-}
+const result = await generateSpec({
+  config: { url: "/api/model", model: "qwen3-14b" }, // a route on your server that adds the key
+  registry: loom.registry,
+  request: "A booking form for a cabin, 2 to 6 guests",
+  guide: {
+    imageHosts: ["cdn.example.com"],
+    actions: [{ name: "book", value: "the number of guests", description: "when the user books" }],
+    notes: "A cabin rental site. Prices are per night.",
+  },
+  onText: (text) => loom.push(text),
+  onReset: () => loom.beginStream(), // a fix is coming: start the screen over
+});
 loom.endStream();
+// result.spec, result.diagnostics, result.first, result.repair, result.timings, result.usage, result.messages
 ```
 
-Then send the user's choices back to the model with `emit` actions:
+If your app supplies data with `loom.state.set`, pass its names as `stateNames: ["products"]`, so a spec that reads them isn't flagged as using unknown names and sent back for a needless repair. When a model writes its whole spec inside a thinking block it never closes, `generateSpec` finds the spec there (`result.first.recovered`).
+
+The guide comes from `languageGuide(registry, options)`, generated from the registered components, so it always matches what the engine supports. Its options tell the model which image hosts work, which `emit:` actions your app listens for, and anything about your app it should know.
+
+#### A smaller guide: compact mode and profiles
+
+The full guide is the default. Two options make it smaller:
+
+```ts
+guide: {
+  mode: "compact",   // "full" (default) or "compact"
+  profile: "shop",   // which elements the model is told about: "forms", "lists", "shop", "dashboard", or a list of names
+}
+```
+
+- **Compact mode** describes each element in one line, generated from the same component definitions: its props with their types and allowed values (`!` marks a required prop), what it holds or where it must go, and what it's for. It keeps the rules that change what a spec does (one line per element, indentation, quoting, local actions versus `emit` events, that a computed list can't be written to, roles instead of colors, image hosts), and shows one worked example instead of four plus one per element. The app's own context (image hosts, actions, notes) comes last, so the part that's the same for every app stays a shared prefix.
+- **Profiles** choose the elements the model is told about. A profile's elements bring what they need (`tab` brings `tabs`, `list` brings `list-item`), and `column` and `text` are always included. Examples and instructions that would use an element outside the profile are left out. A profile is chosen by your app; Loom doesn't guess one from the request.
+
+| Guide (with one image host) | Characters | Tokens (estimated) |
+|---|---|---|
+| full (default) | 23,865 | ~5,970 |
+| full, `examples: false` | 19,873 | ~4,970 |
+| full, profile `shop` | 17,853 | ~4,460 |
+| compact | 8,303 | ~2,080 |
+| compact, profile `shop` | 6,570 | ~1,640 |
+| compact, profile `forms` | 4,391 | ~1,100 |
+
+Tokens here are characters divided by 4, a rough estimate; `npm run guide:size` prints the current numbers by section. A smaller guide is cheaper and faster to read, but whether a model writes screens as good with it is a question for `npm run eval -- --guide full,compact` on your model. The full guide stays the default until that's been shown.
+
+Three sets of elements are involved, and they're separate:
+
+- **The renderer's**: the registry your Loom was made with. It can show any of them, whoever wrote the spec.
+- **The model's**: the profile. The guide only describes these.
+- **What's checked**: by default, a spec is checked against the renderer's elements. With `enforceProfile: true`, it's checked against the profile, so an element outside it is sent back for repair.
+
+Examples are chosen explicitly: `examples` turns each element's own short example on or off (default on in full mode, off in compact), and `workedExamples` picks the larger ones by name (`["todo", "cart"]`, `["equipment"]` for a filterable order calculator, or `false` for none). With a profile, an example that uses an element outside it is never shown.
+
+#### Repairs
+
+`generateSpec` asks once for a fix when the parser finds problems (`repairOn: "any" | "errors" | "never"`). With a compact guide, `repairGuide: "full"` sends the full guide for that one repair, still limited to the profile. Each attempt reports the guide it used (`result.first.guide`, `result.repair?.guide`); `npm run eval -- --guide compact --repair-guide same,full` measures whether it helps.
+
+#### Changing a screen
+
+To change the current screen ("make the total bigger"), pass a `refine` context instead of the whole conversation:
+
+```ts
+import { generateSpec, nextRefineContext, type RefineContext } from "loom-ui/model";
+
+let context: RefineContext = { task: "A packing list for a 3-day hike", requirements: ["Prices in euros"], spec: first.spec };
+
+const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: loom.spec } });
+context = nextRefineContext(context, "Add a progress bar", r.spec);
+```
+
+It sends the original task, the `requirements` that must always hold, the changes asked for since, the current spec as it is now (hand edits included), and the new change. It doesn't send earlier specs, failed tries or repair messages, so a change costs about the same on the tenth turn as on the second (`npm run guide:size` shows the difference). Its limits:
+
+- Earlier changes are kept as text, up to `contextPolicy.maxChanges` (default 20). Past that the oldest are left out with a note; the current spec still has their effect. `requirements` are never left out, so anything that must survive belongs there.
+- App state is sent only if you pass it, as `refine.state`, and only the values you pass.
+- Nothing is summarized by another model call.
+
+`result.messages` is the conversation that produced the accepted spec: the guide, the context, the request and the final spec. A rejected repair isn't in it, and a kept repair replaces the first spec. (Before, it included the repair exchange.) `result.transcript` has everything that was sent and received. Passing `result.messages` as `history` still works for apps that want the whole conversation.
+
+#### Usage and timing
+
+`result.usage` adds up the server's token counts over the first try and the repair: `promptTokens`, `completionTokens`, and `reasoningTokens` (part of the completion tokens, not added again). A total is `undefined`, meaning unknown, when any attempt didn't report it; `usage.reported` says how many did. Each attempt also has `inputChars` and `estimatedInputTokens` (characters / 4), `estimatedThinkingTokens`, the guide it used and how long it took. Many servers only report usage while streaming when asked; set `config.streamUsage: true` for those that support `stream_options` (OpenAI, vLLM, recent LM Studio and llama.cpp).
+
+Putting the guide first and the request last means requests with the same guide options share a prefix, which servers with prefix caching (vLLM, llama.cpp, many hosted APIs) can reuse. That's the server's doing: Loom builds the same text each time, but doesn't cache anything itself.
+
+Send the user's choices back to the model with `emit` actions, passing `result.messages` as `history` to continue the conversation:
 
 ```ts
 loom.on("action", ({ name, value }) => {
@@ -782,9 +1369,7 @@ loom.on("action", ({ name, value }) => {
 });
 ```
 
-> **Keep API keys on a server.** Call the model from your backend and stream the text to the browser. Never put a model API key in front-end code.
-
-A ready-made model connection is on the [roadmap](#roadmap).
+> **Keep API keys on a server.** Point `config.url` at a route on your backend that adds the key, as the playground's dev server does. Never put a model API key in front-end code.
 
 ---
 
@@ -846,9 +1431,10 @@ expect(ui.text()).toContain("Clicked 1 times");
 | Helper | What it does |
 |---|---|
 | `find`, `findAll`, `isShown` | Look elements up by `type`, `text` (as written or as shown) and `line` |
-| `press`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
+| `press`, `drag`, `click`, `key`, `tab` | Interact through the same pointer and keyboard path as a real user |
+| `type(query, text, { replace? })`, `editor` | Type into a field one character at a time, as a person would; `editor` is the text box over the field being typed in. While typing, `key` goes to the field (Enter, Tab, Escape) |
 | `set`, `setSpec`, `stream` | Change state, replace the spec, or stream one in chunks |
-| `state`, `emitted`, `focused`, `diagnostics` | Read the results |
+| `state`, `emitted`, `focused`, `diagnostics`, `warnings` | Read the results |
 | `text`, `drawOps`, `hits` | What the last frame drew, and what is clickable |
 
 Map clicks need a real canvas to tell countries apart, so they're covered by the visual tests rather than in Node.
@@ -926,6 +1512,9 @@ What a `ComponentDef` can define:
 | `layout(box, ctx)` | Required. Set `box.h`; containers also lay out `box.children` |
 | `paint(box, ctx)` / `paintOver(box, ctx)` | Draw before or after children |
 | `hitTest(box, x, y)` | Refine clicks inside the box (the map uses this per country) |
+| `drag(ctx)` | Follow the pointer while it's held down (`start`, `move`, `end`); the slider uses this |
+| `key(ctx, key)` | Handle a key while focused; return true if handled |
+| `visible(node, scope)` | Hide the element beyond `if=` (only the active `screen` shows) |
 | `press(ctx)` | What happens on activation; by default it runs the `on` prop |
 | `cursor(target)` | Mouse cursor over it |
 
@@ -958,6 +1547,18 @@ const brand = extendTheme(lightTheme, {
 loom.setTheme(brand);
 ```
 
+### Trying styles in the playground
+
+The playground's **Appearance** button opens a small panel for previewing the current screen in another style, and copying the setup into your app. It only changes the playground's theme, through `loom.setTheme`: the spec, state, selections and any open list or calendar stay as they are, and no model is asked again.
+
+- **Style:** Teal (Loom's default), Purple, Blue or Neutral, each with matching light and dark colors. Neutral is grey, with firmer field and divider lines so controls stand out.
+- **Mode:** Light, Dark, or System, which follows the operating system as it changes. The page around the canvas follows too.
+- **Accent color:** a color picker and a hex field (`#rgb` or `#rrggbb`; half-typed or invalid values aren't applied). Loom uses the accent as text and strokes and as the fill behind button labels, so a color that's too close to the background is darkened (light mode) or lightened (dark mode) just enough to reach 4.5:1 contrast, and the panel says what it shows instead. The color you asked for is kept, so each mode adjusts it on its own. The label color on the accent is picked automatically. **Reset color** goes back to the style's accent; **Reset appearance** goes back to Loom's default.
+- **Copy theme code** copies TypeScript that recreates what you see with `extendTheme`, `lightTheme`, `darkTheme` and `loom.setTheme`, using the colors actually shown (after any adjustment). For Light or Dark it sets one theme; for System it exports both and a `followSystemAppearance(loom)` function that returns a cleanup. If the clipboard isn't available, the code appears in a box to copy by hand.
+- The choice is saved in your browser (`localStorage`, key `loom-playground-appearance:v1`): the style, the mode and the accent you asked for, nothing else.
+
+The styles change colors only, through the same theme tokens every component reads; they're a playground feature, not part of the Loom language, so models still can't choose colors. Teal, Purple and Blue keep Loom's default field and divider lines, which are lighter than the 3:1 that WCAG asks of control boundaries; Neutral meets it.
+
 ---
 
 ## Project structure
@@ -972,16 +1573,19 @@ src/
   component.ts      The ComponentDef contract and PropReader
   registry.ts       The set of components an instance knows
   inspector.ts      Debugging overlays, inspect mode, frame capture
-  prompt.ts         Generates the model guide
+  prompt.ts         Generates the model guide (full and compact)
+  profiles.ts       Component profiles: which elements the model is told about
   theme.ts          Design tokens
   text.ts           Text measuring and wrapping
   state.ts          The state store
   components/       Built-in components; map/ is a separate entry point
   testing/          loom-ui/testing: render() and the recording canvas
+  model/            loom-ui/model: stream, clean, check and repair a model's spec; refinement context
 playground/         The development playground
 test/               Unit, contract, streaming, fuzz and interaction tests (Vitest)
 visual/             Visual regression page, cases and baselines (Playwright)
 bench/              Benchmarks
+eval/               The evaluation set and its scoring (npm run eval)
 scripts/            Map outlines, component docs, component scaffold, benchmark comparison
 .github/workflows/  CI
 docs/               Plan, examples and images
@@ -995,10 +1599,14 @@ docs/images/        README images
 
 Loom draws everything itself, so it gives up what the browser normally provides for free. Today it does **not** have:
 
-- **Text input.** No text fields yet; this is the next priority.
+- **Multi-line text, and form validation** (required fields, email format). A model can show a hint with `if=` for now.
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
-- **Scrolling regions, overlays, dialogs or menus.**
+- **Scrolling regions, dialogs, menus or tooltips.** The one popup so far is a select's list of options (one open at a time); there's no general overlay element yet.
+- **Dates beyond one day.** `date-picker` picks a single calendar day: no ranges, times, recurring dates or time zones, and names are in US English with weeks starting on Sunday.
+- **Selects beyond the basics.** One choice from at most 200 options, with no multi-select, typing to search, option groups, or options showing anything but text.
+- **Tables beyond the basics.** `table` shows at most 200 rows and 8 columns, without scrolling, sticky headers, editable cells, multi-row selection, nested elements in cells, or resizing and reordering columns. A table too wide for its space shows a message instead of scrolling.
+- **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
 
 Don't use Loom where accessibility is required until the accessibility layer lands.
@@ -1010,9 +1618,9 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components**: 18 components that work with the current engine are done (grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, plus pressable cards and struck-through text). Next: text input (a real input positioned over the canvas while typing), images, scrolling, select, slider, table, chart, dialog and toast, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
-4. **Model connection**: a server-side streaming endpoint and a measured comparison against other generative UI formats (token count, validity, time to first pixel).
+4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
 
 ---

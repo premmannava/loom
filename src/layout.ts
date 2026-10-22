@@ -2,17 +2,23 @@
  * Headless layout: turns a node tree into positioned boxes using only a
  * TextMeasurer, so it runs (and is tested) without a canvas.
  */
+import { localToday } from "./dates";
 import { PropReader, type LayoutContext } from "./component";
-import { evaluate, type Scope } from "./expr";
+import { eachInstances, MAX_EACH_ELEMENTS, scopeOf, type EachBudget } from "./each";
+import { bareExpression, evaluate, type Scope } from "./expr";
 import type { Registry } from "./registry";
 import type { TextMeasurer } from "./text";
 import type { Theme } from "./theme";
 import type { Box, LoomNode } from "./types";
 
-export function isVisible(node: LoomNode, scope: Scope): boolean {
+/** Whether a node is shown: its `if=` passes and, given a registry, its component's visible() agrees. */
+export function isVisible(node: LoomNode, base: Scope, registry?: Registry): boolean {
+  const scope = scopeOf(node, base);
+  const own = registry?.get(node.type)?.visible;
+  if (own && !own(node, scope)) return false;
   const raw = node.props.if;
   if (raw === undefined) return true;
-  const expr = raw.replace(/^\{([\s\S]*)\}$/, "$1");
+  const expr = bareExpression(raw);
   const r = evaluate(expr, scope);
   return r.ok && !!r.value;
 }
@@ -23,15 +29,37 @@ export function shiftBox(box: Box, dx: number, dy: number): void {
   for (const k of box.children) shiftBox(k, dx, dy);
 }
 
-export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope): LayoutContext {
+/**
+ * A node's children as they should be laid out: hidden ones (`if=`) left out,
+ * and every `each` replaced by its copies, one set per item.
+ */
+export function shownChildren(node: LoomNode, scope: Scope, registry?: Registry, warn?: (message: string) => void, budget?: EachBudget): LoomNode[] {
+  const out: LoomNode[] = [];
+  const add = (kids: readonly LoomNode[]) => {
+    for (const c of kids) {
+      if (!isVisible(c, scope, registry)) continue;
+      if (c.type === "each") add(eachInstances(c, scopeOf(c, scope), warn, budget));
+      // A passing if= block stands for the lines under it.
+      else if (c.type === "if") add(c.children);
+      else out.push(c);
+    }
+  };
+  add(node.children);
+  return out;
+}
+
+export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void, today: () => string = localToday): LayoutContext {
   const readers = new WeakMap<LoomNode, PropReader>();
+  // Containers may ask more than once per layout; copies must stay the same objects.
+  const kids = new WeakMap<LoomNode, LoomNode[]>();
+  const budget: EachBudget = { left: MAX_EACH_ELEMENTS };
   const ctx: LayoutContext = {
     theme,
     measure,
     scope,
     props(node) {
       let r = readers.get(node);
-      if (!r) readers.set(node, (r = new PropReader(node, scope)));
+      if (!r) readers.set(node, (r = new PropReader(node, scopeOf(node, scope))));
       return r;
     },
     layout(node, x, y, width) {
@@ -41,16 +69,20 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
       return box;
     },
     visibleChildren(node) {
-      return node.children.filter((c) => isVisible(c, scope));
+      let k = kids.get(node);
+      if (!k) kids.set(node, (k = shownChildren(node, scope, registry, warn, budget)));
+      return k;
     },
     shift: shiftBox,
+    warn,
+    today,
   };
   return ctx;
 }
 
 /** Lay out a whole tree. */
-export function layoutTree(root: LoomNode, width: number, registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope): Box {
-  return createLayoutContext(registry, theme, measure, scope).layout(root, 0, 0, width);
+export function layoutTree(root: LoomNode, width: number, registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void): Box {
+  return createLayoutContext(registry, theme, measure, scope, warn).layout(root, 0, 0, width);
 }
 
 /** Find the deepest box containing a point. */
