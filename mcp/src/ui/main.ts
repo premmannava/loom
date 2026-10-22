@@ -10,12 +10,13 @@
  *   message in the conversation, with the action, its value and the
  *   interface's state, so the model can answer it.
  */
-import { App } from "@modelcontextprotocol/ext-apps";
+import { App, applyHostFonts, applyHostStyleVariables, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { SayShape } from "../../../src/engine";
 import { coreComponents } from "../../../src/components";
-import { darkTheme, lightTheme } from "../../../src/theme";
+import { darkTheme, lightTheme, type Theme } from "../../../src/theme";
 import type { Value } from "../../../src/types";
 import { eventMessage, nextChunk } from "./messages";
+import { firstFamily, hostTheme, type ReadVar } from "./host-theme";
 
 const FACES = ['400 15px "Instrument Sans"', '600 15px "Instrument Sans"', '700 15px "Instrument Sans"'];
 
@@ -29,10 +30,68 @@ let shown = "";
 let pending: { spec: string; final: boolean } | null = null;
 
 const prefersDark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
-function applyTheme(theme: string | undefined): void {
-  const dark = theme ? theme === "dark" : prefersDark();
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  loom?.setTheme(dark ? darkTheme : lightTheme);
+const SENTINEL = "rgb(1, 2, 3)";
+
+/**
+ * Reads host variables as values the canvas understands. Colors and lengths
+ * go through a hidden probe so the browser resolves var(), light-dark() and
+ * relative units; a variable that isn't a valid color leaves the probe at the
+ * sentinel, and is ignored.
+ */
+function domReader(dark: boolean): ReadVar {
+  const root = document.documentElement;
+  const wrap = document.createElement("div");
+  // color-scheme only on the probe: light-dark() resolves for the host's theme, and the page
+  // itself stays transparent over the chat (a page-wide scheme can make browsers paint it opaque).
+  wrap.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;color:${SENTINEL};color-scheme:${dark ? "dark" : "light"}`;
+  const probe = document.createElement("span");
+  wrap.append(probe);
+  document.body.append(wrap);
+  return (name, kind) => {
+    const raw = getComputedStyle(root).getPropertyValue(name).trim();
+    if (!raw) return undefined;
+    if (kind === "font") return raw;
+    if (kind === "color") {
+      probe.style.color = `var(${name})`;
+      const c = getComputedStyle(probe).color;
+      return c && c !== SENTINEL ? c : undefined;
+    }
+    probe.style.borderTopLeftRadius = `var(${name})`;
+    return getComputedStyle(probe).borderTopLeftRadius || undefined;
+  };
+}
+
+/** SayShape's light or dark theme, adjusted to the host's own colors, fonts and radii when it sends them. */
+function themeFor(ctx: McpUiHostContext | undefined): Theme {
+  const dark = ctx?.theme ? ctx.theme === "dark" : prefersDark();
+  const root = document.documentElement;
+  root.dataset.theme = dark ? "dark" : "light";
+  const base = dark ? darkTheme : lightTheme;
+  const styles = ctx?.styles;
+  if (styles?.css?.fonts) applyHostFonts(styles.css.fonts);
+  if (!styles?.variables) return base;
+  applyHostStyleVariables(styles.variables);
+  return hostTheme(base, domReader(dark));
+}
+
+/** Canvas text doesn't trigger font loading, so load the theme's faces before drawing with them. */
+async function loadFaces(theme: Theme): Promise<void> {
+  if (!document.fonts) return;
+  const family = firstFamily(theme.font.family);
+  const faces = family && family !== "Instrument Sans"
+    ? [400, 600, 700].map((w) => `${w} 15px "${family}"`)
+    : FACES;
+  await Promise.race([
+    Promise.all(faces.map((f) => document.fonts.load(f))).catch(() => undefined),
+    new Promise((done) => setTimeout(done, 1500)),
+  ]);
+}
+
+async function applyTheme(ctx: McpUiHostContext | undefined): Promise<Theme> {
+  const theme = themeFor(ctx);
+  await loadFaces(theme);
+  loom?.setTheme(theme);
+  return theme;
 }
 
 function show(spec: string, final: boolean): void {
@@ -60,8 +119,9 @@ app.ontoolinput = (p) => {
   const spec = specOf(p.arguments);
   if (spec !== null) show(spec, true);
 };
-app.onhostcontextchanged = (ctx) => {
-  if (ctx.theme) applyTheme(ctx.theme);
+app.onhostcontextchanged = () => {
+  // getHostContext() holds the whole context with this change merged in.
+  void applyTheme(app.getHostContext());
 };
 app.onteardown = async () => {
   loom?.destroy();
@@ -93,11 +153,10 @@ async function deliver(text: string): Promise<void> {
 
 async function start(): Promise<void> {
   await app.connect();
-  applyTheme(app.getHostContext()?.theme);
-  if (document.fonts) await Promise.all(FACES.map((f) => document.fonts.load(f))).catch(() => undefined);
+  const theme = await applyTheme(app.getHostContext());
   loom = new SayShape(canvas, {
     components: coreComponents,
-    theme: document.documentElement.dataset.theme === "dark" ? darkTheme : lightTheme,
+    theme,
     // The view has no network access of its own; the client's sandbox blocks it too.
     imageHosts: [],
     onWarning: () => {},

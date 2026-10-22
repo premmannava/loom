@@ -104,6 +104,31 @@ try {
   await page.screenshot({ path: out + "4-dark.png" });
   check(await frame.evaluate(() => document.documentElement.dataset.theme === "dark"), "the view follows the host's dark theme");
 
+  // A host that sends its own design tokens, as Claude and ChatGPT do, with light-dark() values.
+  const styled = await browser.newPage({ viewport: { width: 680, height: 900 }, deviceScaleFactor: 2 });
+  styled.on("pageerror", (e) => errors.push(e.message));
+  await styled.setContent(`<!doctype html><body style="margin:20px;background:#262624"><script>${hostJs}</script></body>`);
+  await styled.evaluate((html) => window.TestHost.mount(html, "dark", {
+    "--color-background-primary": "light-dark(rgb(255, 255, 255), rgb(48, 48, 46))",
+    "--color-text-primary": "light-dark(rgb(20, 20, 19), rgb(250, 249, 245))",
+    "--color-text-secondary": "rgb(194, 192, 182)",
+    "--color-border-primary": "rgba(222, 220, 209, 0.3)",
+    "--font-sans": "Georgia, serif",
+    "--border-radius-lg": "4px",
+  }), uiHtml);
+  await styled.evaluate(() => window.host.ready);
+  await styled.evaluate((spec) => window.host.bridge.sendToolInput({ arguments: { spec } }), SPEC);
+  await styled.waitForTimeout(700);
+  await styled.screenshot({ path: out + "5-host-styles.png" });
+  const styledFrame = styled.frames().find((f) => f !== styled.mainFrame());
+  const cardPixel = await styledFrame.evaluate(() => {
+    const c = document.querySelector("canvas");
+    // A point inside the card, left of the title and above it.
+    const d = c.getContext("2d").getImageData(Math.round(c.width * 0.1), Math.round(c.height * 0.06), 1, 1).data;
+    return [d[0], d[1], d[2]];
+  });
+  check(Math.abs(cardPixel[0] - 48) <= 3 && Math.abs(cardPixel[1] - 48) <= 3 && Math.abs(cardPixel[2] - 46) <= 3, `the card uses the host's dark background from light-dark() (got rgb(${cardPixel.join(", ")}))`);
+
   check(errors.length === 0, `no errors in the page${errors.length ? ": " + errors.join(" | ") : ""}`);
   writeFileSync(out + "messages.json", JSON.stringify(await page.evaluate(() => window.host.messages), null, 2));
 } finally {
