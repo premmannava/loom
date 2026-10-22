@@ -6,7 +6,8 @@ It's an [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) server,
 
 ```
 you: "Compare the three phone plans I pasted"
-  └─ model calls sayshape_guide (once), then show_interface with a spec
+  └─ model reads show_interface's quick start, asks sayshape_docs about the elements it'll use,
+     then calls show_interface with a spec
        └─ the chat app shows the view: SayShape's engine draws the spec
             └─ you press a button with on=emit:… → it arrives back as a message
 ```
@@ -15,13 +16,17 @@ you: "Compare the three phone plans I pasted"
 
 | | |
 |---|---|
-| `sayshape_guide` | The language guide, generated from the same component definitions the engine renders with. The model reads it once per conversation. |
-| `show_interface` | Takes a spec (and an optional title), checks it with SayShape's own parser and returns any skipped lines with line numbers, so the model can fix them. The chat app shows the result in the view. |
+| `show_interface` | Takes a spec (and an optional title), checks it with SayShape's own parser and returns any skipped lines with line numbers, along with the docs for the elements on those lines. The chat app shows the result in the view. Its description carries a short quick start (about 400 tokens): the syntax, every element's name and how to write for a chat. |
+| `sayshape_docs` | Props and an example for just the elements the model names (a `table` brings its `table-column`), and topics on request: expressions, actions, lists, rules, examples, chat, database. |
 | `ui://sayshape/interface.html` | The view: the SayShape engine, the Instrument Sans font and a small bridge script, all in one HTML file. It loads nothing from anywhere else. |
 
 In chat apps that stream tool input, the interface builds line by line while the model is still writing it. When the person presses a button with `on=emit:name`, the view sends a message into the conversation naming the action, its value and the interface's current values. The model can then reply or show an updated interface. That's the only way anything leaves an interface: specs can't run code, open links or make requests.
 
 Interfaces match the chat app they're in. The view follows its light or dark mode, and when the app shares its design tokens (MCP Apps hosts pass them as CSS variables) it takes the app's background, text, border and status colors, its fonts and its corner radii. The accent stays SayShape's teal, because hosts don't send one.
+
+## Tokens
+
+A model never reads the whole language guide (about 7,500 tokens). It gets a quick start in `show_interface`'s description (about 400) and asks `sayshape_docs` for only the elements it's about to use: about 140 tokens for a button, 700 for a chart and a table, 1,200 for a six-element dashboard. If it guesses an element wrong, the result of `show_interface` brings that element's docs, so a wrong guess costs one retry, not the whole guide. With a database, the rows go from the database to the interface, so the model's tokens don't grow with the data either.
 
 ## Show data from a database
 

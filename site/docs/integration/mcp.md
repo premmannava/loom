@@ -11,7 +11,7 @@ You don't need your own model or API key: the chat app's model writes the spec, 
 
 ## How it works
 
-1. The model calls `sayshape_guide` once to learn the language. The guide is generated from the same component definitions the engine renders with.
+1. The model reads a short quick start in `show_interface`'s description: the syntax and every element's name. For an element it hasn't used yet, it asks `sayshape_docs` for just that element's props and example. Everything it reads is generated from the same component definitions the engine renders with, and it never has to read the whole guide.
 2. It calls `show_interface` with a spec. The server checks the spec with SayShape's parser and tells the model which lines it skipped, with line numbers, so it can fix them.
 3. The chat app shows the server's view: the SayShape engine in one self-contained HTML file. In apps that stream tool input, the interface builds line by line while the model writes.
 4. When someone presses a button with `on=emit:name`, the view sends a message into the conversation with the action, its value and the interface's current values, and the model can respond.

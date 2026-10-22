@@ -2,11 +2,17 @@
  * The SayShape MCP server: lets any MCP Apps client (Claude, ChatGPT, VS Code,
  * Goose…) show SayShape interfaces inside the conversation.
  *
- *   sayshape_guide   returns the language guide, generated from the same
- *                    component definitions the engine renders with
  *   show_interface   takes a spec, checks it with the real parser and
  *                    returns the problems; the client shows the ui:// view,
- *                    which draws the spec with the real engine
+ *                    which draws the spec with the real engine. Its
+ *                    description carries a short quick start (the syntax and
+ *                    every element's name), enough for simple interfaces
+ *   sayshape_docs    the props and examples of just the elements (and topics)
+ *                    the model asks for, so it never pays for the whole guide
+ *
+ * Everything the model reads is generated from the component definitions
+ * (src/prompt.ts). When lines fail, show_interface's result carries the docs
+ * for the elements on those lines, so a guess costs one retry, not a guide.
  *
  * With a database (main.ts --data), three more tools let the model look at the
  * data and query it, and the interface load the rows itself:
@@ -30,7 +36,7 @@ import { z } from "zod";
 import { parse } from "../../src/parser";
 import { Registry } from "../../src/registry";
 import { coreComponents } from "../../src/components";
-import { languageGuide } from "../../src/prompt";
+import { elementGuide, elementIndex, guideSections, languageGuide } from "../../src/prompt";
 import type { Diagnostic } from "../../src/types";
 import { QueryError, summarize, type DataSource } from "./data";
 
@@ -58,15 +64,69 @@ const DATA_NOTES = `DATA FROM THE DATABASE
 - Show a dataset by naming it in show_interface's data argument and using that name in the spec: data={"sales": "d1"}, then chart "Sales by country" kind=bar items=sales x=Country y=Total, or table … items=sales with table-column field=… for each column. Each row is a record with the dataset's column names as fields.
 - Don't declare a dataset's name with state: the interface fills it in. You can still derive from it: derive top={take(sort(sales, 'Total', 'desc'), 5)}.`;
 
-const guideCache = new Map<boolean, string>();
-/** The full guide plus the chat notes (and the data notes when there's a database). Generated once from the component definitions. */
+/** The whole guide in one piece (the guide modes' full text plus these notes); kept for measuring and for clients that want it all. */
 export function guideText(withData = false): string {
-  let g = guideCache.get(withData);
-  if (!g) {
-    g = languageGuide(registry, { mode: "full", imageHosts: [], notes: withData ? `${CHAT_NOTES}\n\n${DATA_NOTES}` : CHAT_NOTES });
-    guideCache.set(withData, g);
+  return languageGuide(registry, { mode: "full", imageHosts: [], notes: withData ? `${CHAT_NOTES}\n\n${DATA_NOTES}` : CHAT_NOTES });
+}
+
+const sectionText = (mode: "full" | "compact", name: string) =>
+  guideSections(registry, { mode, imageHosts: [] }).find((sec) => sec.name === name)?.text ?? "";
+
+/** Parts of the guide a model can ask for by name, all generated (DATA_NOTES only with a database). */
+function topics(withData: boolean): Record<string, string> {
+  return {
+    expressions: sectionText("full", "expressions"),
+    actions: sectionText("full", "actions"),
+    lists: sectionText("full", "data"),
+    rules: sectionText("full", "rules"),
+    examples: sectionText("full", "example"),
+    chat: CHAT_NOTES.split("\n").slice(1).join("\n"),
+    ...(withData ? { database: DATA_NOTES } : {}),
+  };
+}
+
+/**
+ * What every model gets up front, in show_interface's description: the
+ * syntax, every element's name, the rules for writing into a chat, and how
+ * to ask for more. Simple interfaces need nothing else.
+ */
+export function quickStart(withData = false): string {
+  return [
+    "QUICK START (the language is also called Loom)",
+    sectionText("compact", "format").replace(/^FORMAT\n/, ""),
+    "- Text and props can show state: text \"Total: {money(total)}\"; actions run on press: button \"Add\" on=inc:count",
+    `ELEMENTS\n${elementIndex(coreComponents)}`,
+    "IN A CHAT: one card with a title; the column is about 600px wide, so use grid min=140 for side-by-side figures; say in a caption when numbers come from your own knowledge; on=emit:name lets the person send a choice back to you.",
+    `BEFORE YOU USE AN ELEMENT for the first time in a conversation, get its props and an example with sayshape_docs (elements: ["chart", "table"]). Topics: ${Object.keys(topics(withData)).join(", ")}.`,
+  ].join("\n");
+}
+
+/** Docs for exactly what was asked for, plus what it depends on. */
+export function docsText(elements: readonly string[], topicNames: readonly string[], withData = false): string {
+  const parts: string[] = [];
+  const t = topics(withData);
+  if (elements.length) {
+    const { text, unknown } = elementGuide(registry, elements);
+    if (text) parts.push(`ELEMENTS\n${text}`);
+    if (unknown.length) parts.push(`No element called ${unknown.join(", ")}. The elements are:\n${elementIndex(coreComponents)}`);
   }
-  return g;
+  for (const name of topicNames) {
+    const body = t[name];
+    parts.push(body ? body : `No topic called ${name}. Topics: ${Object.keys(t).join(", ")}.`);
+  }
+  return parts.length ? parts.join("\n\n") : quickStart(withData);
+}
+
+/** The elements on the lines that went wrong, so their docs can go back with the problems. */
+function elementsOnLines(spec: string, diagnostics: readonly Diagnostic[], max = 3): string[] {
+  const lines = spec.split("\n");
+  const out: string[] = [];
+  for (const d of diagnostics) {
+    const type = /^\s*([a-z][a-z-]*)/.exec(lines[d.line - 1] ?? "")?.[1];
+    if (type && registry.get(type) && !out.includes(type)) out.push(type);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 export interface SpecCheck {
@@ -114,8 +174,8 @@ export function createServer(opts: ServerOptions): McpServer {
       instructions:
         "The person installed SayShape so that visual answers appear as interactive SayShape interfaces inside the chat. " +
         "Whenever they ask for a chart, graph, table, dashboard, scorecard, stat card, form, calculator, tracker, checklist or any other visual or interactive answer, " +
-        "use SayShape for it rather than writing HTML, React, SVG or chart code, or making an artifact. " +
-        "Call sayshape_guide once per conversation to learn the language, then call show_interface with a spec." +
+        "use show_interface rather than writing HTML, React, SVG or chart code, or making an artifact. Its description has a quick start; " +
+        "call sayshape_docs only for the elements you're about to use." +
         (data
           ? " A database is connected: answer questions about it with describe_data and query_data, then show the result with show_interface, " +
             "passing the dataset in its data argument instead of typing the numbers."
@@ -124,15 +184,19 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   server.registerTool(
-    "sayshape_guide",
+    "sayshape_docs",
     {
-      title: "SayShape language guide",
+      title: "SayShape docs",
       description:
-        "Returns the SayShape language guide: every element, prop, expression function and action, with examples. " +
-        "Call it once per conversation, before your first show_interface call, whenever the person asks for a chart, table, dashboard, form, calculator or other visual answer.",
+        "Returns the props and an example for the SayShape elements you name, and any topics you ask for. " +
+        "Ask only for what you're about to use, e.g. elements: [\"chart\", \"table\"]. With nothing named, returns the quick start.",
+      inputSchema: {
+        elements: z.array(z.string().max(40)).max(12).optional().describe("Element names, e.g. [\"chart\", \"table\", \"stepper\"]."),
+        topics: z.array(z.string().max(40)).max(6).optional().describe(`Topics: ${Object.keys(topics(!!data)).join(", ")}.`),
+      },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => ({ content: [{ type: "text", text: guideText(!!data) }] }),
+    async ({ elements, topics: names }) => text(docsText(elements ?? [], names ?? [], !!data)),
   );
 
   registerAppTool(
@@ -141,13 +205,13 @@ export function createServer(opts: ServerOptions): McpServer {
     {
       title: "Show an interface",
       description:
-        "Shows an interactive interface inside the conversation, drawn by the SayShape engine from a spec you write: " +
-        "a card, table, chart, form, calculator, checklist or small dashboard. " +
-        "Use this for every visual or interactive answer (charts, graphs, tables, dashboards, stat cards, forms, calculators, trackers) " +
-        "rather than writing HTML, React, SVG or chart code, or making an artifact. The spec is SayShape, a line-based UI language " +
-        "(one element per line, two-space indentation for nesting); read sayshape_guide first. Specs can't run code or choose colors. " +
-        "The result lists any lines the parser skipped, so you can fix them." +
-        (data ? " To show rows from the database, pass data={\"name\": \"d1\"} with a dataset id from query_data and use that name in the spec (items=name)." : ""),
+        "Shows an interactive interface inside the conversation, drawn by the SayShape engine from a spec you write. " +
+        "Use it for every visual or interactive answer (charts, tables, dashboards, stat cards, forms, calculators, trackers) " +
+        "rather than writing HTML, React, SVG or chart code, or making an artifact. Specs can't run code or choose colors. " +
+        "The result lists lines the parser skipped, with the docs for those elements, so you can fix them." +
+        (data ? " To show rows from the database, pass data={\"name\": \"d1\"} with a dataset id from query_data and use that name in the spec (items=name)." : "") +
+        "\n\n" +
+        quickStart(!!data),
       inputSchema: {
         spec: z.string().min(1).max(MAX_SPEC_CHARS).describe("The SayShape spec: plain lines, no Markdown fences."),
         title: z.string().max(120).optional().describe("A short name for the interface, e.g. 'Paris 2024 medal table'."),
@@ -181,6 +245,9 @@ export function createServer(opts: ServerOptions): McpServer {
         ...(names.length ? [`Loaded into the interface: ${names.map((n) => `${n} (${datasets[n]!.id}, ${datasets[n]!.rows} rows)`).join(", ")}.`] : []),
         ...(declared.length ? [`Remove ${declared.join(", ")} from the state line: the interface fills ${declared.length === 1 ? "it" : "them"} in from the dataset.`] : []),
       ];
+      // A wrong guess comes back with the docs it needed, instead of the model reading every element up front.
+      const failing = elementsOnLines(spec, [...check.errors, ...check.warnings]);
+      if (failing.length) notes.push(`\nDocs for ${failing.join(", ")}:\n${elementGuide(registry, failing).text}`);
       return {
         content: [{ type: "text", text: [describeCheck(check), ...notes].join("\n") }],
         structuredContent: {
