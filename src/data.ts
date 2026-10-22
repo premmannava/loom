@@ -1,5 +1,5 @@
 /**
- * Lists and records: the structured values Loom state can hold.
+ * Lists and records: the structured values SayShape state can hold.
  *
  * They come from two places, and both go through this file:
  *
@@ -47,7 +47,7 @@ export function isRecord(v: unknown): v is DataRecord {
 }
 
 /**
- * Whether a value is Loom data: a scalar, or a list or record this module
+ * Whether a value is SayShape data: a scalar, or a list or record this module
  * made. Expressions only accept values that pass this, so nothing else a
  * scope might return (a host object, a prototype) can reach them.
  */
@@ -73,7 +73,7 @@ export function isScalar(v: unknown): v is string | number | boolean | null {
 // ---------------------------------------------------------------- host data
 
 /**
- * Copy a value from the host app into plain Loom data. Throws a DataError
+ * Copy a value from the host app into plain SayShape data. Throws a DataError
  * that says what's wrong, for values that can't be data: functions, class
  * instances (Date, Map…), cycles, numbers that aren't finite, or anything
  * over the limits. Fields set to undefined are left out.

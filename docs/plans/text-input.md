@@ -5,9 +5,9 @@
 
 ## The problem
 
-Loom has no way to type. Testing with Qwen3 14B showed what that costs:
+SayShape has no way to type. Testing with Qwen3 14B showed what that costs:
 
-- Asked for a contact list where you can add a contact, the model invented an `input` element, which Loom skips.
+- Asked for a contact list where you can add a contact, the model invented an `input` element, which SayShape skips.
 - "A login form" is an eval trap today, because it can't be built.
 - A to-do list can only add a ready-made task ("Trail mix"), not one the user names.
 - Search boxes and filters, the most common thing a generated screen needs, can't be made at all.
@@ -51,13 +51,13 @@ card
 | `disabled` | As on buttons |
 | `max` | Longest value in characters (default 500, at most 10,000) |
 
-Loom paints the field: label, box, placeholder or value, and a focus ring, all from the theme. A password shows as dots. Long values are cut with an ellipsis when not focused.
+SayShape paints the field: label, box, placeholder or value, and a focus ring, all from the theme. A password shows as dots. Long values are cut with an ellipsis when not focused.
 
 ### 2. Typing: a real `<input>`, only while focused
 
 This is the approach the project brief already allows (rule 7: "a temporary native `<input>` while typing").
 
-- When a field gets focus (clicked, tapped or reached with Tab), the engine places one real `<input>` exactly over the field's text area, styled with the theme's font, size and colors, with a transparent background. Loom keeps painting the box, label and focus ring; the browser paints only the text, the caret and the selection.
+- When a field gets focus (clicked, tapped or reached with Tab), the engine places one real `<input>` exactly over the field's text area, styled with the theme's font, size and colors, with a transparent background. SayShape keeps painting the box, label and focus ring; the browser paints only the text, the caret and the selection.
 - So the browser does what it's good at: typing, selection, copy and paste, undo, IME for Chinese, Japanese and Korean, autocorrect, password managers, autofill and the phone keyboard.
 - **Every keystroke writes state.** That re-lays out the screen, so filters, counts and `{task}` in other text update as you type.
 - When focus leaves (Tab, Escape, a click elsewhere), the `<input>` is removed and the canvas draws the value again.

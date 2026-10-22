@@ -1,6 +1,6 @@
 ---
 title: Streaming, validation and repair
-description: How Loom renders a model's response as it streams, cleans it, checks it with the parser, and asks once for a fix.
+description: How SayShape renders a model's response as it streams, cleans it, checks it with the parser, and asks once for a fix.
 ---
 
 # Streaming, validation and repair
@@ -19,7 +19,7 @@ Any prefix of a valid spec, cut at a line boundary, is a valid and smaller spec,
 
 ## Cleaning
 
-Models don't always send just Loom. `loom-ui/model` cleans the text as it streams: it drops thinking (`<think>…</think>`, and reasoning a server sends separately), Markdown code fences and chatter before the spec starts, and joins a state value a model spread over several lines back into one line. When a model writes its whole spec inside a thinking block it never closes, the spec is recovered from there (`result.first.recovered`).
+Models don't always send just SayShape. `loom-ui/model` cleans the text as it streams: it drops thinking (`<think>…</think>`, and reasoning a server sends separately), Markdown code fences and chatter before the spec starts, and joins a state value a model spread over several lines back into one line. When a model writes its whole spec inside a thinking block it never closes, the spec is recovered from there (`result.first.recovered`).
 
 ## Validation
 

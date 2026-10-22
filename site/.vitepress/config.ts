@@ -8,8 +8,10 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const loomGrammar = JSON.parse(readFileSync(here("./loom.tmLanguage.json"), "utf8"));
 
 const REPO = "https://github.com/premmannava/loom";
-const SITE_URL = "https://premmannava.github.io/loom/";
-const TITLE = "Loom";
+// The site's path on GitHub Pages: the repository's name. Change SITE_BASE if the repository is renamed.
+const BASE = process.env.SITE_BASE ?? "/loom/";
+const SITE_URL = `https://premmannava.github.io${BASE}`;
+const TITLE = "SayShape";
 const DESCRIPTION = "A UI language for AI models to write, and a canvas engine that renders it: parser, layout, painting, state and input of its own.";
 
 const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
@@ -18,7 +20,7 @@ const docsSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Getting started",
     items: [
-      { text: "What Loom is", link: "/docs/" },
+      { text: "What SayShape is", link: "/docs/" },
       { text: "Local setup", link: "/docs/getting-started/setup" },
       { text: "Your first interface", link: "/docs/getting-started/first-interface" },
       { text: "From spec to pixels", link: "/docs/getting-started/pipeline" },
@@ -48,7 +50,7 @@ const docsSidebar: DefaultTheme.SidebarItem[] = [
   {
     text: "Integration",
     items: [
-      { text: "Embedding Loom", link: "/docs/integration/embedding" },
+      { text: "Embedding SayShape", link: "/docs/integration/embedding" },
       { text: "Host data and events", link: "/docs/integration/host-data" },
       { text: "Loading, success and failure", link: "/docs/integration/states" },
       { text: "Themes", link: "/docs/integration/themes" },
@@ -78,10 +80,10 @@ const docsSidebar: DefaultTheme.SidebarItem[] = [
 ];
 
 export default defineConfig({
-  base: "/loom/",
+  base: BASE as `/${string}/`,
   lang: "en-US",
   title: TITLE,
-  titleTemplate: ":title · Loom",
+  titleTemplate: ":title · SayShape",
   description: DESCRIPTION,
   // Pages are emitted as .html files, which GitHub Pages serves for direct visits and refreshes.
   cleanUrls: false,
@@ -89,11 +91,11 @@ export default defineConfig({
   appearance: true,
   sitemap: { hostname: SITE_URL },
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/loom/favicon.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: `${BASE}favicon.svg` }],
     ["meta", { name: "theme-color", content: "#0E7C76" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: TITLE }],
-    ["meta", { property: "og:title", content: "Loom: a UI language for AI, and an engine that brings it to life" }],
+    ["meta", { property: "og:title", content: "SayShape: a UI language for AI, and an engine that brings it to life" }],
     ["meta", { property: "og:description", content: DESCRIPTION }],
     ["meta", { property: "og:url", content: SITE_URL }],
     ["meta", { property: "og:image", content: `${SITE_URL}og.png` }],
@@ -103,19 +105,19 @@ export default defineConfig({
   ],
   themeConfig: {
     logo: { light: "/logo.svg", dark: "/logo-dark.svg", alt: "" },
-    siteTitle: "Loom",
+    siteTitle: "SayShape",
     nav: [
       { text: "Playground", link: "/playground", activeMatch: "^/playground" },
       { text: "Examples", link: "/examples/", activeMatch: "^/examples" },
       { text: "Docs", link: "/docs/", activeMatch: "^/docs/" },
     ],
-    socialLinks: [{ icon: "github", link: REPO, ariaLabel: "Loom on GitHub" }],
+    socialLinks: [{ icon: "github", link: REPO, ariaLabel: "SayShape on GitHub" }],
     sidebar: { "/docs/": docsSidebar },
     search: { provider: "local" },
     outline: { level: [2, 3] },
     editLink: { pattern: `${REPO}/edit/main/site/:path`, text: "Suggest a change to this page" },
     footer: {
-      message: `Loom is an early prototype (v0.1), released under the MIT License. <a href="${REPO}">Source on GitHub</a>.`,
+      message: `SayShape is an early prototype (v0.1), released under the MIT License. <a href="${REPO}">Source on GitHub</a>.`,
     },
   },
   markdown: {

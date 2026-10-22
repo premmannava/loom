@@ -11,7 +11,7 @@ import type { ImageState } from "./images";
 import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
 import type { PopupSize, PopupState } from "./popup";
-import type { Box, HitTarget, LoomNode, Rect, Value } from "./types";
+import type { Box, HitTarget, SayShapeNode, Rect, Value } from "./types";
 
 /**
  * `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to.
@@ -36,11 +36,11 @@ export interface LayoutContext {
   theme: Theme;
   measure: TextMeasurer;
   scope: Scope;
-  props(node: LoomNode): PropReader;
+  props(node: SayShapeNode): PropReader;
   /** Lay out a child at a position with an available width; returns its box. */
-  layout(node: LoomNode, x: number, y: number, width: number): Box;
+  layout(node: SayShapeNode, x: number, y: number, width: number): Box;
   /** Children to lay out: those whose `if` passes, with every `each` replaced by its copies. */
-  visibleChildren(node: LoomNode): LoomNode[];
+  visibleChildren(node: SayShapeNode): SayShapeNode[];
   /** Move a box and its whole subtree. */
   shift(box: Box, dx: number, dy: number): void;
   /** Today's date as YYYY-MM-DD (the engine's today option, or the device's local day). */
@@ -57,7 +57,7 @@ export interface PaintContext {
   theme: Theme;
   scope: Scope;
   now: number;
-  props(node: LoomNode): PropReader;
+  props(node: SayShapeNode): PropReader;
   font(weight: number | string, size: number): string;
   roundRect(x: number, y: number, w: number, h: number, r: number): void;
   /**
@@ -73,20 +73,20 @@ export interface PaintContext {
   focus: HitTarget | null;
   pressed: HitTarget | null;
   /** Pass `detail` to ask about one part of an element (the one given to addHit). */
-  isHovered(node: LoomNode, detail?: unknown): boolean;
+  isHovered(node: SayShapeNode, detail?: unknown): boolean;
   /** True only while the keyboard is in use, when a focus style should show. */
-  isFocused(node: LoomNode, detail?: unknown): boolean;
-  isPressed(node: LoomNode, detail?: unknown): boolean;
+  isFocused(node: SayShapeNode, detail?: unknown): boolean;
+  isPressed(node: SayShapeNode, detail?: unknown): boolean;
   /** Whether a real text box is over this element right now; it then draws the text, so don't. */
-  isEditing(node: LoomNode): boolean;
+  isEditing(node: SayShapeNode): boolean;
   /** Whether this element's popup is open (to draw it as open). */
-  isPopupOpen(node: LoomNode): boolean;
+  isPopupOpen(node: SayShapeNode): boolean;
   /** Today's date as YYYY-MM-DD. */
   today(): string;
   /** False when animation is off (option or reduced motion): draw a still frame. */
   motion: boolean;
   /** Fade-in opacity for a node that just appeared (0..1). */
-  appear(node: LoomNode): number;
+  appear(node: SayShapeNode): number;
   /** Ask for another frame (for animation). */
   requestFrame(): void;
   /**
@@ -99,7 +99,7 @@ export interface PaintContext {
 export interface PressContext {
   target: HitTarget;
   scope: Scope;
-  props(node: LoomNode): PropReader;
+  props(node: SayShapeNode): PropReader;
   /**
    * Write a value to a state name or path, as seen from the pressed element:
    * pass its bind= as written (count, or t.done inside each).
@@ -187,7 +187,7 @@ export interface ComponentDef {
    * Whether an element is shown, beyond its `if=` prop. Hidden elements aren't
    * laid out or painted (only the active screen is, for example).
    */
-  visible?(node: LoomNode, scope: Scope): boolean;
+  visible?(node: SayShapeNode, scope: Scope): boolean;
   /** Keyboard activation; default is the same as press. */
   cursor?(target: HitTarget): string;
   /**
@@ -210,7 +210,7 @@ export const COMMON_PROPS: Record<string, PropDef> = {
  * and interpolating text against current state.
  */
 export class PropReader {
-  constructor(private node: LoomNode, private scope: Scope) {}
+  constructor(private node: SayShapeNode, private scope: Scope) {}
 
   has(name: string): boolean {
     return name in this.node.props;

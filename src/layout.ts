@@ -9,10 +9,10 @@ import { bareExpression, evaluate, type Scope } from "./expr";
 import type { Registry } from "./registry";
 import type { TextMeasurer } from "./text";
 import type { Theme } from "./theme";
-import type { Box, LoomNode } from "./types";
+import type { Box, SayShapeNode } from "./types";
 
 /** Whether a node is shown: its `if=` passes and, given a registry, its component's visible() agrees. */
-export function isVisible(node: LoomNode, base: Scope, registry?: Registry): boolean {
+export function isVisible(node: SayShapeNode, base: Scope, registry?: Registry): boolean {
   const scope = scopeOf(node, base);
   const own = registry?.get(node.type)?.visible;
   if (own && !own(node, scope)) return false;
@@ -33,9 +33,9 @@ export function shiftBox(box: Box, dx: number, dy: number): void {
  * A node's children as they should be laid out: hidden ones (`if=`) left out,
  * and every `each` replaced by its copies, one set per item.
  */
-export function shownChildren(node: LoomNode, scope: Scope, registry?: Registry, warn?: (message: string) => void, budget?: EachBudget): LoomNode[] {
-  const out: LoomNode[] = [];
-  const add = (kids: readonly LoomNode[]) => {
+export function shownChildren(node: SayShapeNode, scope: Scope, registry?: Registry, warn?: (message: string) => void, budget?: EachBudget): SayShapeNode[] {
+  const out: SayShapeNode[] = [];
+  const add = (kids: readonly SayShapeNode[]) => {
     for (const c of kids) {
       if (!isVisible(c, scope, registry)) continue;
       if (c.type === "each") add(eachInstances(c, scopeOf(c, scope), warn, budget));
@@ -49,9 +49,9 @@ export function shownChildren(node: LoomNode, scope: Scope, registry?: Registry,
 }
 
 export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void, today: () => string = localToday): LayoutContext {
-  const readers = new WeakMap<LoomNode, PropReader>();
+  const readers = new WeakMap<SayShapeNode, PropReader>();
   // Containers may ask more than once per layout; copies must stay the same objects.
-  const kids = new WeakMap<LoomNode, LoomNode[]>();
+  const kids = new WeakMap<SayShapeNode, SayShapeNode[]>();
   const budget: EachBudget = { left: MAX_EACH_ELEMENTS };
   const ctx: LayoutContext = {
     theme,
@@ -81,7 +81,7 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
 }
 
 /** Lay out a whole tree. */
-export function layoutTree(root: LoomNode, width: number, registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void): Box {
+export function layoutTree(root: SayShapeNode, width: number, registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void): Box {
   return createLayoutContext(registry, theme, measure, scope, warn).layout(root, 0, 0, width);
 }
 

@@ -9,7 +9,7 @@
 import "@fontsource/instrument-sans/400.css";
 import "@fontsource/instrument-sans/600.css";
 import "@fontsource/instrument-sans/700.css";
-import { Loom } from "../src/engine";
+import { SayShape } from "../src/engine";
 import { coreComponents } from "../src/components";
 import { mapComponents } from "../src/components/map";
 import { darkTheme, lightTheme } from "../src/theme";
@@ -17,7 +17,7 @@ import { fixtureImageLoader } from "./fixture-image";
 import { cases } from "./cases";
 
 declare global {
-  interface Window { __loomReady?: boolean; __loomError?: string; __loom?: Loom }
+  interface Window { __loomReady?: boolean; __loomError?: string; __loom?: SayShape }
 }
 
 async function main(): Promise<void> {
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   await Promise.all([400, 600, 700].map((w) => document.fonts.load(`${w} 16px "Instrument Sans"`)));
 
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-  const loom = new Loom(canvas, {
+  const loom = new SayShape(canvas, {
     components: [...coreComponents, ...mapComponents],
     theme,
     width,

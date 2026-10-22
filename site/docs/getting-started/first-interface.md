@@ -1,11 +1,11 @@
 ---
 title: Your first interface
-description: Create a Loom instance on a canvas, give it a spec, and listen for what people do.
+description: Create a SayShape instance on a canvas, give it a spec, and listen for what people do.
 ---
 
 # Your first interface
 
-A Loom interface needs three things: a `<canvas>`, the components the instance understands, and a spec.
+A SayShape interface needs three things: a `<canvas>`, the components the instance understands, and a spec.
 
 ```html
 <div style="max-width: 480px">
@@ -14,10 +14,10 @@ A Loom interface needs three things: a `<canvas>`, the components the instance u
 ```
 
 ```ts
-import { Loom, coreComponents } from "loom-ui";
+import { SayShape, coreComponents } from "loom-ui";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#ui")!;
-const loom = new Loom(canvas, { components: coreComponents });
+const loom = new SayShape(canvas, { components: coreComponents });
 
 loom.setSpec(`state count=0
 card
@@ -58,17 +58,17 @@ loom.on("action", ({ name, value }) => {
 - `loom.state.set("count", 10)` changes state from your app.
 - `loom.setTheme(theme)` switches themes ([Themes](../integration/themes)).
 
-The full list of options, methods and events is in [Embedding Loom](../integration/embedding).
+The full list of options, methods and events is in [Embedding SayShape](../integration/embedding).
 
 ## Add the map
 
 The world map ships separately because its country outlines are large:
 
 ```ts
-import { Loom, coreComponents } from "loom-ui";
+import { SayShape, coreComponents } from "loom-ui";
 import { mapComponents } from "loom-ui/map";
 
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents] });
+const loom = new SayShape(canvas, { components: [...coreComponents, ...mapComponents] });
 ```
 
 Next: [what happens between the spec and the pixels](./pipeline).

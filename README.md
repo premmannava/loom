@@ -1,10 +1,10 @@
-# Loom
+# SayShape
 
 **A UI language built for AI models to write, and an engine that renders it entirely on its own.**
 
-Loom has its own parser, layout engine, painter and input handling. It draws straight onto a `<canvas>`, without HTML elements, CSS layout or React. A model streams a few lines of Loom, and the interface appears on screen line by line while the model is still writing.
+SayShape has its own parser, layout engine, painter and input handling. It draws straight onto a `<canvas>`, without HTML elements, CSS layout or React. A model streams a few lines of SayShape, and the interface appears on screen line by line while the model is still writing.
 
-![The Loom playground: a spec on the left, the world map it describes rendered on canvas on the right](docs/images/playground.png)
+![The SayShape playground: a spec on the left, the world map it describes rendered on canvas on the right](docs/images/playground.png)
 
 ```
 state days=2 hikers=3
@@ -18,15 +18,17 @@ card
 
 **Website:** [premmannava.github.io/loom](https://premmannava.github.io/loom/) has a playground, interactive examples and the documentation, all rendered by this engine.
 
+> **Name:** SayShape was called Loom while it was being built. The package (`loom-ui`), CSS variables (`--loom-*`) and the model guide still use that name; they'll be renamed before the first npm release.
+
 > **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
 ## Contents
 
-- [Why Loom](#why-loom)
+- [Why SayShape](#why-loom)
 - [Quick start](#quick-start)
-- [The Loom language](#the-loom-language)
+- [The SayShape language](#the-loom-language)
 - [Components](#components)
 - [Using the engine](#using-the-engine)
 - [Connecting a model](#connecting-a-model)
@@ -42,11 +44,11 @@ card
 
 ---
 
-## Why Loom
+## Why SayShape
 
-Most generative UI today has a model write React code or JSON, then hands it to a web framework. Loom takes a different approach:
+Most generative UI today has a model write React code or JSON, then hands it to a web framework. SayShape takes a different approach:
 
-| | Model writes React/JSX | Loom |
+| | Model writes React/JSX | SayShape |
 |---|---|---|
 | Half-finished output | Can't render until the code compiles | Every finished line renders immediately |
 | A mistake in the output | One syntax error breaks the component | The bad line is skipped with a clear message |
@@ -96,7 +98,7 @@ The playground streams sample specs as a model would. Once a sample finishes you
 
 ---
 
-## The Loom language
+## The SayShape language
 
 ### Elements
 
@@ -145,7 +147,7 @@ derive total={subtotal + tax}
 stat label="Total" value={total}
 ```
 
-- **Grammar.** `derive name={expression}`, unindented, at the top level of the spec; several pairs may share a line, as with `state`. The expression is the same safe kind as everywhere else in Loom, with the same functions; there are no functions of your own, callbacks or side effects.
+- **Grammar.** `derive name={expression}`, unindented, at the top level of the spec; several pairs may share a line, as with `state`. The expression is the same safe kind as everywhere else in SayShape, with the same functions; there are no functions of your own, callbacks or side effects.
 - **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. Its expression can read state, data your app sets with `loom.state.set`, and other derived values.
 - **Order.** Declarations can come in any order: a value is worked out from whatever it reads, wherever that's declared. While a spec streams in, a value whose inputs haven't arrived yet shows as nothing (—) until they do.
 - **Updates.** A value is worked out the first time it's read and kept until something it reads changes, directly or through other derived values; then it's worked out again the next time it's read. Changes to state it doesn't read leave it alone, and a render reads each value at most once per change.
@@ -265,7 +267,7 @@ Formatting, for text people read:
 
 Numbers and money are formatted in US English for now.
 
-Your app can pass its own data, which is copied into plain, frozen Loom data (functions, class instances and cycles are refused with a clear error):
+Your app can pass its own data, which is copied into plain, frozen SayShape data (functions, class instances and cycles are refused with a clear error):
 
 ```ts
 loom.state.set("products", await fetchProducts());
@@ -320,7 +322,7 @@ date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"
 
 The props are in the [reference](#date-picker). How it treats dates:
 
-- **The value** is text, `YYYY-MM-DD`, or `""` for no date: a day on the calendar with no time and no time zone. Loom works dates out itself (leap years, month lengths, weekdays) instead of using JavaScript's `Date`, so a date never shifts by a day across time zones and text like `2026-02-30` is never quietly read as March 2.
+- **The value** is text, `YYYY-MM-DD`, or `""` for no date: a day on the calendar with no time and no time zone. SayShape works dates out itself (leap years, month lengths, weekdays) instead of using JavaScript's `Date`, so a date never shifts by a day across time zones and text like `2026-02-30` is never quietly read as March 2.
 - **Limits.** `min=` and `max=` are inclusive. Days outside them are greyed out and can't be chosen, and paging stops at them. A limit that isn't a real date is ignored, and if `min` is after `max` both are, each with a warning.
 - **Values it can't use.** A bound value that isn't a real date shows "Invalid date"; one outside the limits is still shown but can't be chosen again. Both are reported once through `onWarning`. Drawing never changes state.
 - **Opening.** The calendar opens on the chosen date's month, or else on today's, moved inside the limits. Today is the device's local day, or the engine's `today` option, which tests and screenshots use to fix it.
@@ -388,7 +390,7 @@ Lines starting with `#` are ignored.
 
 ### Errors
 
-Loom never stops on a mistake. Each problem becomes a diagnostic with a line number:
+SayShape never stops on a mistake. Each problem becomes a diagnostic with a line number:
 
 - **Errors** (unknown element, element in the wrong place, nesting more than 100 levels deep): that line and anything nested under it are skipped.
 - **Warnings** (unknown prop, bad value, broken expression, a name nothing defines, a loop variable outside its `each`): the element still renders, and the bad part is ignored.
@@ -1097,14 +1099,14 @@ pin "Nairobi" lat=-1.29 lon=36.82
 
 ## Using the engine
 
-> Loom isn't published to npm yet. Until it is, build it with `npm run build` and import from `dist/`, or import from `src/` in your own bundler. The examples use the package name it will have, `loom-ui`.
+> SayShape isn't published to npm yet. Until it is, build it with `npm run build` and import from `dist/`, or import from `src/` in your own bundler. The examples use the package name it will have, `loom-ui`.
 
 ```ts
-import { Loom, coreComponents } from "loom-ui";
+import { SayShape, coreComponents } from "loom-ui";
 import { mapComponents } from "loom-ui/map";
 
 const canvas = document.querySelector("canvas")!;
-const loom = new Loom(canvas, {
+const loom = new SayShape(canvas, {
   components: [...coreComponents, ...mapComponents],
 });
 
@@ -1174,10 +1176,10 @@ loom.on("action", ({ name, value }) => {
 
 ### Images
 
-A spec can name any image URL, and a model writes specs, so Loom only loads images from your own site (the page's origin) and from hosts you list. Anything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and the console says which host to allow.
+A spec can name any image URL, and a model writes specs, so SayShape only loads images from your own site (the page's origin) and from hosts you list. Anything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and the console says which host to allow.
 
 ```ts
-const loom = new Loom(canvas, {
+const loom = new SayShape(canvas, {
   components: coreComponents,
   imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
 });
@@ -1204,7 +1206,7 @@ A `select` shows its options, and a `date-picker` its calendar, in a popup: a pa
 
 ### Typing
 
-An `input` field is drawn on the canvas like everything else. While someone types in one, Loom places a real `<input>` exactly over it, with the field's font and colors and a transparent background, so the browser handles typing, selection, copy and paste, undo, input methods for Chinese, Japanese and Korean, autocorrect, password managers, autofill and the phone keyboard. It's removed when they leave the field.
+An `input` field is drawn on the canvas like everything else. While someone types in one, SayShape places a real `<input>` exactly over it, with the field's font and colors and a transparent background, so the browser handles typing, selection, copy and paste, undo, input methods for Chinese, Japanese and Korean, autocorrect, password managers, autofill and the phone keyboard. It's removed when they leave the field.
 
 - Clicking or tapping a field, or reaching it with Tab, starts typing there. Tabbing onto the canvas starts typing in its first element if that's a field.
 - Every keystroke writes the field's `bind=`, so filters, counts and greetings update as people type. While an input method is composing, the value is written when the text is finished.
@@ -1234,11 +1236,11 @@ LOOM_API_KEY=                             # only for servers that need one
 LOOM_USER_SUFFIX=                         # optional: added to every request, e.g. /no_think for Qwen3
 ```
 
-The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether Loom's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one. It sends the first request, the changes since and the screen as it is now, including your own edits (see [Changing a screen](#changing-a-screen)).
+The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether SayShape's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one. It sends the first request, the changes since and the screen as it is now, including your own edits (see [Changing a screen](#changing-a-screen)).
 
 Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their thinking is hidden from the screen, but it delays the first line. With Qwen3, `LOOM_USER_SUFFIX=/no_think` skips it.
 
-**Copy guide**, under the model guide at the bottom of the playground, copies the same instructions the model gets, for trying Loom in any chat app.
+**Copy guide**, under the model guide at the bottom of the playground, copies the same instructions the model gets, for trying SayShape in any chat app.
 
 The playground uses the compact guide with equipment-order and numeric-calculator examples, plus short binding reminders. The calculator demonstrates numeric state, automatic control bindings, and derived totals without JavaScript event handlers. This leaves more room for a request and repair on local models loaded with an 8K context window. The library's default remains the full guide. A request can still exceed the model's context with a large spec or refinement; guide token estimates are not exact tokenizer counts.
 
@@ -1251,13 +1253,13 @@ npm run eval -- --only data,hard    # some categories or request ids
 npm run eval -- --no-repair         # first tries only
 ```
 
-`eval/cases.ts` holds 41 requests: forms (a login and a sign-up among them), comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines, a search that filters as you type), harder multi-part requests, and traps like "a big red button" (Loom has no colors).
+`eval/cases.ts` holds 41 requests: forms (a login and a sign-up among them), comparisons, dashboards, shopping, multi-screen flows, content, lists of data (a to-do list, a cart, a kanban board, orders with their lines, a search that filters as you type), harder multi-part requests, and traps like "a big red button" (SayShape has no colors).
 
 Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item, typing in a search must filter the list. A spec can be valid and still not work, and these catch that.
 
 The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, input and output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
 
-Token counts are the server's own when it reports them, and "unknown" when it doesn't; they're never filled in with zero. Estimates (characters divided by 4) are labelled as estimates. Reasoning tokens a server reports are part of its output tokens and aren't added again. The time to the first Loom line is when something could be shown, not when the screen is usable.
+Token counts are the server's own when it reports them, and "unknown" when it doesn't; they're never filled in with zero. Estimates (characters divided by 4) are labelled as estimates. Reasoning tokens a server reports are part of its output tokens and aren't added again. The time to the first SayShape line is when something could be shown, not when the screen is usable.
 
 To compare ways of prompting, give variants. Each request runs once per variant, one after another, with the same model and settings:
 
@@ -1274,7 +1276,7 @@ The report starts with a side-by-side table on the requests every variant can bu
 
 ### In your own app
 
-`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with Loom's parser, and asks once for a fix.
+`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with SayShape's parser, and asks once for a fix.
 
 ```ts
 import { generateSpec } from "loom-ui/model";
@@ -1312,7 +1314,7 @@ guide: {
 ```
 
 - **Compact mode** describes each element in one line, generated from the same component definitions: its props with their types and allowed values (`!` marks a required prop), what it holds or where it must go, and what it's for. It keeps the rules that change what a spec does (one line per element, indentation, quoting, local actions versus `emit` events, that a computed list can't be written to, roles instead of colors, image hosts), and shows one worked example instead of four plus one per element. The app's own context (image hosts, actions, notes) comes last, so the part that's the same for every app stays a shared prefix.
-- **Profiles** choose the elements the model is told about. A profile's elements bring what they need (`tab` brings `tabs`, `list` brings `list-item`), and `column` and `text` are always included. Examples and instructions that would use an element outside the profile are left out. A profile is chosen by your app; Loom doesn't guess one from the request.
+- **Profiles** choose the elements the model is told about. A profile's elements bring what they need (`tab` brings `tabs`, `list` brings `list-item`), and `column` and `text` are always included. Examples and instructions that would use an element outside the profile are left out. A profile is chosen by your app; SayShape doesn't guess one from the request.
 
 | Guide (with one image host) | Characters | Tokens (estimated) |
 |---|---|---|
@@ -1327,7 +1329,7 @@ Tokens here are characters divided by 4, a rough estimate; `npm run guide:size` 
 
 Three sets of elements are involved, and they're separate:
 
-- **The renderer's**: the registry your Loom was made with. It can show any of them, whoever wrote the spec.
+- **The renderer's**: the registry your SayShape was made with. It can show any of them, whoever wrote the spec.
 - **The model's**: the profile. The guide only describes these.
 - **What's checked**: by default, a spec is checked against the renderer's elements. With `enforceProfile: true`, it's checked against the profile, so an element outside it is sent back for repair.
 
@@ -1362,7 +1364,7 @@ It sends the original task, the `requirements` that must always hold, the change
 
 `result.usage` adds up the server's token counts over the first try and the repair: `promptTokens`, `completionTokens`, and `reasoningTokens` (part of the completion tokens, not added again). A total is `undefined`, meaning unknown, when any attempt didn't report it; `usage.reported` says how many did. Each attempt also has `inputChars` and `estimatedInputTokens` (characters / 4), `estimatedThinkingTokens`, the guide it used and how long it took. Many servers only report usage while streaming when asked; set `config.streamUsage: true` for those that support `stream_options` (OpenAI, vLLM, recent LM Studio and llama.cpp).
 
-Putting the guide first and the request last means requests with the same guide options share a prefix, which servers with prefix caching (vLLM, llama.cpp, many hosted APIs) can reuse. That's the server's doing: Loom builds the same text each time, but doesn't cache anything itself.
+Putting the guide first and the request last means requests with the same guide options share a prefix, which servers with prefix caching (vLLM, llama.cpp, many hosted APIs) can reuse. That's the server's doing: SayShape builds the same text each time, but doesn't cache anything itself.
 
 Send the user's choices back to the model with `emit` actions, passing `result.messages` as `history` to continue the conversation:
 
@@ -1395,7 +1397,7 @@ Each stage only reruns when its inputs change: editing the spec re-parses, a sta
 
 ## Debugging
 
-Browser DevTools can't see inside a canvas, so Loom ships its own tools. All of them are available in the playground and from code.
+Browser DevTools can't see inside a canvas, so SayShape ships its own tools. All of them are available in the playground and from code.
 
 | Tool | How to use it | What it shows |
 |---|---|---|
@@ -1500,7 +1502,7 @@ export const ribbon: ComponentDef = {
   },
 };
 
-const loom = new Loom(canvas, { components: [...coreComponents, ribbon] });
+const loom = new SayShape(canvas, { components: [...coreComponents, ribbon] });
 ```
 
 What a `ComponentDef` can define:
@@ -1527,7 +1529,7 @@ Use `ctx.props(node)` to read props. It evaluates `{expressions}` and fills temp
 
 ## Theming
 
-Components never use literal colors or sizes. They read design tokens from the theme: `colors`, `space`, `radius`, `font`, `text` sizes and `control` height. Loom ships `lightTheme` and `darkTheme`, and with `theme: "auto"` it follows the page's light or dark mode.
+Components never use literal colors or sizes. They read design tokens from the theme: `colors`, `space`, `radius`, `font`, `text` sizes and `control` height. SayShape ships `lightTheme` and `darkTheme`, and with `theme: "auto"` it follows the page's light or dark mode.
 
 With `theme: "auto"`, you can override colors from CSS with `--loom-*` variables on the canvas or any ancestor:
 
@@ -1554,13 +1556,13 @@ loom.setTheme(brand);
 
 The playground's **Appearance** button opens a small panel for previewing the current screen in another style, and copying the setup into your app. It only changes the playground's theme, through `loom.setTheme`: the spec, state, selections and any open list or calendar stay as they are, and no model is asked again.
 
-- **Style:** Teal (Loom's default), Purple, Blue or Neutral, each with matching light and dark colors. Neutral is grey, with firmer field and divider lines so controls stand out.
+- **Style:** Teal (SayShape's default), Purple, Blue or Neutral, each with matching light and dark colors. Neutral is grey, with firmer field and divider lines so controls stand out.
 - **Mode:** Light, Dark, or System, which follows the operating system as it changes. The page around the canvas follows too.
-- **Accent color:** a color picker and a hex field (`#rgb` or `#rrggbb`; half-typed or invalid values aren't applied). Loom uses the accent as text and strokes and as the fill behind button labels, so a color that's too close to the background is darkened (light mode) or lightened (dark mode) just enough to reach 4.5:1 contrast, and the panel says what it shows instead. The color you asked for is kept, so each mode adjusts it on its own. The label color on the accent is picked automatically. **Reset color** goes back to the style's accent; **Reset appearance** goes back to Loom's default.
+- **Accent color:** a color picker and a hex field (`#rgb` or `#rrggbb`; half-typed or invalid values aren't applied). SayShape uses the accent as text and strokes and as the fill behind button labels, so a color that's too close to the background is darkened (light mode) or lightened (dark mode) just enough to reach 4.5:1 contrast, and the panel says what it shows instead. The color you asked for is kept, so each mode adjusts it on its own. The label color on the accent is picked automatically. **Reset color** goes back to the style's accent; **Reset appearance** goes back to SayShape's default.
 - **Copy theme code** copies TypeScript that recreates what you see with `extendTheme`, `lightTheme`, `darkTheme` and `loom.setTheme`, using the colors actually shown (after any adjustment). For Light or Dark it sets one theme; for System it exports both and a `followSystemAppearance(loom)` function that returns a cleanup. If the clipboard isn't available, the code appears in a box to copy by hand.
 - The choice is saved in your browser (`localStorage`, key `loom-playground-appearance:v1`): the style, the mode and the accent you asked for, nothing else.
 
-The styles change colors only, through the same theme tokens every component reads; they're a playground feature, not part of the Loom language, so models still can't choose colors. Teal, Purple and Blue keep Loom's default field and divider lines, which are lighter than the 3:1 that WCAG asks of control boundaries; Neutral meets it.
+The styles change colors only, through the same theme tokens every component reads; they're a playground feature, not part of the SayShape language, so models still can't choose colors. Teal, Purple and Blue keep SayShape's default field and divider lines, which are lighter than the 3:1 that WCAG asks of control boundaries; Neutral meets it.
 
 ---
 
@@ -1568,7 +1570,7 @@ The styles change colors only, through the same theme tokens every component rea
 
 ```
 src/
-  engine.ts         The Loom class: pipeline, canvas, pointer and keyboard input
+  engine.ts         The SayShape class: pipeline, canvas, pointer and keyboard input
   parser.ts         Spec text → node tree, with diagnostics
   expr.ts           The safe expression language
   actions.ts        on= actions
@@ -1600,7 +1602,7 @@ docs/images/        README images
 
 ## Limitations
 
-Loom draws everything itself, so it gives up what the browser normally provides for free. Today it does **not** have:
+SayShape draws everything itself, so it gives up what the browser normally provides for free. Today it does **not** have:
 
 - **Multi-line text, and form validation** (required fields, email format). A model can show a hint with `if=` for now.
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
@@ -1612,7 +1614,7 @@ Loom draws everything itself, so it gives up what the browser normally provides 
 - **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
 
-Don't use Loom where accessibility is required until the accessibility layer lands.
+Don't use SayShape where accessibility is required until the accessibility layer lands.
 
 ---
 
@@ -1622,7 +1624,7 @@ The full phase-by-phase plan, including the component pipeline, testing strategy
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
 2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
-3. **Docs site**: started. `site/` is a VitePress site with a playground, an example gallery and documentation whose examples render live with Loom, deployed to GitHub Pages by `.github/workflows/pages.yml`.
+3. **Docs site**: started. `site/` is a VitePress site with a playground, an example gallery and documentation whose examples render live with SayShape, deployed to GitHub Pages by `.github/workflows/pages.yml`.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
 

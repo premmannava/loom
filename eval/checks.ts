@@ -6,7 +6,7 @@
 import { PropReader } from "../src/component";
 import { scopeOf } from "../src/each";
 import type { Rendered } from "../src/testing";
-import type { LoomNode } from "../src/types";
+import type { SayShapeNode } from "../src/types";
 
 export interface Check {
   /** What the check looks for, shown in the report when it fails. */
@@ -41,7 +41,7 @@ export const repeats = (n: number): Check => ({
       shown.set(line, (shown.get(line) ?? 0) + 1);
     }
     let items = 0;
-    const walk = (node: LoomNode) => {
+    const walk = (node: SayShapeNode) => {
       if (node.type === "each") items += Math.max(0, ...node.children.map((c) => shown.get(c.id) ?? 0));
       node.children.forEach(walk);
     };
@@ -54,7 +54,7 @@ export const repeats = (n: number): Check => ({
 export const nested: Check = {
   label: "repeats a list inside each item",
   test: (_spec, ui) => {
-    const inside = (n: LoomNode, depth: number): boolean =>
+    const inside = (n: SayShapeNode, depth: number): boolean =>
       n.children.some((c) => (c.type === "each" && depth > 0) || inside(c, depth + (c.type === "each" ? 1 : 0)));
     return !!ui.loom.tree && inside(ui.loom.tree, 0);
   },
@@ -110,7 +110,7 @@ export const allDoneShowsMore: Check = {
 };
 
 /** Whether a check's bind= is true, read through the element's own scope (t.done inside each). */
-function isTicked(ui: Rendered, node: LoomNode): boolean {
+function isTicked(ui: Rendered, node: SayShapeNode): boolean {
   return !!new PropReader(node, scopeOf(node, ui.loom.state.scope)).bound();
 }
 

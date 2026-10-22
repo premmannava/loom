@@ -5,12 +5,12 @@
 
 ## The problem
 
-Loom's state holds single values only: a number, a string, true/false or null. Testing with a real model (Qwen3 14B through LM Studio) showed what that costs:
+SayShape's state holds single values only: a number, a string, true/false or null. Testing with a real model (Qwen3 14B through LM Studio) showed what that costs:
 
 - "A to-do list with five tasks" forces the model to write five `check` lines and five separately named state values (`task1`, `task2`…), which it often gets wrong.
 - "A cart with three items and a total" needs a hand-written sum of every price times every quantity.
 - "A list of 20 products" can't be done sensibly at all.
-- An app can't hand Loom its own data ("here are the products, lay them out"), which was the original goal: the model writes the layout, the app supplies the data.
+- An app can't hand SayShape its own data ("here are the products, lay them out"), which was the original goal: the model writes the layout, the app supplies the data.
 
 ## What it will look like
 
@@ -151,7 +151,7 @@ Each step ends with typecheck, tests and build passing, and its own commit.
 
 ## Decisions (confirmed 2026-10-21)
 
-1. **`each items=todos as=t`**, not `each todos as=t`. It keeps Loom's one rule, "everything after the element name is `name=value`", which is easier for models than a special case. *Confirmed.*
+1. **`each items=todos as=t`**, not `each todos as=t`. It keeps SayShape's one rule, "everything after the element name is `name=value`", which is easier for models than a special case. *Confirmed.*
 2. **`remove:t`** to remove the current item, with `remove:list:{i}` as the fallback. It's the simplest for models inside `each`. *Confirmed.*
 3. **Braces starting with `name:` are a record**, so `add:todos:{text:'Snacks'}` works without extra syntax. *Confirmed.*
 4. **A 500-item limit** until scrolling exists. *Confirmed.*

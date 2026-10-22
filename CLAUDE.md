@@ -1,15 +1,15 @@
-# Loom: brief for AI assistants
+# SayShape: brief for AI assistants
 
-Read this before changing anything in this repository. It explains what Loom is, the rules that keep it working, and how to make changes safely. The phase plan is in [`docs/PLAN.md`](docs/PLAN.md); user-facing documentation is in [`README.md`](README.md).
+Read this before changing anything in this repository. It explains what SayShape is, the rules that keep it working, and how to make changes safely. The phase plan is in [`docs/PLAN.md`](docs/PLAN.md); user-facing documentation is in [`README.md`](README.md).
 
-## What Loom is
+## What SayShape is
 
-Loom is two things that are designed together:
+SayShape is two things that are designed together:
 
 1. **A UI language for AI models to write.** It is line-based (one element per line, indentation for nesting), so a model's streamed output renders line by line. It can't run code, and it never contains colors, fonts or pixel sizes.
 2. **An engine that renders that language entirely on its own.** It has its own parser, layout, painter and input handling, and draws onto a single `<canvas>`. It does not use HTML elements, CSS layout, React or any UI framework.
 
-The goal is **generative UI**: a model produces an interface at runtime, in response to a user, and the engine renders it safely, consistently and fast. Loom is not trying to replace React for human-built apps. It is trying to be the layer the model speaks.
+The goal is **generative UI**: a model produces an interface at runtime, in response to a user, and the engine renders it safely, consistently and fast. SayShape is not trying to replace React for human-built apps. It is trying to be the layer the model speaks.
 
 ```
 state days=2 hikers=3
@@ -31,7 +31,7 @@ spec text → parse → tree → layout → boxes → paint → canvas pixels
 
 | Stage | File | Notes |
 |---|---|---|
-| Parse | `src/parser.ts` | Text → `LoomNode` tree plus line-numbered `Diagnostic`s. Validates against component definitions. |
+| Parse | `src/parser.ts` | Text → `SayShapeNode` tree plus line-numbered `Diagnostic`s. Validates against component definitions. |
 | Derived values | `src/state.ts`, `src/parser.ts` | `derive total={…}` lines: parsed and checked (duplicates, state collisions, cycles, writes) into `ParseResult.derived`; `Store` works them out lazily through `evaluate`, caches each until something it reads changes, and refuses writes (`DerivedWriteError`). |
 | Expressions | `src/expr.ts` | Own tokenizer, parser and evaluator for `{…}`. Whitelisted functions only. |
 | Actions | `src/actions.ts` | `on=` strings: `inc`, `dec`, `toggle`, `set`, `emit`, `go`, `back`, `notify`, `add`, `remove`, `clear`, chained with `;`. |
@@ -39,7 +39,7 @@ spec text → parse → tree → layout → boxes → paint → canvas pixels
 | Lists | `src/each.ts` | `each` copies: per-copy scope (`scopeOf`) and where each item lives in state, for writing (`locateOf`). |
 | Paths | `src/paths.ts` | Writing to `t.done` or `settings.theme`: `placeOf`, and `setIn`, which never changes data in place. |
 | Layout | `src/layout.ts` | Headless: needs only a `TextMeasurer`. Produces `Box` trees. `shownChildren` drops hidden children and replaces `each` and `if` blocks with what they stand for. |
-| Engine | `src/engine.ts` | `Loom` class: dirty-stage pipeline, canvas sizing, paint, hit testing, pointer and keyboard. |
+| Engine | `src/engine.ts` | `SayShape` class: dirty-stage pipeline, canvas sizing, paint, hit testing, pointer and keyboard. |
 | Components | `src/components/` | One `ComponentDef` per component. `map/` is a separate entry point. |
 | Contract | `src/component.ts` | `ComponentDef`, `PropDef`, contexts, and `PropReader` for typed prop access. |
 | Popups | `src/popup.ts` | One popup at a time (a select's list, a date picker's calendar): `ComponentDef.popup` measures and paints it; the engine places it in the visible area, paints it last, hit-tests it first, swallows outside presses, routes keys to it and closes it when its owner goes. Its highlight and scroll live in engine-held `PopupState`, never app state. |
@@ -88,7 +88,7 @@ npm run build:world        # regenerate map outlines (rarely needed)
 npm run site:dev           # the website (needs npm ci --prefix site); site:build, site:check
 ```
 
-The website has its own dependencies in `site/package.json`; never add them to the library. Its demos import the engine from `src/`. Its component reference and model guide pages are generated (`npm run site:docs`), and `test/site.test.ts` checks every gallery example and every Loom block in its Markdown.
+The website has its own dependencies in `site/package.json`; never add them to the library. Its demos import the engine from `src/`. Its component reference and model guide pages are generated (`npm run site:docs`), and `test/site.test.ts` checks every gallery example and every SayShape block in its Markdown.
 
 ## Before you say a change is done
 

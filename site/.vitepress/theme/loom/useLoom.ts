@@ -1,11 +1,11 @@
 /**
- * A Vue composable that owns one Loom instance for a component: created in
+ * A Vue composable that owns one SayShape instance for a component: created in
  * the browser after mount (optionally only once it scrolls near the
  * viewport), kept in step with the site theme, and destroyed with every
  * listener removed when the component unmounts.
  */
 import { onBeforeUnmount, onMounted, shallowRef, type Ref } from "vue";
-import { createLoom, loomModules, watchSiteTheme, type CreateOptions, type Loom, type LoomModules } from "./runtime";
+import { createLoom, loomModules, watchSiteTheme, type CreateOptions, type SayShape, type LoomModules } from "./runtime";
 
 export interface UseLoomOptions extends CreateOptions {
   /** Create the instance only when this element comes near the viewport. */
@@ -14,10 +14,10 @@ export interface UseLoomOptions extends CreateOptions {
   followSiteTheme?: () => boolean;
 }
 
-type Setup = (loom: Loom, mods: LoomModules) => void | (() => void);
+type Setup = (loom: SayShape, mods: LoomModules) => void | (() => void);
 
 export function useLoom(canvas: Ref<HTMLCanvasElement | null>, setup: Setup, opts: UseLoomOptions = {}) {
-  const loom = shallowRef<Loom | null>(null);
+  const loom = shallowRef<SayShape | null>(null);
   const failed = shallowRef<string | null>(null);
   const cleanups: Array<() => void> = [];
   let alive = true;

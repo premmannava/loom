@@ -1,5 +1,5 @@
 /**
- * Markdown support for live Loom examples.
+ * Markdown support for live SayShape examples.
  *
  *   ```loom live      highlighted source, with the spec rendered by the real engine beside it
  *   ```loom           highlighted source only

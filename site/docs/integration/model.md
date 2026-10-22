@@ -1,11 +1,11 @@
 ---
 title: Connecting a model
-description: Generating Loom specs with a model. The development playground's local setup, loom-ui/model in your own app, and the evaluation script.
+description: Generating SayShape specs with a model. The development playground's local setup, loom-ui/model in your own app, and the evaluation script.
 ---
 
 # Connecting a model
 
-Loom doesn't include a model. It works with any server that speaks the OpenAI chat completions format: LM Studio, Ollama, vLLM or llama.cpp on your own machine, or hosted APIs such as DeepSeek, OpenAI and OpenRouter.
+SayShape doesn't include a model. It works with any server that speaks the OpenAI chat completions format: LM Studio, Ollama, vLLM or llama.cpp on your own machine, or hosted APIs such as DeepSeek, OpenAI and OpenRouter.
 
 ::: warning This website has no model connection
 GitHub Pages serves static files only. It can't keep an API key secret or forward requests to a model, so the public playground runs saved and edited specs without generating new ones. To generate, run the development playground locally, or give your app a server route that adds the key.
@@ -33,7 +33,7 @@ The repository also has a general-purpose demo at `/playground/connected-order/i
 
 ## In your own app
 
-`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with Loom's parser, and asks once for a fix if there are problems.
+`loom-ui/model` does what the playground does: it streams a spec from an OpenAI-compatible endpoint, removes thinking and code fences, checks the result with SayShape's parser, and asks once for a fix if there are problems.
 
 ```ts
 import { generateSpec } from "loom-ui/model";
@@ -67,11 +67,11 @@ A public site that generates specs needs a server-side endpoint that:
 - streams the response through, so specs still render line by line;
 - limits who can call it and how often, since every request costs money.
 
-Loom doesn't ship that server yet (a production model server package is on the roadmap). Because the browser side only needs a URL, a static front end like this site's playground can use one later by passing its address as `config.url`.
+SayShape doesn't ship that server yet (a production model server package is on the roadmap). Because the browser side only needs a URL, a static front end like this site's playground can use one later by passing its address as `config.url`.
 
 ## Measure it
 
-Whether a model writes good Loom is something to measure, not assume. The repository's evaluation runs a fixed set of requests against your model and checks the results:
+Whether a model writes good SayShape is something to measure, not assume. The repository's evaluation runs a fixed set of requests against your model and checks the results:
 
 ```bash
 npm run eval                        # every request, with the model from .env.local
@@ -80,4 +80,4 @@ npm run eval -- --only data,hard    # some categories or request ids
 npm run eval -- --guide full,compact  # compare guide modes
 ```
 
-`eval/cases.ts` covers forms, comparisons, dashboards, shopping, multi-screen flows, lists of data and traps like "a big red button" (Loom has no colors). Some requests also have **behavior checks**: the spec is rendered with the real engine and used, so ticking a box must change a count and changing a quantity must change a total. The report shows how many specs were valid on the first try and after one repair, how many worked when used, invented props or elements, token usage as the server reports it, and time to the first line. Results go to `eval/results/`, which git ignores.
+`eval/cases.ts` covers forms, comparisons, dashboards, shopping, multi-screen flows, lists of data and traps like "a big red button" (SayShape has no colors). Some requests also have **behavior checks**: the spec is rendered with the real engine and used, so ticking a box must change a count and changing a quantity must change a total. The report shows how many specs were valid on the first try and after one repair, how many worked when used, invented props or elements, token usage as the server reports it, and time to the first line. Results go to `eval/results/`, which git ignores.

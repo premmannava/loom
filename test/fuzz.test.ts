@@ -156,7 +156,7 @@ const mutatedSpec = fc
 
 // ---------------------------------------------------------------- checks
 
-/** A plain value, or a list or record made by Loom's data module (never a host object). */
+/** A plain value, or a list or record made by SayShape's data module (never a host object). */
 const isValue = (v: unknown): v is Value => isData(v);
 
 function checkParse(spec: string): void {
@@ -244,7 +244,7 @@ describe("engine", () => {
 });
 
 describe("expressions", () => {
-  // Scalars plus real Loom data, as a spec's state would hold.
+  // Scalars plus real SayShape data, as a spec's state would hold.
   const data = new Store();
   for (const [k, v] of Object.entries({ a: 2, b: "s", count: 0, done: true, price: 9.5, qty: null, x: -1 })) data.set(k, v);
   data.set("todos", [{ text: "Pack", done: false, price: 3 }, { text: "Go", done: true, lines: [1, 2] }] as unknown as Value);

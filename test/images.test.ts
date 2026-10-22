@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fitRect, ratioValue } from "../src/components/media";
 import { resolveImageUrl, type LoadedImage } from "../src/images";
 import { coreComponents } from "../src/components";
-import { Loom } from "../src/engine";
+import { SayShape } from "../src/engine";
 import { FakeCanvas, render } from "../src/testing";
 
 const policy = { origin: "https://shop.example", base: "https://shop.example/products/", hosts: ["cdn.example.com", "*.imgs.example.net"] };
@@ -97,11 +97,11 @@ describe("image component", () => {
   it("warns on the console by default", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     // render() collects warnings itself, so build an engine with the defaults.
-    const loom = new Loom(new FakeCanvas() as unknown as HTMLCanvasElement, { components: coreComponents, width: 400, animate: false });
+    const loom = new SayShape(new FakeCanvas() as unknown as HTMLCanvasElement, { components: coreComponents, width: 400, animate: false });
     loom.setSpec(`image "Pixel" src="https://tracker.example.org/p.gif"\n`);
     loom.renderNow();
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0]![0])).toMatch(/^Loom: Image .* isn't in imageHosts/);
+    expect(String(warn.mock.calls[0]![0])).toMatch(/^SayShape: Image .* isn't in imageHosts/);
     loom.destroy();
   });
 

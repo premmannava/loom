@@ -1,7 +1,7 @@
 /**
  * The if block: a line holding only if={…} shows the lines indented under it
  * only while its condition holds. Models write conditions this way on their
- * own, so Loom accepts it.
+ * own, so SayShape accepts it.
  */
 import { describe, expect, it } from "vitest";
 import { coreComponents } from "../src/components";

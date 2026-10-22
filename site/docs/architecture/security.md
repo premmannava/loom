@@ -1,17 +1,17 @@
 ---
 title: The expression boundary
-description: Why Loom specs can't run code. The expression interpreter, frozen data, restricted images, and reviewed components.
+description: Why SayShape specs can't run code. The expression interpreter, frozen data, restricted images, and reviewed components.
 ---
 
 # The expression boundary
 
-A spec is written by a model, and a model's output can't be trusted to be harmless. Loom's answer is that a spec isn't a program: there's no route from a spec to JavaScript.
+A spec is written by a model, and a model's output can't be trusted to be harmless. SayShape's answer is that a spec isn't a program: there's no route from a spec to JavaScript.
 
 ## What an expression can do
 
-Everything inside `{…}` goes through Loom's own tokenizer, parser and evaluator in `src/expr.ts`. It can:
+Everything inside `{…}` goes through SayShape's own tokenizer, parser and evaluator in `src/expr.ts`. It can:
 
-- read state and derived values by name, and fields and items of Loom data;
+- read state and derived values by name, and fields and items of SayShape data;
 - do arithmetic, comparisons and logic;
 - call the functions on the [expressions page](../language/expressions#every-function), and no others.
 
@@ -21,7 +21,7 @@ The engine never uses `eval`, `new Function`, `with` or dynamic `import` for spe
 
 ## Data stays data
 
-State values are plain Loom data: numbers, text, true/false, null, and lists and records that are frozen and have no prototype. Data your app passes in with `loom.state.set` is copied into that form; functions, class instances and cycles are refused. Literals in a spec are parsed as data, never run, and are limited in depth (20 levels) and size (10,000 values).
+State values are plain SayShape data: numbers, text, true/false, null, and lists and records that are frozen and have no prototype. Data your app passes in with `loom.state.set` is copied into that form; functions, class instances and cycles are refused. Literals in a spec are parsed as data, never run, and are limited in depth (20 levels) and size (10,000 values).
 
 ## Components are code you review
 

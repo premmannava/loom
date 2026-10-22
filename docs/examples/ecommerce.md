@@ -1,8 +1,8 @@
-# Example: an ecommerce store built with Loom
+# Example: an ecommerce store built with SayShape
 
-This is the design for **Loom Shop**, the reference app in [Phase 6 of the plan](../PLAN.md#phase-6-loom-shop-the-reference-app): a small outdoor-gear store called *Trailhead Outfitters*. It shows how a complete, working store fits together: fixed screens for the parts that must be exact, a shopping assistant whose screens a model generates on the fly, and the host code that connects both to real data and payments.
+This is the design for **SayShape Shop**, the reference app in [Phase 6 of the plan](../PLAN.md#phase-6-loom-shop-the-reference-app): a small outdoor-gear store called *Trailhead Outfitters*. It shows how a complete, working store fits together: fixed screens for the parts that must be exact, a shopping assistant whose screens a model generates on the fly, and the host code that connects both to real data and payments.
 
-> **This uses proposed syntax.** Lists (`each`), data (`source`), host commands (`call:`), screens, `notify:` and the components `input`, `image`, `grid`, `select`, `stepper`, `slider`, `badge`, `rating`, `skeleton` and `empty` are designed in [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) and [Phase 3](../PLAN.md#phase-3-components-and-engine-capabilities). None of them work in Loom 0.1. This document is the target those phases build toward.
+> **This uses proposed syntax.** Lists (`each`), data (`source`), host commands (`call:`), screens, `notify:` and the components `input`, `image`, `grid`, `select`, `stepper`, `slider`, `badge`, `rating`, `skeleton` and `empty` are designed in [Phase 2](../PLAN.md#phase-2-language-02-data-lists-screens) and [Phase 3](../PLAN.md#phase-3-components-and-engine-capabilities). None of them work in SayShape 0.1. This document is the target those phases build toward.
 
 ---
 
@@ -42,18 +42,18 @@ This is the design for **Loom Shop**, the reference app in [Phase 6 of the plan]
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Two Loom instances share one set of registered sources and commands:
+Two SayShape instances share one set of registered sources and commands:
 
 - **The shop** runs a fixed, reviewed spec with five screens. It never involves the model, so it is fast, predictable and exact.
 - **The assistant** is a side panel. The user describes what they need, and a model generates a screen to answer: a comparison, a short list, an outfit. Its buttons open products in the shop or ask the model a follow-up.
 
-Payment details never touch Loom. Checkout hands off to the payment provider's hosted page and comes back to the confirmation screen.
+Payment details never touch SayShape. Checkout hands off to the payment provider's hosted page and comes back to the confirmation screen.
 
 ---
 
 ## Data the store provides
 
-The host registers these with Loom. The model guide describes them from their registrations, exactly like components, so a model knows what data exists and what each command does.
+The host registers these with SayShape. The model guide describes them from their registrations, exactly like components, so a model knows what data exists and what each command does.
 
 ### Sources (read)
 
@@ -253,7 +253,7 @@ screen name=checkout title="Checkout"
   button "Back to cart" variant=secondary on=back
 ```
 
-`checkout.start` creates a session with the payment provider and sends the browser to its hosted page. Card numbers, addresses and payment authentication all happen there. This keeps the store out of scope for most card-data compliance work and keeps Loom away from the most sensitive data in the app.
+`checkout.start` creates a session with the payment provider and sends the browser to its hosted page. Card numbers, addresses and payment authentication all happen there. This keeps the store out of scope for most card-data compliance work and keeps SayShape away from the most sensitive data in the app.
 
 ### 5. Order confirmation
 
@@ -284,12 +284,12 @@ When the payment provider redirects back (for example to `/order/ord_8841`), the
 The host registers sources and commands with their schemas, loads the fixed spec, and connects the assistant. The API names below are the ones proposed in Phase 2 and Phase 4.
 
 ```ts
-import { Loom, coreComponents } from "loom-ui";
+import { SayShape, coreComponents } from "loom-ui";
 import { connectAssistant } from "loom-ui/client";
 import shopSpec from "./shop.loom?raw";
 import { api } from "./api";
 
-const shop = new Loom(document.querySelector("#shop")!, {
+const shop = new SayShape(document.querySelector("#shop")!, {
   components: coreComponents,
   rules: ["commerce"],                 // see "Safety rules for commerce"
 });
@@ -389,7 +389,7 @@ if (match) {
 
 // ---------- the assistant panel
 
-const assistant = new Loom(document.querySelector("#assistant")!, {
+const assistant = new SayShape(document.querySelector("#assistant")!, {
   components: coreComponents,
   rules: ["commerce"],
   sources: shop.sources,               // same data
@@ -417,7 +417,7 @@ shop.on("action", ({ name, value }) => {
 
 ### The assistant endpoint (server)
 
-The server builds the prompt from the same registrations, gives the model tools to look at the catalog, streams Loom to the browser, and repairs once if the spec has errors.
+The server builds the prompt from the same registrations, gives the model tools to look at the catalog, streams SayShape to the browser, and repairs once if the spec has errors.
 
 ```ts
 import { languageGuide, parse, sourceGuide, commandGuide } from "loom-ui/server";
@@ -429,7 +429,7 @@ export async function assistant(req: Request): Promise<Response> {
 
   const system = [
     "You are the shopping assistant for Trailhead Outfitters, an outdoor gear store.",
-    "Answer every request with one Loom screen. Use the tools to find real products first.",
+    "Answer every request with one SayShape screen. Use the tools to find real products first.",
     "Show prices only with {money(...)} reading source data. Never write a price yourself.",
     "To let the shopper continue, add buttons that call shop.open_product or cart.add, or emit ask:<question>.",
     languageGuide(registry),

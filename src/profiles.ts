@@ -3,7 +3,7 @@
  *
  * Three sets are involved, and they're separate on purpose:
  *
- * 1. The renderer's components: the Registry a Loom instance was built with.
+ * 1. The renderer's components: the Registry a SayShape instance was built with.
  *    A screen can use any of them, whoever wrote it.
  * 2. The components exposed to the model: a profile, a subset of (1). The
  *    guide describes only these, so the prompt is smaller and more focused.

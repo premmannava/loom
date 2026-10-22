@@ -1,5 +1,5 @@
 /**
- * Typing. Loom draws text fields on the canvas, but while one is being
+ * Typing. SayShape draws text fields on the canvas, but while one is being
  * edited the engine asks an editor host to put a real text box exactly over
  * it, so the browser does what it's good at: typing, selection, copy and
  * paste, undo, input methods for other languages, autocorrect, password

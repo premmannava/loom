@@ -1,6 +1,6 @@
 ---
 title: Adding a component
-description: How to add a Loom component, and how its documentation, validation and model guide stay in sync.
+description: How to add a SayShape component, and how its documentation, validation and model guide stay in sync.
 ---
 
 # Adding a component

@@ -1,6 +1,6 @@
 /**
- * Asks a model for a Loom spec, streams the clean lines out as they arrive,
- * checks the result with Loom's own parser, and asks once for a fix if it has
+ * Asks a model for a SayShape spec, streams the clean lines out as they arrive,
+ * checks the result with SayShape's own parser, and asks once for a fix if it has
  * problems. Used by the playground and the evaluation script; works in
  * browsers and Node.
  */
@@ -51,7 +51,7 @@ export interface GenerateResult {
   timings: {
     /** Until the model sent anything at all (thinking included). */
     firstTokenMs?: number;
-    /** Until the first Loom line could be shown: what a user waits for. */
+    /** Until the first SayShape line could be shown: what a user waits for. */
     firstLineMs?: number;
     totalMs: number;
   };
@@ -111,7 +111,7 @@ export interface GenerateOptions {
   stateNames?: readonly string[];
   /** Repair when the first spec has: any diagnostic (default), only errors, or never. */
   repairOn?: "any" | "errors" | "never";
-  /** Clean Loom text as it streams. */
+  /** Clean SayShape text as it streams. */
   onText?: (text: string) => void;
   /** Throw away what onText sent so far (a repair is starting, or it was thinking after all). */
   onReset?: (reason: "repair" | "thinking") => void;

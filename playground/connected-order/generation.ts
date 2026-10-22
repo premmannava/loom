@@ -1,4 +1,4 @@
-import { parse, parseActions, type GuideOptions, type LoomNode, type Registry } from "../../src/index";
+import { parse, parseActions, type GuideOptions, type SayShapeNode, type Registry } from "../../src/index";
 import { orderBody, orderPrelude } from "./spec";
 
 export const hostNames = ["equipment", "orders", "events", "department", "departments", "selected", "quantity", "delivery", "earliest", "latest", "sortField", "sortDirection", "activityOpen", "loading", "submitting", "simulateFailure", "message", "visible", "item", "subtotal", "total"];
@@ -28,8 +28,8 @@ export function validateConnectedBody(body: string, registry: Registry): string[
   const parsed = parse(body, registry, { knownNames: hostNames });
   const problems = parsed.diagnostics.map((d) => `Line ${d.line}: ${d.message}`);
   if (parsed.state.length || parsed.derived.length) problems.push("Output UI only. The host owns all state and derived declarations.");
-  const nodes: LoomNode[] = [];
-  const visit = (node: LoomNode) => { nodes.push(node); node.children.forEach(visit); };
+  const nodes: SayShapeNode[] = [];
+  const visit = (node: SayShapeNode) => { nodes.push(node); node.children.forEach(visit); };
   visit(parsed.root);
   for (const node of nodes) {
     const def = registry.get(node.type);

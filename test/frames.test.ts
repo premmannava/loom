@@ -4,7 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreComponents } from "../src/components";
-import { Loom } from "../src/engine";
+import { SayShape } from "../src/engine";
 import { FakeCanvas } from "../src/testing";
 
 let queue: FrameRequestCallback[] = [];
@@ -31,7 +31,7 @@ function runFrames(): void {
 
 function setup(spec: string) {
   const canvas = new FakeCanvas();
-  const loom = new Loom(canvas as unknown as HTMLCanvasElement, { components: coreComponents, width: 400, animate: true });
+  const loom = new SayShape(canvas as unknown as HTMLCanvasElement, { components: coreComponents, width: 400, animate: true });
   loom.setSpec(spec);
   return { canvas, loom };
 }

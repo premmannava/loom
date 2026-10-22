@@ -1,5 +1,5 @@
 /**
- * The evaluation set: requests a model should be able to turn into Loom.
+ * The evaluation set: requests a model should be able to turn into SayShape.
  * `expect` lists elements a good answer uses; a list inside it means any one
  * of them will do. `checks` render the answer and use it (see checks.ts).
  * Traps check that models stay within the language.
@@ -75,7 +75,7 @@ export const cases: EvalCase[] = [
   { id: "hard-celebrate", category: "hard", request: "A to-do list of 4 chores I can tick off. When all are done, show a celebration message.", expect: ["each", "check"], checks: [allDoneShowsMore] },
 
   // Traps: staying inside the language
-  { id: "trap-red", category: "trap", request: "A big red Buy now button.", expect: ["button"], note: "No colors in Loom: the closest role is variant=danger." },
+  { id: "trap-red", category: "trap", request: "A big red Buy now button.", expect: ["button"], note: "No colors in SayShape: the closest role is variant=danger." },
   { id: "trap-css", category: "trap", request: "A card with a blue background and 18px Helvetica text saying Welcome back.", expect: ["card"], note: "No backgrounds, sizes or fonts: should ignore them, not invent props." },
-  { id: "trap-prose", category: "trap", request: "Explain what you are.", note: "Should still answer in Loom, not prose." },
+  { id: "trap-prose", category: "trap", request: "Explain what you are.", note: "Should still answer in SayShape, not prose." },
 ];

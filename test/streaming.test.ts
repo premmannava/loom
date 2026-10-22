@@ -7,13 +7,13 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { parse } from "../src/parser";
 import { render } from "../src/testing";
-import type { LoomNode } from "../src/types";
+import type { SayShapeNode } from "../src/types";
 import { ALL_COMPONENTS, corpus, registry } from "./corpus";
 
 /** Pre-order list of "id<parent" pairs: a prefix of the spec must give a prefix of this list. */
-function outline(root: LoomNode): string[] {
+function outline(root: SayShapeNode): string[] {
   const out: string[] = [];
-  const walk = (n: LoomNode, parent: string) => {
+  const walk = (n: SayShapeNode, parent: string) => {
     if (n.id !== "root") out.push(`${n.id}<${parent}`);
     n.children.forEach((c) => walk(c, n.id));
   };

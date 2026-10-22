@@ -1,4 +1,4 @@
-import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
+import { SayShape, coreComponents, languageGuide, type Diagnostic, type SayShapeNode } from "../src";
 import { mapComponents } from "../src/components/map";
 import { setupAppearance } from "./appearance/panel";
 import { setupAsk } from "./ask";
@@ -12,7 +12,7 @@ const canvas = $<HTMLCanvasElement>("cv");
 
 // The samples use real photos from Unsplash; images from any other host are blocked.
 const imageHosts = ["images.unsplash.com"];
-const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts }).expose("loom");
+const loom = new SayShape(canvas, { components: [...coreComponents, ...mapComponents], imageHosts }).expose("loom");
 // Style presets, light/dark/system and a custom accent, through loom.setTheme.
 setupAppearance(loom);
 // The same guide a model gets from "Ask a model", so copying it into a chat app works the same way.
@@ -151,7 +151,7 @@ $<HTMLInputElement>("tHits").addEventListener("change", (e) => loom.inspector.se
 $<HTMLInputElement>("tInspect").addEventListener("change", (e) => loom.inspector.setInspecting((e.target as HTMLInputElement).checked));
 
 const inspectOut = $("inspect");
-function showNode(node: LoomNode | null) {
+function showNode(node: SayShapeNode | null) {
   inspectOut.textContent = node ? JSON.stringify(loom.inspector.describe(node), null, 2) : "Nothing selected.";
 }
 loom.on("inspect", (sel) => {

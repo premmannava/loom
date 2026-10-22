@@ -1,6 +1,6 @@
 import { toNumber } from "../data";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
-import type { Box, LoomNode, Value } from "../types";
+import type { Box, SayShapeNode, Value } from "../types";
 import { wrapText } from "../text";
 import { chevron, fillTint, gapProp, onProp, partBox, runOn, stack, themeFont } from "./util";
 
@@ -9,17 +9,17 @@ import { chevron, fillTint, gapProp, onProp, partBox, runOn, stack, themeFont } 
 const BAR_H = 42, TAB_PAD = 16;
 
 /** The value a tab stands for: its value= prop, or its label. */
-function tabValue(node: LoomNode, props: (n: LoomNode) => PropReader): Value {
+function tabValue(node: SayShapeNode, props: (n: SayShapeNode) => PropReader): Value {
   const p = props(node);
   return p.has("value") ? (p.value("value") ?? "") : p.text();
 }
 
 /** Which visible tab is selected: the one matching bind=, or the first. */
-function selectedTab(tabs: LoomNode[], current: Value | undefined, props: (n: LoomNode) => PropReader): LoomNode | undefined {
+function selectedTab(tabs: SayShapeNode[], current: Value | undefined, props: (n: SayShapeNode) => PropReader): SayShapeNode | undefined {
   return tabs.find((t) => tabValue(t, props) === current) ?? tabs[0];
 }
 
-interface TabCell { node: LoomNode; label: string; value: Value; x: number; w: number }
+interface TabCell { node: SayShapeNode; label: string; value: Value; x: number; w: number }
 
 export const tabs: ComponentDef = {
   type: "tabs",
