@@ -18,7 +18,8 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:e2e": "node scripts/e2e.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm test && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "1.7.5",
@@ -32,5 +33,19 @@
     "typescript": "5.6.3",
     "vite": "5.4.10",
     "vitest": "2.1.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/premmannava/sayshape.git",
+    "directory": "mcp"
+  },
+  "homepage": "https://premmannava.github.io/sayshape/docs/integration/mcp.html",
+  "keywords": [
+    "mcp",
+    "mcp-apps",
+    "generative-ui",
+    "claude",
+    "chatgpt",
+    "sayshape"
+  ]
 }

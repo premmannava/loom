@@ -23,35 +23,26 @@ In chat apps that stream tool input, the interface builds line by line while the
 
 ## Install
 
-The package isn't on npm yet, so build it from the repository (Node 20 or later):
-
-```bash
-git clone https://github.com/premmannava/sayshape.git
-cd sayshape/mcp
-npm ci
-npm run build          # dist/server.js and dist/ui.html
-```
-
-Then add it to your chat app. Use the full path to `dist/server.js`.
+You need Node.js 20 or later. There's nothing to download yourself: your chat app runs the server with `npx`.
 
 **Claude Desktop:** Settings → Developer → Edit Config, then add:
 
 ```json
 {
   "mcpServers": {
-    "sayshape": { "command": "node", "args": ["/full/path/to/sayshape/mcp/dist/server.js"] }
+    "sayshape": { "command": "npx", "args": ["-y", "sayshape-mcp"] }
   }
 }
 ```
 
-Restart Claude Desktop.
+Quit Claude Desktop completely (Cmd+Q) and reopen it. If it can't find `npx`, use the full path that `which npx` prints.
 
 **VS Code:** in `.vscode/mcp.json`:
 
 ```json
 {
   "servers": {
-    "sayshape": { "type": "stdio", "command": "node", "args": ["/full/path/to/sayshape/mcp/dist/server.js"] }
+    "sayshape": { "type": "stdio", "command": "npx", "args": ["-y", "sayshape-mcp"] }
   }
 }
 ```
@@ -59,12 +50,22 @@ Restart Claude Desktop.
 **Apps that connect to a URL** (custom connectors in Claude on the web, ChatGPT developer mode): run it over HTTP and put it behind HTTPS (a reverse proxy or a tunnel). It listens only on 127.0.0.1:
 
 ```bash
-node dist/server.js --http 3001    # http://127.0.0.1:3001/mcp
+npx -y sayshape-mcp --http 3001    # http://127.0.0.1:3001/mcp
+```
+
+**From source**, to try changes before they're published:
+
+```bash
+git clone https://github.com/premmannava/sayshape.git
+cd sayshape/mcp && npm ci && npm run build
+# then use "command": "node", "args": ["/full/path/to/sayshape/mcp/dist/server.js"]
 ```
 
 Then ask for something visual: *"Show the 2022 World Cup final as a stat card"*, or *"Make me a tip calculator for $86 split three ways"*.
 
 ## Development
+
+Publishing: `npm publish` from this folder runs the tests and the build first (`prepublishOnly`), then uploads `dist/`, this README and the license.
 
 ```bash
 npm test           # server and helpers, against an in-memory MCP client
