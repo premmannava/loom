@@ -25,7 +25,9 @@ Interfaces match the chat app they're in. The view follows its light or dark mod
 
 ## Install
 
-You need Node.js 20 or later. There's nothing to download yourself: your chat app runs the server with `npx`.
+You need Node.js 20 or later.
+
+> **Not on npm yet.** Until it's published, build it from source and point your chat app at `dist/server.js` (see **From source** below), using `"command": "node", "args": ["/full/path/to/sayshape/mcp/dist/server.js"]` in place of the `npx` lines. Once it's published, the `npx` settings below work as written.
 
 **Claude Desktop:** Settings → Developer → Edit Config, then add:
 

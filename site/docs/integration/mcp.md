@@ -20,7 +20,26 @@ Nothing else leaves an interface. A spec can't run code, open links or make requ
 
 ## Install
 
-You need Node.js 20 or later. Add the server to your chat app's MCP settings, and the app runs it with `npx`. In Claude Desktop that's Settings → Developer → Edit Config:
+You need Node.js 20 or later. The server isn't on npm yet, so for now build it from the repository:
+
+```bash
+git clone https://github.com/premmannava/sayshape.git
+cd sayshape/mcp
+npm ci
+npm run build
+```
+
+Then add it to your chat app's MCP settings, with the full path to `mcp/dist/server.js`. In Claude Desktop that's Settings → Developer → Edit Config:
+
+```json
+{
+  "mcpServers": {
+    "sayshape": { "command": "node", "args": ["/full/path/to/sayshape/mcp/dist/server.js"] }
+  }
+}
+```
+
+Once it's published to npm, this shorter setting will work instead:
 
 ```json
 {
