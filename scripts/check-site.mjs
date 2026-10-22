@@ -1,6 +1,6 @@
 /**
  * Checks the built website (site/.vitepress/dist) the way GitHub Pages will
- * serve it, under /loom/.
+ * serve it, under /sayshape/.
  *
  *   npm run site:check              static checks
  *   npm run site:check -- --browser also open every page in Chromium (needs `npx playwright install chromium`)
@@ -8,7 +8,7 @@
  * Static checks:
  * - every internal link, script, stylesheet, image and icon resolves to a built
  *   file, and every #fragment on an internal page link exists on that page;
- * - nothing points at the server root instead of /loom/;
+ * - nothing points at the server root instead of /sayshape/;
  * - no secrets: values from .env.local (if present) and key-shaped strings;
  * - the playground and theme code (not documentation text) never reference a
  *   local model server or the development proxy.
@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const DIST = join(ROOT, "site/.vitepress/dist");
-const BASE = process.env.SITE_BASE ?? "/loom/";
+const BASE = process.env.SITE_BASE ?? "/sayshape/";
 const problems = [];
 const fail = (msg) => problems.push(msg);
 
@@ -119,7 +119,7 @@ console.log("No problems found.");
 async function browserCheck() {
   const { chromium } = await import("playwright");
   const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".woff": "font/woff", ".json": "application/json", ".xml": "application/xml" };
-  // A static server like GitHub Pages: files under /loom/, index.html for folders, 404.html otherwise.
+  // A static server like GitHub Pages: files under /sayshape/, index.html for folders, 404.html otherwise.
   const server = createServer((req, res) => {
     const path = new URL(req.url, "http://x").pathname;
     const file = fileFor(path);

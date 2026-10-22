@@ -5,7 +5,7 @@ description: Working on SayShape itself. Commands, tests, the rules every change
 
 # Development
 
-The repository's brief for contributors, human or AI, is [`CLAUDE.md`](https://github.com/premmannava/loom/blob/main/CLAUDE.md). This page summarizes it.
+The repository's brief for contributors, human or AI, is [`CLAUDE.md`](https://github.com/premmannava/sayshape/blob/main/CLAUDE.md). This page summarizes it.
 
 ```bash
 npm ci
