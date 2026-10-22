@@ -94,8 +94,32 @@ function componentBlock(c: ComponentDef, examples: boolean): string {
   return lines.join("\n");
 }
 
+/**
+ * Full documentation for some elements, for tools that hand a model only what
+ * it asks for (the MCP server's sayshape_docs). Elements an element needs come
+ * along: a table's table-column, a tab's tabs. Unknown names are returned so
+ * the caller can say so.
+ */
+export function elementGuide(registry: Registry, names: readonly string[]): { text: string; unknown: string[] } {
+  const wanted: ComponentDef[] = [];
+  const unknown: string[] = [];
+  const add = (name: string) => {
+    const def = registry.get(name);
+    if (!def) { if (name !== "root") unknown.push(name); return; }
+    if (!wanted.includes(def)) wanted.push(def);
+  };
+  for (const n of names) {
+    const def = registry.get(n);
+    add(n);
+    if (!def) continue;
+    if (Array.isArray(def.children)) def.children.forEach(add);
+    def.parents?.forEach(add);
+  }
+  return { text: wanted.map((c) => componentBlock(c, true)).join("\n\n"), unknown };
+}
+
 /** One line per element, grouped by category, so the model sees the whole menu first. */
-function index(comps: readonly ComponentDef[]): string {
+export function elementIndex(comps: readonly ComponentDef[]): string {
   return CATEGORIES.map((cat) => [cat, comps.filter((c) => c.category === cat)] as const)
     .filter(([, defs]) => defs.length)
     .map(([cat, defs]) => `- ${cat}: ${defs.map((d) => d.type).join(", ")}`)
@@ -352,7 +376,7 @@ ${appActions(opts.actions)}`);
   add("common-props", `EVERY ELEMENT ACCEPTS
 ${Object.entries(COMMON_PROPS).map(([n, d]) => propLine(n, d)).join("\n")}`);
   add("index", `ELEMENTS AT A GLANCE
-${index(comps)}`);
+${elementIndex(comps)}`);
   // An element's example is shown only if it works with the exposed elements.
   add("elements", `ELEMENTS
 ${comps.map((c) => componentBlock(c, examples && ctx.valid(componentExampleSpec(c, comps)))).join("\n\n")}`);
