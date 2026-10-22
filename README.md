@@ -16,6 +16,8 @@ card
   button "Add day" on=inc:days
 ```
 
+**Website:** [premmannava.github.io/loom](https://premmannava.github.io/loom/) has a playground, interactive examples and the documentation, all rendered by this engine.
+
 > **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
@@ -88,6 +90,7 @@ npm run dev        # opens the playground
 | `npm run docs:check` | Fails if the component reference is out of date |
 | `npm run new:component -- <name>` | Scaffolds a component and its test file, and registers it |
 | `npm run build:world` | Regenerates the map's country outlines |
+| `npm run site:dev` / `site:build` / `site:check` | The website in `site/` (VitePress): develop, build, and check the build ([publishing it](https://premmannava.github.io/loom/docs/contributing/website.html)) |
 
 The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels. **Appearance**, at the top, previews the screen in other styles ([Theming](#theming)).
 
@@ -1619,7 +1622,7 @@ The full phase-by-phase plan, including the component pipeline, testing strategy
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
 2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
-3. **Docs site**, built with Loom so every example is live.
+3. **Docs site**: started. `site/` is a VitePress site with a playground, an example gallery and documentation whose examples render live with Loom, deployed to GitHub Pages by `.github/workflows/pages.yml`.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
 
