@@ -1,5 +1,6 @@
 import { Loom, coreComponents, languageGuide, type Diagnostic, type LoomNode } from "../src";
 import { mapComponents } from "../src/components/map";
+import { setupAppearance } from "./appearance/panel";
 import { setupAsk } from "./ask";
 import { samples } from "./samples";
 
@@ -11,6 +12,8 @@ const canvas = $<HTMLCanvasElement>("cv");
 // The samples use real photos from Unsplash; images from any other host are blocked.
 const imageHosts = ["images.unsplash.com"];
 const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents], imageHosts }).expose("loom");
+// Style presets, light/dark/system and a custom accent, through loom.setTheme.
+setupAppearance(loom);
 // The same guide a model gets from "Ask a model", so copying it into a chat app works the same way.
 const guideOptions = { imageHosts };
 const guideText = languageGuide(loom.registry, guideOptions);

@@ -89,7 +89,7 @@ npm run dev        # opens the playground
 | `npm run new:component -- <name>` | Scaffolds a component and its test file, and registers it |
 | `npm run build:world` | Regenerates the map's country outlines |
 
-The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels.
+The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels. **Appearance**, at the top, previews the screen in other styles ([Theming](#theming)).
 
 ---
 
@@ -1544,6 +1544,18 @@ const brand = extendTheme(lightTheme, {
 });
 loom.setTheme(brand);
 ```
+
+### Trying styles in the playground
+
+The playground's **Appearance** button opens a small panel for previewing the current screen in another style, and copying the setup into your app. It only changes the playground's theme, through `loom.setTheme`: the spec, state, selections and any open list or calendar stay as they are, and no model is asked again.
+
+- **Style:** Teal (Loom's default), Purple, Blue or Neutral, each with matching light and dark colors. Neutral is grey, with firmer field and divider lines so controls stand out.
+- **Mode:** Light, Dark, or System, which follows the operating system as it changes. The page around the canvas follows too.
+- **Accent color:** a color picker and a hex field (`#rgb` or `#rrggbb`; half-typed or invalid values aren't applied). Loom uses the accent as text and strokes and as the fill behind button labels, so a color that's too close to the background is darkened (light mode) or lightened (dark mode) just enough to reach 4.5:1 contrast, and the panel says what it shows instead. The color you asked for is kept, so each mode adjusts it on its own. The label color on the accent is picked automatically. **Reset color** goes back to the style's accent; **Reset appearance** goes back to Loom's default.
+- **Copy theme code** copies TypeScript that recreates what you see with `extendTheme`, `lightTheme`, `darkTheme` and `loom.setTheme`, using the colors actually shown (after any adjustment). For Light or Dark it sets one theme; for System it exports both and a `followSystemAppearance(loom)` function that returns a cleanup. If the clipboard isn't available, the code appears in a box to copy by hand.
+- The choice is saved in your browser (`localStorage`, key `loom-playground-appearance:v1`): the style, the mode and the accent you asked for, nothing else.
+
+The styles change colors only, through the same theme tokens every component reads; they're a playground feature, not part of the Loom language, so models still can't choose colors. Teal, Purple and Blue keep Loom's default field and divider lines, which are lighter than the 3:1 that WCAG asks of control boundaries; Neutral meets it.
 
 ---
 

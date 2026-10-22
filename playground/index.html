@@ -15,6 +15,38 @@
       <h1>Loom<span>.</span> playground</h1>
       <p>Write or stream a spec on the left. Loom parses it, lays it out and paints it on a canvas on the right.</p>
     </div>
+    <details class="appearance" id="appearance">
+      <summary class="btn">Appearance</summary>
+      <div class="ap-panel">
+        <fieldset>
+          <legend>Style</legend>
+          <div class="ap-opts" id="apPresets"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Mode</legend>
+          <div class="ap-opts">
+            <label class="ap-opt"><input type="radio" name="apMode" value="light"><span>Light</span></label>
+            <label class="ap-opt"><input type="radio" name="apMode" value="dark"><span>Dark</span></label>
+            <label class="ap-opt"><input type="radio" name="apMode" value="system"><span>System</span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Accent color</legend>
+          <div class="ap-accent">
+            <input type="color" id="apColor" aria-label="Accent color picker">
+            <input type="text" id="apHex" aria-label="Accent color as a hex code" aria-describedby="apNote" spellcheck="false" autocomplete="off" maxlength="9" placeholder="#6d28d9">
+            <button class="btn" id="apReset" type="button">Reset color</button>
+          </div>
+          <p class="ap-note" id="apNote" aria-live="polite"></p>
+        </fieldset>
+        <div class="ap-actions">
+          <button class="btn primary" id="apCopy" type="button">Copy theme code</button>
+          <button class="btn" id="apResetAll" type="button">Reset appearance</button>
+        </div>
+        <p class="ap-note" id="apCopyStatus" role="status"></p>
+        <textarea class="ap-code" id="apCode" readonly hidden aria-label="Theme code to copy" spellcheck="false"></textarea>
+      </div>
+    </details>
     <dl class="metrics" aria-label="Pipeline metrics">
       <div><dt>Nodes</dt><dd id="mNodes">0</dd></div>
       <div><dt>Parse</dt><dd id="mParse">0.00 ms</dd></div>
