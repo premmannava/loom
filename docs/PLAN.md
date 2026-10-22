@@ -229,9 +229,9 @@ screen name=product title="{product.data.name}"
 - `tabs` holds `tab` children, and only the selected tab's content is laid out.
 - `avatar` shows initials only; photos wait for `image`.
 
-Since then: `image` and `slider` (with the engine's images and dragging), `screen` (Phase 2.6), `input`, and `chart` (bar and line, one series, read-only; no scrolling needed since it fits its width).
+Since then: `image` and `slider` (with the engine's images and dragging), `screen` (Phase 2.6), `input`, `chart` (bar and line, one series, read-only; no scrolling needed since it fits its width), and `table` (up to 200 rows and 8 columns, sorting and single-row selection through state; no scrolling, so long lists are paged with `take()` or `pagination`).
 
-Still waiting on engine capabilities: `select`/`option` and `table` (lists of data now exist; they still need scrolling and, for `select`, overlays), `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
+Still waiting on engine capabilities: `select`/`option` (needs overlays), a scrolling or virtualized table for long lists, `dialog`, `menu` and `tooltip` (need overlays), and all of Tier C.
 
 **Exit criteria:** Tier A and the engine capabilities are done, with contract tests, visual baselines and docs. The accessibility mirror passes an automated audit (axe) on all samples. A screen reader can complete the store's add-to-cart flow (tested by hand with VoiceOver and NVDA).
 

@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, 36 components including text input, lists and data, bar and line charts, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, 38 components including text input, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -267,6 +267,27 @@ chart "Revenue trend" kind=line items=sales x=month y=revenue format=money
 - An empty list, a value that isn't a list, or no numbers at all shows "No data to chart" or "No numbers to chart". More than 200 items, or too little width for them, shows a message saying so instead of a partial chart.
 - Problems a model can fix (items that aren't a list, gaps, too little room) are reported once through the engine's `onWarning`, not on every frame.
 
+#### Tables
+
+`table` shows a list of records as rows, with one `table-column` line per field, in the order written:
+
+```
+state equipment=[{id: "laptop", name: "Laptop", price: 1200, stock: 12}, {id: "monitor", name: "Monitor", price: 350, stock: 24}] selected="" sortField="name" sortDirection="asc"
+table "Available equipment" items=equipment key=id bind=selected sort=sortField direction=sortDirection
+  table-column "Equipment" field=name
+  table-column "Price" field=price format=money
+  table-column "In stock" field=stock format=number
+```
+
+Everything beyond showing rows is opt-in through state, so it can be read, shown and changed like any other state: `sort=` and `direction=` make the headers pressable (press to sort, press again to flip), and `bind=` with `key=` makes the rows pressable (`on=` runs after the selection is stored). The props are in the [reference](#table). How it treats data:
+
+- **Cells.** Text columns show text as written, numbers like `1,200.5` and true/false as Yes/No. `number` and `money` columns (US dollars, as `money()`) show only numbers, right-aligned; text like `"12"` is never read as a number. Missing fields, `null`, lists, records and values a column can't show appear as `—`. `0` and `false` are values, not missing. Very large or small numbers use scientific form (`1E300`) instead of being cut short.
+- **Sorting.** The list itself is never reordered: the table shows a sorted copy. Ascending puts numbers by value, then text alphabetically (ignoring case, with numbers in text compared as numbers, so "Item 2" comes before "Item 10"), then false and true; descending reverses that. Missing values always go last, and equal values keep their list order. A sort state naming no column leaves the list in order.
+- **Selection.** `bind=` holds the selected row's `key=` value, text or a number (0 included), so the selection stays with its record when the table is sorted or the list changes. Rows with no key, or a key an earlier row already has, can't be selected. A selected key no row has selects nothing; the state keeps its value until something changes it.
+- **Space.** Columns get their natural width, and spare room goes to text columns. When space is short, text columns are narrowed with an ellipsis, but never below a minimum, and numbers are never cut. If the columns still don't fit, or there are more than 200 rows or 8 columns, the table shows a message saying so instead of a cut-down table. Show a page of a long list with `take()` or `pagination`.
+- **Keyboard.** Pressable headers and rows are each a Tab stop and work with Enter and Space. A table with no `sort=` or `bind=` adds no Tab stops.
+- Problems a model can fix (items that aren't a list, missing or repeated keys, cells their column can't show, too many rows or columns, too little room) are reported once through `onWarning`. While a spec streams in, a table whose columns haven't arrived shows "No columns yet".
+
 ### Screens
 
 A spec can hold several screens. Only one shows at a time: the first, until a button moves to another with `go:name`. `back` returns to the previous one, and the visible screen's name is in `{screen}`.
@@ -327,7 +348,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 |---|---|
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
-| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`map`](#map), [`pin`](#pin) |
+| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
@@ -625,6 +646,46 @@ A bar or line chart of one number per item of a list of records, such as revenue
 ```
 state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
 chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+```
+
+### `table`
+
+Rows of a list of records, one table-column per field, for things like inventory, orders or expenses. With sort= and direction=, pressing a header sorts by it; with bind= and key=, pressing a row selects it.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | A title above the table. |
+| `items` | expression, required | The list of records, e.g. items=equipment. At most 200 rows; show a page of a longer list with take() or pagination. |
+| `key` | name | The field that identifies each row, e.g. key=id. Needed for bind=. |
+| `bind` | state | State that holds the selected row's key. Pressing a row sets it. |
+| `sort` | state | State that holds the field to sort by. Pressing a header sets it; missing values sort last. |
+| `direction` | state | State that holds asc or desc. Pressing the sorted header again flips it. |
+| `on` | action | Actions to run after a row is selected, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+Children: `table-column`.
+
+```
+state gear=[{id: "tent", name: "Tent", price: 180}, {id: "stove", name: "Stove", price: 45}] picked="" by="name" dir="asc"
+table items=gear key=id bind=picked sort=by direction=dir
+  table-column "Item" field=name
+  table-column "Price" field=price format=money
+```
+
+### `table-column`
+
+One column of a table: its header and the field it shows.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The header. Defaults to the field name. |
+| `field` | name, required | The field of each record to show, e.g. field=price. |
+| `format` | `text` / `number` / `money` | text, number (1,200.5) or money ($1,200.00, US dollars). number and money show only numbers; other values show —. |
+| `align` | `left` / `right` | left or right. Default: right for number and money, left for text. |
+
+Only inside: `table`.
+
+```
+table-column "Price" field=price format=money
 ```
 
 ### `button`
@@ -1417,6 +1478,7 @@ Loom draws everything itself, so it gives up what the browser normally provides 
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
 - **Scrolling regions, overlays, dialogs or menus.**
+- **Tables beyond the basics.** `table` shows at most 200 rows and 8 columns, without scrolling, sticky headers, editable cells, multi-row selection, nested elements in cells, or resizing and reordering columns. A table too wide for its space shows a message instead of scrolling.
 - **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
 
@@ -1429,7 +1491,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), and bar and line charts. Next: scrolling, select, table and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, and tables with sorting and selection. Next: scrolling, select and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

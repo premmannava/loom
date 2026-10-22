@@ -265,4 +265,26 @@ card
     button "Drop oldest" variant=secondary on=remove:months:0 disabled={len(months) < 2}
 `,
   },
+  inventory: {
+    label: "Inventory",
+    prompt: "An equipment inventory table I can sort by any column, where picking a row shows that item's details.",
+    spec: `state equipment=[{id: "laptop", name: "Laptop", category: "Computers", price: 1200, stock: 12}, {id: "monitor", name: "27-inch monitor", category: "Displays", price: 350, stock: 24}, {id: "dock", name: "USB-C dock", category: "Accessories", price: 189.5, stock: 0}, {id: "keyboard", name: "Keyboard", category: "Accessories", price: 79, stock: 41}, {id: "headset", name: "Headset", category: "Audio", price: 129, stock: 7}, {id: "webcam", name: "Webcam", category: "Video", price: 95, stock: 3}] selected="laptop" sortField="name" sortDirection="asc"
+card
+  text "Equipment" style=title
+  text "{len(equipment)} items, sorted by {sortField} ({sortDirection == 'asc' ? 'low to high' : 'high to low'})" tone=muted
+  table items=equipment key=id bind=selected sort=sortField direction=sortDirection on="emit:selected:{selected}"
+    table-column "Equipment" field=name
+    table-column "Price" field=price format=money
+    table-column "In stock" field=stock format=number
+  if={selected != ''}
+    card
+      text "{find(equipment, 'id', selected).name}" weight=semibold
+      text "{find(equipment, 'id', selected).category}" tone=muted
+      list
+        list-item "Price" trailing="{money(find(equipment, 'id', selected).price)}"
+        list-item "In stock" trailing="{find(equipment, 'id', selected).stock}"
+        list-item "Stock value" trailing="{money(find(equipment, 'id', selected).price * find(equipment, 'id', selected).stock)}"
+      button "Request one" on="emit:request:{selected}" disabled={find(equipment, 'id', selected).stock == 0}
+`,
+  },
 };

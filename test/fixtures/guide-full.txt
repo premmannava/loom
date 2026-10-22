@@ -94,7 +94,7 @@ EVERY ELEMENT ACCEPTS
 ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
 - content: text, image, code, badge, avatar
-- data: stat, rating, chart, map, pin
+- data: stat, rating, chart, table, table-column, map, pin
 - input: button, link, check, switch, radio, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
 - feedback: progress, skeleton, empty
@@ -262,6 +262,30 @@ ELEMENTS
     example:
       state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
       chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+
+  table "<text>"  — Rows of a list of records, one table-column per field, for things like inventory, orders or expenses. With sort= and direction=, pressing a header sorts by it; with bind= and key=, pressing a row selects it.
+    "<text>"  A title above the table.
+    items=<expression, required>  The list of records, e.g. items=equipment. At most 200 rows; show a page of a longer list with take() or pagination.
+    key=<name>  The field that identifies each row, e.g. key=id. Needed for bind=.
+    bind=<state>  State that holds the selected row's key. Pressing a row sets it.
+    sort=<state>  State that holds the field to sort by. Pressing a header sets it; missing values sort last.
+    direction=<state>  State that holds asc or desc. Pressing the sorted header again flips it.
+    on=<action>  Actions to run after a row is selected, with bind= already set, e.g. emit:changed. Separate several with ;
+    children: table-column
+    example:
+      state gear=[{id: "tent", name: "Tent", price: 180}, {id: "stove", name: "Stove", price: 45}] picked="" by="name" dir="asc"
+      table items=gear key=id bind=picked sort=by direction=dir
+        table-column "Item" field=name
+        table-column "Price" field=price format=money
+
+  table-column "<text>"  — One column of a table: its header and the field it shows.
+    "<text>"  The header. Defaults to the field name.
+    field=<name, required>  The field of each record to show, e.g. field=price.
+    format=<text|number|money>  text, number (1,200.5) or money ($1,200.00, US dollars). number and money show only numbers; other values show —.
+    align=<left|right>  left or right. Default: right for number and money, left for text.
+    only inside: table
+    example:
+      table-column "Price" field=price format=money
 
   button "<text>"  — A pressable button that runs actions. Use emit: to tell the app what the user chose.
     "<text>" (required)  The button label.

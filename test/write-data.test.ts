@@ -68,6 +68,7 @@ describe("bind= inside each, for every component that binds", () => {
     ["breadcrumb", `breadcrumb "Shop / Shoes / Socks" bind=r.v`, "v", "Socks", "press"],
     ["pagination", `pagination bind=r.v pages=3`, "v", 1, "last"],
     ["map", `map bind=r.v`, "v", "", "country"],
+    ["table", `table items=rows key=name bind=r.v\n      table-column "Name" field=name`, "v", "", "press"],
   ];
 
   it("covers all of them", () => {
