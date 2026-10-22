@@ -5,10 +5,12 @@
  * browsers and Node.
  */
 import { parse } from "../parser";
-import { languageGuide, type GuideOptions } from "../prompt";
+import { languageGuide, type GuideMode, type GuideOptions } from "../prompt";
+import { resolveProfile } from "../profiles";
 import type { Registry } from "../registry";
 import type { Diagnostic } from "../types";
 import { loomLineTest, SpecFilter } from "./clean";
+import { refineMessages, sumUsage, type ContextInfo, type ContextPolicy, type RefineContext, type UsageTotals } from "./context";
 import { streamChat, type ChatMessage, type ModelConfig, type Usage } from "./stream";
 
 export type Phase = "waiting" | "thinking" | "writing" | "repairing" | "done";
@@ -27,6 +29,15 @@ export interface Attempt {
    * thinking: some models write the spec inside a thinking block they never close.
    */
   recovered: boolean;
+  /** The guide this attempt was sent: its mode ("custom" for a guide passed as text) and profile. */
+  guide: { mode: GuideMode | "custom"; profile: string };
+  /** Characters sent (every message), and that divided by 4: an estimate, not a token count. */
+  inputChars: number;
+  estimatedInputTokens: number;
+  /** Thinking characters / 4: an estimate, kept apart from the server's reasoningTokens. */
+  estimatedThinkingTokens: number;
+  /** How long this attempt took, from its request to its last byte. */
+  ms: number;
 }
 
 export interface GenerateResult {
@@ -42,8 +53,20 @@ export interface GenerateResult {
     firstLineMs?: number;
     totalMs: number;
   };
-  /** The conversation, for a follow-up request. */
+  /**
+   * The conversation ending with the accepted spec: the guide, the context,
+   * the request and the final spec. A rejected repair isn't in it, and a
+   * kept repair replaces the first spec, so it can be sent as history.
+   */
   messages: ChatMessage[];
+  /** Everything that was sent and received, repair included, for debugging. */
+  transcript: ChatMessage[];
+  /** Usage over all attempts. A total stays undefined (unknown) when any attempt didn't report it. */
+  usage: UsageTotals;
+  /** The context sent with the request. */
+  context: ContextInfo;
+  /** The elements a spec was checked against: "renderer" (every registered one) or the profile's. */
+  validatedAgainst: "renderer" | "profile";
 }
 
 export interface GenerateOptions {
@@ -53,8 +76,30 @@ export interface GenerateOptions {
   request: string;
   /** The guide, or options to build it from the registry. */
   guide?: string | GuideOptions;
-  /** Earlier turns, to refine a previous screen ("make it shorter"). */
+  /**
+   * Earlier turns, sent as they are, between the guide and the request. For
+   * changing a screen, refine is usually better: it doesn't grow every turn.
+   */
   history?: ChatMessage[];
+  /**
+   * Change an existing spec: sends the original task, lasting requirements,
+   * earlier changes, the current spec and the change (request), instead of
+   * the whole conversation. See context.ts. Can't be used with history.
+   */
+  refine?: RefineContext;
+  /** Limits for refine. */
+  contextPolicy?: ContextPolicy;
+  /**
+   * The guide for the repair attempt: "same" (default) or "full", which
+   * switches a compact guide to the full one for the repair, with the same
+   * profile. Only works when guide is options, not text.
+   */
+  repairGuide?: "same" | "full";
+  /**
+   * Check specs against the profile's elements, not every registered one,
+   * so an element outside the profile is sent back for repair. Default false.
+   */
+  enforceProfile?: boolean;
   /** Appended to the user's request, e.g. "/no_think" to turn off Qwen3's thinking. */
   userSuffix?: string;
   /**
@@ -83,18 +128,38 @@ export function repairPrompt(diagnostics: Diagnostic[]): string {
 }
 
 export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> {
+  if (o.history?.length && o.refine) throw new Error("generateSpec: pass history or refine, not both");
   const now = o.now ?? clock;
   const start = now();
-  const guide = typeof o.guide === "string" ? o.guide : languageGuide(o.registry, o.guide);
+  const guideOpts = typeof o.guide === "string" ? undefined : o.guide ?? {};
+  const guide = typeof o.guide === "string" ? o.guide : languageGuide(o.registry, guideOpts);
+  const profile = resolveProfile(o.registry, guideOpts?.profile);
+  const guideInfo = (mode: GuideMode | "custom") => ({ mode, profile: profile.name });
+  const firstGuide = guideInfo(guideOpts ? guideOpts.mode ?? "full" : "custom");
+  const checkWith = o.enforceProfile ? profile.registry : o.registry;
   const isLoomLine = loomLineTest((name) => o.registry.has(name));
   const timings: GenerateResult["timings"] = { totalMs: 0 };
-  const messages: ChatMessage[] = [
-    { role: "system", content: guide },
-    ...(o.history ?? []),
-    { role: "user", content: o.request + (o.userSuffix ? `\n\n${o.userSuffix}` : "") },
-  ];
 
-  const run = async (msgs: ChatMessage[]): Promise<Attempt> => {
+  // The guide first, then the context, then the request: the guide is the
+  // same for every request with the same options, so it stays a shared
+  // prefix that servers with prefix caching can reuse.
+  const suffix = o.userSuffix ? `\n\n${o.userSuffix}` : "";
+  let context: ChatMessage[], request: ChatMessage, info: ContextInfo;
+  if (o.refine) {
+    const r = refineMessages(o.refine, o.request, o.contextPolicy);
+    context = r.messages.slice(0, -1);
+    request = { ...r.messages[r.messages.length - 1]!, content: r.messages[r.messages.length - 1]!.content + suffix };
+    info = r.info;
+  } else {
+    context = o.history ?? [];
+    request = { role: "user", content: o.request + suffix };
+    info = { policy: context.length ? "history" : "none", messages: context.length, chars: 0 };
+  }
+  info.chars = [...context, request].reduce((n, m) => n + m.content.length, 0);
+  const sent: ChatMessage[] = [{ role: "system", content: guide }, ...context, request];
+
+  const run = async (msgs: ChatMessage[], g: Attempt["guide"]): Promise<Attempt> => {
+    const began = now();
     const filter = new SpecFilter(isLoomLine);
     const usage: Usage = {};
     let raw = "", spec = "", thinking = "", phase: Phase = "waiting";
@@ -125,12 +190,18 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
       const found = again.push(text).text + again.end().text;
       if (found.trim()) { recovered = true; emit({ text: found.trimEnd() + "\n", reset: false }); }
     }
-    const diagnostics = parse(spec, o.registry, { knownNames: o.stateNames }).diagnostics;
-    return { spec, diagnostics, raw, usage, thinkingChars: thinking.length + filter.thinkingChars, thinking, recovered };
+    const diagnostics = parse(spec, checkWith, { knownNames: o.stateNames }).diagnostics;
+    const inputChars = msgs.reduce((n, m) => n + m.content.length, 0);
+    const thinkingChars = thinking.length + filter.thinkingChars;
+    return {
+      spec, diagnostics, raw, usage, thinkingChars, thinking, recovered,
+      guide: g, inputChars, estimatedInputTokens: Math.round(inputChars / 4), estimatedThinkingTokens: Math.round(thinkingChars / 4),
+      ms: now() - began,
+    };
   };
 
-  const first = await run(messages);
-  messages.push({ role: "assistant", content: first.spec });
+  const first = await run(sent, firstGuide);
+  const transcript: ChatMessage[] = [...sent, { role: "assistant", content: first.spec }];
   const repairOn = o.repairOn ?? "any";
   const needsRepair =
     repairOn === "any" ? first.diagnostics.length > 0 :
@@ -140,9 +211,16 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
   if (needsRepair && first.spec.trim()) {
     o.onReset?.("repair");
     o.onPhase?.("repairing");
-    messages.push({ role: "user", content: repairPrompt(first.diagnostics) });
-    repair = await run(messages);
-    messages.push({ role: "assistant", content: repair.spec });
+    // Optionally swap a compact guide for the full one, with the same profile.
+    const fallback = o.repairGuide === "full" && guideOpts && (guideOpts.mode ?? "full") !== "full";
+    const repairMsgs: ChatMessage[] = [
+      fallback ? { role: "system", content: languageGuide(o.registry, { ...guideOpts, mode: "full" }) } : sent[0]!,
+      ...transcript.slice(1),
+      { role: "user", content: repairPrompt(first.diagnostics) },
+    ];
+    repair = await run(repairMsgs, fallback ? guideInfo("full") : firstGuide);
+    transcript.length = 0;
+    transcript.push(...repairMsgs, { role: "assistant", content: repair.spec });
   }
 
   timings.totalMs = now() - start;
@@ -150,5 +228,16 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
   // Keep the first spec if the repair came back empty or worse.
   const useRepair = repair && repair.spec.trim() && repair.diagnostics.length <= first.diagnostics.length;
   const final = useRepair ? repair! : first;
-  return { spec: final.spec, diagnostics: final.diagnostics, first, repair, timings, messages };
+  return {
+    spec: final.spec,
+    diagnostics: final.diagnostics,
+    first,
+    repair,
+    timings,
+    messages: [...sent, { role: "assistant", content: final.spec }],
+    transcript,
+    usage: sumUsage(repair ? [first.usage, repair.usage] : [first.usage]),
+    context: info,
+    validatedAgainst: o.enforceProfile ? "profile" : "renderer",
+  };
 }

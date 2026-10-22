@@ -4,7 +4,7 @@
  * browser needs no CORS from the model server and never sees an API key.
  */
 import type { Loom } from "../src";
-import { generateSpec, ModelError, type ChatMessage, type GenerateResult, type Phase } from "../src/model";
+import { generateSpec, ModelError, nextRefineContext, type GenerateResult, type Phase, type RefineContext } from "../src/model";
 import type { GuideOptions } from "../src/prompt";
 
 declare const __LOOM_MODEL__: string;
@@ -42,10 +42,11 @@ export function setupAsk(d: AskDeps): void {
 
   let controller: AbortController | null = null;
   /**
-   * The conversation as the user sees it: each request and the screen it
-   * ended with. Repair turns aren't kept, so refining doesn't resend mistakes.
+   * What a refinement sends: the first request, the changes asked for since,
+   * and the current screen. Earlier screens and failed tries aren't kept, so
+   * a refinement costs about the same however many came before.
    */
-  let turns: ChatMessage[] = [];
+  let context: RefineContext | null = null;
 
   const say = (html: string, kind: "" | "live" | "error" = "") => {
     status.innerHTML = html;
@@ -95,8 +96,10 @@ export function setupAsk(d: AskDeps): void {
 
   function summary(r: GenerateResult): string {
     const parts = [`Done in ${secs(r.timings.totalMs)}`, `first line after ${secs(r.timings.firstLineMs)}`];
-    const tokens = (r.first.usage.completionTokens ?? 0) + (r.repair?.usage.completionTokens ?? 0);
-    if (tokens) parts.push(`${tokens} output tokens`);
+    // Reported numbers only; a server that doesn't report them leaves them out.
+    if (r.usage.promptTokens !== undefined) parts.push(`${r.usage.promptTokens} input tokens`);
+    else parts.push(`about ${r.first.estimatedInputTokens + (r.repair?.estimatedInputTokens ?? 0)} input tokens (estimated)`);
+    if (r.usage.completionTokens !== undefined) parts.push(`${r.usage.completionTokens} output tokens`);
     if (r.first.thinkingChars) parts.push(`thought for about ${Math.round(r.first.thinkingChars / 4)} tokens first`);
     const firstProblems = r.first.diagnostics.length;
     if (!firstProblems) parts.push("valid on the first try");
@@ -114,15 +117,11 @@ export function setupAsk(d: AskDeps): void {
     d.stopSample();
     d.setPrompt(request);
 
-    // Refining sends the conversation so far, with the editor's current text
-    // (which the user may have edited) as the model's last answer.
-    let history: ChatMessage[] | undefined;
-    if (refine.checked && turns.length) {
-      history = [...turns.slice(0, -1), { role: "assistant", content: d.loom.spec }];
-    }
+    // Refining sends the editor's current text, which the user may have edited.
+    const refining = refine.checked && context ? { ...context, spec: d.loom.spec } : undefined;
 
     const startScreen = () => {
-      d.loom.beginStream({ keepState: !!history });
+      d.loom.beginStream({ keepState: !!refining });
       d.setEditor("", { readOnly: true });
     };
     startScreen();
@@ -138,7 +137,7 @@ export function setupAsk(d: AskDeps): void {
         registry: d.loom.registry,
         guide: d.guide,
         request,
-        history,
+        refine: refining,
         userSuffix,
         signal: controller.signal,
         onText: (t) => { d.loom.push(t); d.setEditor(t, { append: true, readOnly: true }); },
@@ -150,13 +149,13 @@ export function setupAsk(d: AskDeps): void {
           say(repairing && p !== "repairing" ? `${phaseText.repairing} ${phaseText[p].toLowerCase()}` : phaseText[p], "live");
         },
       });
-      turns = [...(history ?? []), { role: "user", content: request }, { role: "assistant", content: r.spec }];
+      context = refining ? nextRefineContext(refining, request, r.spec) : r.spec.trim() ? { task: request, spec: r.spec } : null;
       d.loom.endStream();
       d.setEditor(r.spec, { readOnly: false });
       // The final spec may be the first attempt if the repair came out worse.
       if (d.loom.spec !== r.spec) d.loom.setSpec(r.spec);
       say(esc(summary(r)));
-      refine.disabled = false;
+      refine.disabled = !context;
     } catch (e) {
       d.loom.endStream();
       d.setEditor(d.loom.spec, { readOnly: false });

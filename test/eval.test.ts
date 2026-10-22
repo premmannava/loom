@@ -222,3 +222,70 @@ card
     expect(report(results, { model: "m", url: "u", date: "d", guideTokens: 1, repair: false })).toMatch(/\| Worked when used \(behavior checks\) \| 1\/1 \(100%\) \|/);
   });
 });
+
+describe("comparing prompting variants", () => {
+  const pick = (...ids: string[]) => cases.filter((c) => ids.includes(c.id));
+
+  it("runs each request once per variant, interleaved, and records the guide and profile", async () => {
+    const order: string[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as { messages: Array<{ content: string }> };
+      order.push(body.messages[0]!.content.includes("ELEMENTS AT A GLANCE") ? "full" : "compact");
+      return fakeModel(() => `card\n  stepper "Guests" bind=g\n  button "Book"\n`)(url, init);
+    }) as typeof fetch;
+    const results = await runEval(pick("form-booking", "form-settings"), {
+      config, registry, fetch: fetchImpl, repair: false,
+      variants: [{ name: "full", guide: { mode: "full" } }, { name: "compact", guide: { mode: "compact" } }],
+    });
+    expect(order).toEqual(["full", "compact", "full", "compact"]);
+    expect(results.map((r) => `${r.id}/${r.variant}/${r.guideMode}/${r.profile}/${r.contextPolicy}`)).toEqual([
+      "form-booking/full/full/all/none", "form-booking/compact/compact/all/none",
+      "form-settings/full/full/all/none", "form-settings/compact/compact/all/none",
+    ]);
+    expect(results[1]!.guideChars).toBeLessThan(results[0]!.guideChars);
+    expect(results[1]!.inputTokensEstimated).toBeLessThan(results[0]!.inputTokensEstimated);
+    const md = report(results, { model: "fake", url: "u", date: "d", guideTokens: 1, repair: false });
+    expect(md).toMatch(/## Comparison on the 2 requests every variant supports/);
+    expect(md).toMatch(/\| Valid on the first try \| 2\/2 \(100%\) \| 2\/2 \(100%\) \|/);
+    expect(md).toMatch(/## Variant: compact/);
+  });
+
+  it("reports requests a profile can't build without sending them, and compares only the rest", async () => {
+    let sent = 0;
+    const reply = fakeModel(() => `card\n  text "Hi"\n`);
+    const fetchImpl = (async (url: string, init: RequestInit) => { sent++; return reply(url, init); }) as typeof fetch;
+    // dashboard has no stepper or switch.
+    const results = await runEval(pick("form-booking", "form-settings"), {
+      config, registry, fetch: fetchImpl, repair: false,
+      variants: [{ name: "full", guide: {} }, { name: "dash", guide: { mode: "compact", profile: "dashboard" } }],
+    });
+    expect(sent).toBe(2);
+    const dash = results.filter((r) => r.variant === "dash");
+    expect(dash.every((r) => !r.supported)).toBe(true);
+    expect(dash[0]!.unsupportedBy).toEqual(["stepper", "button"]);
+    expect(summarize(dash)).toMatchObject({ cases: 0, unsupported: 2 });
+    const md = report(results, { model: "fake", url: "u", date: "d", guideTokens: 1, repair: false });
+    expect(md).toMatch(/## Comparison on the 0 requests every variant supports/);
+    expect(md).toMatch(/\| form-booking \| not supported by the profile: needs stepper, button \|/);
+  });
+
+  it("keeps input tokens unknown when the server doesn't report them, and sums them when it does", async () => {
+    let results = await runEval(pick("form-booking"), { config, registry, repair: false, fetch: fakeModel(() => `card\n  text "Hi"\n`) });
+    expect(results[0]!.inputTokens).toBeUndefined();
+    expect(summarize(results).medianInputTokens).toBeUndefined();
+    expect(report(results, { model: "f", url: "u", date: "d", guideTokens: 1, repair: false })).toMatch(/\| Input tokens per screen, reported \(median\) \| unknown \|/);
+
+    const withUsage = (async () => new Response(
+      `data: ${JSON.stringify({ choices: [{ delta: { content: `card\n  text "Hi"\n` } }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 1234, completion_tokens: 9 } })}\n\ndata: [DONE]\n\n`,
+    )) as unknown as typeof fetch;
+    results = await runEval(pick("form-booking"), { config, registry, repair: false, fetch: withUsage });
+    expect(results[0]).toMatchObject({ inputTokens: 1234, outputTokensReported: 9, outputTokens: 9, tokensEstimated: false });
+  });
+
+  it("records whether a repair turned an invalid spec valid, and with which guide", async () => {
+    const fetch = fakeModel((_r, attempt) => (attempt === 0 ? `card\n  button "Book" color=red\n` : `card\n  button "Book"\n`));
+    const [r] = await runEval(pick("form-booking"), { config, registry, fetch, variants: [{ name: "c", guide: { mode: "compact" }, repairGuide: "full" }] });
+    expect(r).toMatchObject({ repaired: true, repairFixed: true, guideMode: "compact", repairGuideMode: "full" });
+    expect(summarize([r!])).toMatchObject({ repairs: 1, repairsFixed: 1 });
+  });
+});

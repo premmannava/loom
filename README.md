@@ -80,6 +80,7 @@ npm run dev        # opens the playground
 | `npm run test:visual:docker` | Same, in the Linux image the baselines come from; add `VISUAL_ARGS=--update-snapshots` to update them |
 | `npm run bench` | Benchmarks parse, layout and paint on 1,000- and 5,000-element specs |
 | `npm run eval` | Scores a real model on 41 requests ([Measure it](#measure-it)) |
+| `npm run guide:size` | Measures the model guide by section, per mode and profile |
 | `npm run typecheck` | Type-checks everything |
 | `npm run build` | Builds the library into `dist/` |
 | `npm run build:playground` | Builds the playground as a static site into `dist-playground/` |
@@ -1021,7 +1022,7 @@ LOOM_API_KEY=                             # only for servers that need one
 LOOM_USER_SUFFIX=                         # optional: added to every request, e.g. /no_think for Qwen3
 ```
 
-The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether Loom's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one.
+The dev server passes the playground's requests through to the model server, so the browser needs no CORS settings and never sees the key. While it runs you'll see the model wait, think, write, and fix problems. When it's done, the status line says how long it took, how long until the first line appeared, and whether Loom's parser found problems that a second request fixed. Tick **Refine this screen** to ask for changes to the current screen instead of a new one. It sends the first request, the changes since and the screen as it is now, including your own edits (see [Changing a screen](#changing-a-screen)).
 
 Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their thinking is hidden from the screen, but it delays the first line. With Qwen3, `LOOM_USER_SUFFIX=/no_think` skips it.
 
@@ -1040,7 +1041,22 @@ npm run eval -- --no-repair         # first tries only
 
 Some requests also have **behavior checks** (`eval/checks.ts`): the final spec is rendered with the real engine and used. Ticking a box must change the "X of Y done" count, changing a quantity must change the total, Remove must remove an item, typing in a search must filter the list. A spec can be valid and still not work, and these catch that.
 
-The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
+The report shows how many specs were valid on the first try and after one repair, whether they used the expected elements, how many worked when used, any invented props or elements, input and output tokens, and time to the first line. It's written to `eval/results/<date>-<model>/` with every generated spec, which you can paste into the playground, and everything the model sent for each request (`<id>.raw.txt`), thinking included.
+
+Token counts are the server's own when it reports them, and "unknown" when it doesn't; they're never filled in with zero. Estimates (characters divided by 4) are labelled as estimates. Reasoning tokens a server reports are part of its output tokens and aren't added again. The time to the first Loom line is when something could be shown, not when the screen is usable.
+
+To compare ways of prompting, give variants. Each request runs once per variant, one after another, with the same model and settings:
+
+```bash
+npm run eval -- --guide full,compact                      # the full guide against the compact one
+npm run eval -- --guide full,compact --profile shop       # both, describing only the shop profile's elements
+npm run eval -- --guide compact --repair-guide same,full  # does repairing with the full guide help?
+npm run eval -- --enforce-profile                         # elements outside the profile count as problems
+npm run eval -- --stream-usage                            # ask the server for token usage (if it supports it)
+npm run guide:size                                        # guide size by section, and what refinement sends
+```
+
+The report starts with a side-by-side table on the requests every variant can build. A request that needs an element a profile doesn't have (by its expected elements) isn't sent for that profile; it's listed as not supported. `results.json` records each result's guide mode, profile, repair guide and context policy.
 
 ### In your own app
 
@@ -1063,12 +1079,76 @@ const result = await generateSpec({
   onReset: () => loom.beginStream(), // a fix is coming: start the screen over
 });
 loom.endStream();
-// result.spec, result.diagnostics, result.first, result.repair, result.timings, result.messages
+// result.spec, result.diagnostics, result.first, result.repair, result.timings, result.usage, result.messages
 ```
 
 If your app supplies data with `loom.state.set`, pass its names as `stateNames: ["products"]`, so a spec that reads them isn't flagged as using unknown names and sent back for a needless repair. When a model writes its whole spec inside a thinking block it never closes, `generateSpec` finds the spec there (`result.first.recovered`).
 
 The guide comes from `languageGuide(registry, options)`, generated from the registered components, so it always matches what the engine supports. Its options tell the model which image hosts work, which `emit:` actions your app listens for, and anything about your app it should know.
+
+#### A smaller guide: compact mode and profiles
+
+The full guide is the default. Two options make it smaller:
+
+```ts
+guide: {
+  mode: "compact",   // "full" (default) or "compact"
+  profile: "shop",   // which elements the model is told about: "forms", "lists", "shop", "dashboard", or a list of names
+}
+```
+
+- **Compact mode** describes each element in one line, generated from the same component definitions: its props with their types and allowed values (`!` marks a required prop), what it holds or where it must go, and what it's for. It keeps the rules that change what a spec does (one line per element, indentation, quoting, local actions versus `emit` events, that a computed list can't be written to, roles instead of colors, image hosts), and shows one worked example instead of four plus one per element. The app's own context (image hosts, actions, notes) comes last, so the part that's the same for every app stays a shared prefix.
+- **Profiles** choose the elements the model is told about. A profile's elements bring what they need (`tab` brings `tabs`, `list` brings `list-item`), and `column` and `text` are always included. Examples and instructions that would use an element outside the profile are left out. A profile is chosen by your app; Loom doesn't guess one from the request.
+
+| Guide (with one image host) | Characters | Tokens (estimated) |
+|---|---|---|
+| full (default) | 23,865 | ~5,970 |
+| full, `examples: false` | 19,873 | ~4,970 |
+| full, profile `shop` | 17,853 | ~4,460 |
+| compact | 8,303 | ~2,080 |
+| compact, profile `shop` | 6,570 | ~1,640 |
+| compact, profile `forms` | 4,391 | ~1,100 |
+
+Tokens here are characters divided by 4, a rough estimate; `npm run guide:size` prints the current numbers by section. A smaller guide is cheaper and faster to read, but whether a model writes screens as good with it is a question for `npm run eval -- --guide full,compact` on your model. The full guide stays the default until that's been shown.
+
+Three sets of elements are involved, and they're separate:
+
+- **The renderer's**: the registry your Loom was made with. It can show any of them, whoever wrote the spec.
+- **The model's**: the profile. The guide only describes these.
+- **What's checked**: by default, a spec is checked against the renderer's elements. With `enforceProfile: true`, it's checked against the profile, so an element outside it is sent back for repair.
+
+Examples are chosen explicitly: `examples` turns each element's own short example on or off (default on in full mode, off in compact), and `workedExamples` picks the larger ones by name (`["todo", "cart"]`, or `false` for none). With a profile, an example that uses an element outside it is never shown.
+
+#### Repairs
+
+`generateSpec` asks once for a fix when the parser finds problems (`repairOn: "any" | "errors" | "never"`). With a compact guide, `repairGuide: "full"` sends the full guide for that one repair, still limited to the profile. Each attempt reports the guide it used (`result.first.guide`, `result.repair?.guide`); `npm run eval -- --guide compact --repair-guide same,full` measures whether it helps.
+
+#### Changing a screen
+
+To change the current screen ("make the total bigger"), pass a `refine` context instead of the whole conversation:
+
+```ts
+import { generateSpec, nextRefineContext, type RefineContext } from "loom-ui/model";
+
+let context: RefineContext = { task: "A packing list for a 3-day hike", requirements: ["Prices in euros"], spec: first.spec };
+
+const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: loom.spec } });
+context = nextRefineContext(context, "Add a progress bar", r.spec);
+```
+
+It sends the original task, the `requirements` that must always hold, the changes asked for since, the current spec as it is now (hand edits included), and the new change. It doesn't send earlier specs, failed tries or repair messages, so a change costs about the same on the tenth turn as on the second (`npm run guide:size` shows the difference). Its limits:
+
+- Earlier changes are kept as text, up to `contextPolicy.maxChanges` (default 20). Past that the oldest are left out with a note; the current spec still has their effect. `requirements` are never left out, so anything that must survive belongs there.
+- App state is sent only if you pass it, as `refine.state`, and only the values you pass.
+- Nothing is summarized by another model call.
+
+`result.messages` is the conversation that produced the accepted spec: the guide, the context, the request and the final spec. A rejected repair isn't in it, and a kept repair replaces the first spec. (Before, it included the repair exchange.) `result.transcript` has everything that was sent and received. Passing `result.messages` as `history` still works for apps that want the whole conversation.
+
+#### Usage and timing
+
+`result.usage` adds up the server's token counts over the first try and the repair: `promptTokens`, `completionTokens`, and `reasoningTokens` (part of the completion tokens, not added again). A total is `undefined`, meaning unknown, when any attempt didn't report it; `usage.reported` says how many did. Each attempt also has `inputChars` and `estimatedInputTokens` (characters / 4), `estimatedThinkingTokens`, the guide it used and how long it took. Many servers only report usage while streaming when asked; set `config.streamUsage: true` for those that support `stream_options` (OpenAI, vLLM, recent LM Studio and llama.cpp).
+
+Putting the guide first and the request last means requests with the same guide options share a prefix, which servers with prefix caching (vLLM, llama.cpp, many hosted APIs) can reuse. That's the server's doing: Loom builds the same text each time, but doesn't cache anything itself.
 
 Send the user's choices back to the model with `emit` actions, passing `result.messages` as `history` to continue the conversation:
 
@@ -1270,13 +1350,14 @@ src/
   component.ts      The ComponentDef contract and PropReader
   registry.ts       The set of components an instance knows
   inspector.ts      Debugging overlays, inspect mode, frame capture
-  prompt.ts         Generates the model guide
+  prompt.ts         Generates the model guide (full and compact)
+  profiles.ts       Component profiles: which elements the model is told about
   theme.ts          Design tokens
   text.ts           Text measuring and wrapping
   state.ts          The state store
   components/       Built-in components; map/ is a separate entry point
   testing/          loom-ui/testing: render() and the recording canvas
-  model/            loom-ui/model: stream, clean, check and repair a model's spec
+  model/            loom-ui/model: stream, clean, check and repair a model's spec; refinement context
 playground/         The development playground
 test/               Unit, contract, streaming, fuzz and interaction tests (Vitest)
 visual/             Visual regression page, cases and baselines (Playwright)

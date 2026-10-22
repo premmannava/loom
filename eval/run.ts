@@ -3,7 +3,8 @@
  * scripts/eval.ts; this file has no Node-only code, so it's tested directly.
  */
 import { generateSpec, type GenerateResult, type ModelConfig } from "../src/model";
-import type { GuideOptions } from "../src/prompt";
+import { describeGuide, type GuideOptions } from "../src/prompt";
+import { resolveProfile } from "../src/profiles";
 import { parse } from "../src/parser";
 import type { Registry } from "../src/registry";
 import { render } from "../src/testing";
@@ -13,8 +14,43 @@ import type { EvalCase } from "./cases";
 /** Props a model invents when it tries to style things itself. */
 const DESIGN_PROPS = ["color", "colour", "background", "bg", "font", "fontSize", "font-size", "size", "width", "height", "margin", "padding", "border", "radius", "fontWeight", "textColor"];
 
+/**
+ * One way of prompting, so the same requests can be compared: the guide's
+ * mode and profile, and what the repair uses. Every variant uses the same
+ * model and generation settings.
+ */
+export interface Variant {
+  /** A short label for reports, e.g. "full" or "compact+full-repair". */
+  name: string;
+  guide?: GuideOptions;
+  repairGuide?: "same" | "full";
+  enforceProfile?: boolean;
+}
+
 export interface CaseResult {
   id: string;
+  /** Which variant produced this result ("default" when there's only one). */
+  variant: string;
+  guideMode: string;
+  profile: string;
+  /** The guide used by the repair, when one ran. */
+  repairGuideMode?: string;
+  /** Always "none": each request is generated fresh. Recorded so results say so. */
+  contextPolicy: string;
+  /** False when the profile lacks an element the request needs; such requests aren't sent. */
+  supported: boolean;
+  /** The expected elements outside the profile, for unsupported requests. */
+  unsupportedBy: string[];
+  /** Characters in the guide, and every character sent over all attempts / 4 (an estimate). */
+  guideChars: number;
+  inputTokensEstimated: number;
+  /** Input and output tokens over all attempts as the server reported them; undefined when any attempt didn't. */
+  inputTokens?: number;
+  outputTokensReported?: number;
+  /** Reasoning tokens the server reported (part of output tokens, not added to them). */
+  reasoningTokens?: number;
+  /** A repair ran and turned an invalid first spec into a valid final one. */
+  repairFixed: boolean;
   category: string;
   request: string;
   note?: string;
@@ -57,6 +93,12 @@ export interface EvalOptions {
   guide?: GuideOptions;
   userSuffix?: string;
   repair?: boolean;
+  /**
+   * Prompting variants to compare. Each request runs once per variant, one
+   * after another (interleaved), so a server slowing down affects all alike.
+   * Left out: one variant from guide.
+   */
+  variants?: Variant[];
   fetch?: typeof fetch;
   /** Called as each case finishes, for progress output. */
   onCase?: (r: CaseResult, index: number, total: number) => void;
@@ -70,14 +112,42 @@ function types(root: LoomNode): Set<string> {
 }
 
 const tokensOf = (r: GenerateResult): { tokens: number; estimated: boolean } => {
-  const reported = (r.first.usage.completionTokens ?? 0) + (r.repair?.usage.completionTokens ?? 0);
-  if (reported) return { tokens: reported, estimated: false };
+  // Reported only when every attempt reported it; a missing count isn't zero.
+  const reported = r.usage.completionTokens;
+  if (reported !== undefined) return { tokens: reported, estimated: false };
   // About four characters per token, when the server doesn't report usage.
   const chars = r.first.raw.length + (r.repair?.raw.length ?? 0);
   return { tokens: Math.round(chars / 4), estimated: true };
 };
 
-export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): CaseResult {
+/** The expected elements a profile can't build: an entry fails when none of its choices are exposed. */
+export function unsupportedBy(c: EvalCase, exposed: readonly string[]): string[] {
+  return (c.expect ?? [])
+    .filter((e) => (Array.isArray(e) ? !e.some((t) => exposed.includes(t)) : !exposed.includes(e)))
+    .map((e) => (Array.isArray(e) ? e.join(" or ") : e));
+}
+
+const DEFAULT_VARIANT = "default";
+
+function variantFields(r: GenerateResult, guideChars: number, variant: string): Pick<CaseResult, "variant" | "guideMode" | "profile" | "repairGuideMode" | "contextPolicy" | "supported" | "unsupportedBy" | "guideChars" | "inputTokensEstimated" | "inputTokens" | "outputTokensReported" | "reasoningTokens" | "repairFixed"> {
+  return {
+    variant,
+    guideMode: r.first.guide.mode,
+    profile: r.first.guide.profile,
+    repairGuideMode: r.repair?.guide.mode,
+    contextPolicy: r.context.policy,
+    supported: true,
+    unsupportedBy: [],
+    guideChars,
+    inputTokensEstimated: Math.round((r.first.inputChars + (r.repair?.inputChars ?? 0)) / 4),
+    inputTokens: r.usage.promptTokens,
+    outputTokensReported: r.usage.completionTokens,
+    reasoningTokens: r.usage.reasoningTokens,
+    repairFixed: !!r.repair && r.first.diagnostics.length > 0 && r.diagnostics.length === 0 && !!r.spec.trim(),
+  };
+}
+
+export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry, variant = DEFAULT_VARIANT, guideChars = 0): CaseResult {
   const final = parse(r.spec, registry);
   const used = types(final.root);
   const missing = (c.expect ?? [])
@@ -99,6 +169,7 @@ export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): C
   }).map((check) => check.label);
   return {
     id: c.id,
+    ...variantFields(r, guideChars, variant),
     category: c.category,
     request: c.request,
     note: c.note,
@@ -129,32 +200,54 @@ export function scoreCase(c: EvalCase, r: GenerateResult, registry: Registry): C
   };
 }
 
+function emptyResult(c: EvalCase, v: Variant, profile: string, guideChars: number, extra: Partial<CaseResult>): CaseResult {
+  return {
+    id: c.id, variant: v.name, guideMode: v.guide?.mode ?? "full", profile, contextPolicy: "none", supported: true, unsupportedBy: [],
+    guideChars, inputTokensEstimated: 0, repairFixed: false,
+    category: c.category, request: c.request, note: c.note, ok: false,
+    validFirst: false, validFinal: false, problemsFirst: 0, problemsFinal: 0, repaired: false,
+    missing: [], checks: c.checks?.length ?? 0, failedChecks: [], inventedDesign: [], inventedElements: [], empty: true, recovered: false, firstRaw: "", outputTokens: 0, tokensEstimated: true,
+    thinkingTokens: 0, totalMs: 0, elements: 0, firstSpec: "", finalSpec: "", firstProblems: [], finalProblems: [],
+    ...extra,
+  };
+}
+
 export async function runEval(list: EvalCase[], o: EvalOptions): Promise<CaseResult[]> {
+  const variants: Variant[] = o.variants?.length ? o.variants : [{ name: DEFAULT_VARIANT, guide: o.guide }];
+  const prepared = variants.map((v) => {
+    const info = describeGuide(o.registry, v.guide);
+    return { v, info, exposed: resolveProfile(o.registry, v.guide?.profile).types };
+  });
+  const total = list.length * variants.length;
   const results: CaseResult[] = [];
-  for (const [i, c] of list.entries()) {
-    let result: CaseResult;
-    try {
-      const r = await generateSpec({
-        config: o.config,
-        registry: o.registry,
-        guide: o.guide,
-        request: c.request,
-        userSuffix: o.userSuffix,
-        repairOn: o.repair === false ? "never" : "any",
-        fetch: o.fetch,
-      });
-      result = scoreCase(c, r, o.registry);
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
-      result = {
-        id: c.id, category: c.category, request: c.request, note: c.note, ok: false, error,
-        validFirst: false, validFinal: false, problemsFirst: 0, problemsFinal: 0, repaired: false,
-        missing: [], checks: c.checks?.length ?? 0, failedChecks: [], inventedDesign: [], inventedElements: [], empty: true, recovered: false, firstRaw: "", outputTokens: 0, tokensEstimated: true,
-        thinkingTokens: 0, totalMs: 0, elements: 0, firstSpec: "", finalSpec: "", firstProblems: [], finalProblems: [],
-      };
+  for (const c of list) {
+    for (const { v, info, exposed } of prepared) {
+      let result: CaseResult;
+      const unsupported = unsupportedBy(c, exposed);
+      if (unsupported.length) {
+        // Not sent: the profile can't build what the request needs, so it would only measure the profile's gaps.
+        result = emptyResult(c, v, info.profile, info.chars, { supported: false, unsupportedBy: unsupported, ok: true, empty: false });
+      } else {
+        try {
+          const r = await generateSpec({
+            config: o.config,
+            registry: o.registry,
+            guide: v.guide,
+            request: c.request,
+            userSuffix: o.userSuffix,
+            repairOn: o.repair === false ? "never" : "any",
+            repairGuide: v.repairGuide,
+            enforceProfile: v.enforceProfile,
+            fetch: o.fetch,
+          });
+          result = scoreCase(c, r, o.registry, v.name, info.chars);
+        } catch (e) {
+          result = emptyResult(c, v, info.profile, info.chars, { error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      results.push(result);
+      o.onCase?.(result, results.length - 1, total);
     }
-    results.push(result);
-    o.onCase?.(result, i, list.length);
   }
   return results;
 }
@@ -172,6 +265,13 @@ const secs = (ms?: number) => (ms === undefined ? "—" : `${(ms / 1000).toFixed
 
 export interface Summary {
   cases: number;
+  /** Requests the profile couldn't build, so they weren't sent. Not counted in the rest. */
+  unsupported: number;
+  repairs: number;
+  repairsFixed: number;
+  /** Median reported input tokens over all attempts; undefined unless every request reported them. */
+  medianInputTokens?: number;
+  medianInputTokensEstimated?: number;
   failed: number;
   validFirst: number;
   validFinal: number;
@@ -190,11 +290,18 @@ export interface Summary {
   tokensEstimated: boolean;
 }
 
-export function summarize(results: CaseResult[]): Summary {
+export function summarize(all: CaseResult[]): Summary {
+  const results = all.filter((r) => r.supported !== false);
   const ran = results.filter((r) => r.ok);
   const checkedIds = new Set(results.filter((r) => r.checks > 0).map((r) => r.id));
+  const inputs = ran.map((r) => r.inputTokens);
   return {
     cases: results.length,
+    unsupported: all.length - results.length,
+    repairs: ran.filter((r) => r.repaired).length,
+    repairsFixed: ran.filter((r) => r.repairFixed).length,
+    medianInputTokens: inputs.length && inputs.every((n) => n !== undefined) ? median(inputs as number[]) : undefined,
+    medianInputTokensEstimated: median(ran.map((r) => r.inputTokensEstimated ?? 0)),
     failed: results.length - ran.length,
     validFirst: ran.filter((r) => r.validFirst).length,
     validFinal: ran.filter((r) => r.validFinal).length,
@@ -214,13 +321,70 @@ export function summarize(results: CaseResult[]): Summary {
 }
 
 /** A Markdown report: the headline numbers, then one row per request. */
+/** The headline rows for one set of results. */
+function summaryRows(s: Summary): Array<[string, string]> {
+  const ran = s.cases - s.failed;
+  return [
+    ["Valid on the first try", `${s.validFirst}/${ran} (${pct(s.validFirst, ran)})`],
+    ["Valid after one repair", `${s.validFinal}/${ran} (${pct(s.validFinal, ran)})`],
+    ["Repairs run / turned valid", `${s.repairs} / ${s.repairsFixed}`],
+    ["Used the expected elements", `${s.expectedMet}/${ran} (${pct(s.expectedMet, ran)})`],
+    ["Worked when used (behavior checks)", s.checked ? `${s.checksMet}/${s.checked} (${pct(s.checksMet, s.checked)})` : "—"],
+    ["Invented design props / elements", `${s.inventedDesign} / ${s.inventedElements}`],
+    ["Empty answers", `${s.empty}`],
+    ["Input tokens per screen, reported (median)", s.medianInputTokens === undefined ? "unknown" : `${s.medianInputTokens}`],
+    ["Input tokens per screen, estimated chars/4 (median)", `${s.medianInputTokensEstimated ?? "—"}`],
+    ["Output tokens per screen (median)", `${s.medianTokens ?? "—"}${s.tokensEstimated ? " (estimated from length)" : ""}`],
+    ["Time to first Loom line (median)", secs(s.medianFirstLineMs)],
+    ["Total time per screen (median)", secs(s.medianTotalMs)],
+    ["Requests not supported by the profile (not sent)", `${s.unsupported}`],
+  ];
+}
+
+/** Compare variants side by side on the requests every one of them supports. */
+export function compareVariants(results: CaseResult[]): string {
+  const names = [...new Set(results.map((r) => r.variant))];
+  if (names.length < 2) return "";
+  const supportedByAll = new Set(
+    [...new Set(results.map((r) => r.id))].filter((id) => names.every((n) => results.some((r) => r.id === id && r.variant === n && r.supported !== false))),
+  );
+  const sums = names.map((n) => summarize(results.filter((r) => r.variant === n && supportedByAll.has(r.id))));
+  const rows = summaryRows(sums[0]!).map(([label], i) => `| ${label} | ${sums.map((s) => summaryRows(s)[i]![1]).join(" | ")} |`);
+  const guides = names.map((n) => {
+    const r = results.find((x) => x.variant === n)!;
+    return `| ${n} | ${r.guideMode} | ${r.profile} | ${r.guideChars.toLocaleString("en-US")} (~${Math.round(r.guideChars / 4).toLocaleString("en-US")} est.) |`;
+  });
+  return [
+    `## Comparison on the ${supportedByAll.size} requests every variant supports`,
+    "",
+    "| Variant | Guide | Profile | Guide characters (tokens est.) |",
+    "|---|---|---|---|",
+    ...guides,
+    "",
+    `| | ${names.join(" | ")} |`,
+    `|---|${names.map(() => "---").join("|")}|`,
+    ...rows,
+    "",
+    "The time to the first Loom line is when the first line could be shown, not when the screen is usable.",
+    "",
+  ].join("\n");
+}
+
 export function report(results: CaseResult[], meta: { model: string; url: string; date: string; guideTokens: number; repair: boolean }): string {
+  const variants = [...new Set(results.map((r) => r.variant))];
+  if (variants.length > 1) {
+    const parts = variants.map((v) => report(results.filter((r) => r.variant === v), meta).replace(/^# Loom evaluation: .*\n/, `## Variant: ${v}\n`));
+    return [`# Loom evaluation: ${meta.model}`, "", `${meta.date} · ${meta.url} · repair ${meta.repair ? "on" : "off"} · same model and settings for every variant`, "", compareVariants(results), ...parts].join("\n");
+  }
   const s = summarize(results);
   const ran = s.cases - s.failed;
+  const first = results[0];
+  // Only named when it isn't the default, so existing reports read as before.
+  const guideNote = first && (first.guideMode !== "full" || first.profile !== "all") ? ` · ${first.guideMode} guide, profile ${first.profile}` : "";
   const lines = [
     `# Loom evaluation: ${meta.model}`,
     "",
-    `${meta.date} · ${meta.url} · guide about ${meta.guideTokens} tokens · repair ${meta.repair ? "on" : "off"}`,
+    `${meta.date} · ${meta.url} · guide about ${meta.guideTokens} tokens${guideNote} · repair ${meta.repair ? "on" : "off"}`,
     "",
     "| | |",
     "|---|---|",
@@ -232,16 +396,22 @@ export function report(results: CaseResult[], meta: { model: string; url: string
     `| Invented elements | ${s.inventedElements} |`,
     `| Empty answers | ${s.empty} |`,
     ...(s.recovered ? [`| Specs found inside unclosed thinking | ${s.recovered} |`] : []),
+    `| Repairs run / turned valid | ${s.repairs} / ${s.repairsFixed} |`,
+    `| Input tokens per screen, reported (median) | ${s.medianInputTokens ?? "unknown"} |`,
+    `| Input tokens per screen, estimated chars/4 (median) | ${s.medianInputTokensEstimated ?? "—"} |`,
     `| Output tokens per screen (median) | ${s.medianTokens ?? "—"}${s.tokensEstimated ? " (estimated from length)" : ""} |`,
     `| Thinking tokens before writing (median) | ${s.medianThinkingTokens ?? "—"} |`,
     `| Time to first line (median) | ${secs(s.medianFirstLineMs)} |`,
     `| Total time per screen (median) | ${secs(s.medianTotalMs)} |`,
     ...(s.failed ? [`| Requests that failed | ${s.failed} |`] : []),
+    ...(s.unsupported ? [`| Requests the profile can't build (not sent) | ${s.unsupported} |`] : []),
     "",
     "| Request | First try | Final | Missing | Checks | Invented | Tokens | First line | Total |",
     "|---|---|---|---|---|---|---|---|---|",
     ...results.map((r) =>
-      r.ok
+      r.supported === false
+        ? `| ${r.id} | not supported by the profile: needs ${r.unsupportedBy.join(", ")} | | | | | | | |`
+        : r.ok
         ? `| ${r.id} | ${r.validFirst ? "valid" : `${r.problemsFirst} problems`} | ${r.validFinal ? "valid" : r.empty ? "empty" : `${r.problemsFinal} problems`} | ${r.missing.join(", ") || "—"} | ${!r.checks ? "—" : r.failedChecks.length ? `failed: ${r.failedChecks.join("; ")}` : "pass"} | ${[...r.inventedDesign.map((p) => p + "="), ...r.inventedElements].join(", ") || "—"} | ${r.outputTokens} | ${secs(r.firstLineMs)} | ${secs(r.totalMs)} |`
         : `| ${r.id} | failed: ${r.error?.slice(0, 80)} | | | | | | | |`,
     ),

@@ -23,6 +23,13 @@ export interface ModelConfig {
   maxTokens?: number;
   /** Extra headers, e.g. for a router's analytics. */
   headers?: Record<string, string>;
+  /**
+   * Ask the server to report token usage at the end of the stream
+   * (stream_options.include_usage). Off by default: OpenAI, vLLM and recent
+   * LM Studio and llama.cpp support it, but some servers reject the field.
+   * Without it, usage is whatever the server sends on its own, or unknown.
+   */
+  streamUsage?: boolean;
 }
 
 export interface StreamPart {
@@ -31,9 +38,12 @@ export interface StreamPart {
   text: string;
 }
 
+/** Token counts as the server reported them. A missing field means unknown, never zero. */
 export interface Usage {
   promptTokens?: number;
   completionTokens?: number;
+  /** Thinking tokens, when reported (completion_tokens_details). Already counted in completionTokens. */
+  reasoningTokens?: number;
 }
 
 export class ModelError extends Error {
@@ -47,7 +57,7 @@ type Fetch = typeof fetch;
 
 interface ChunkJSON {
   choices?: Array<{ delta?: { content?: string | null; reasoning_content?: string | null; reasoning?: string | null } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } | null } | null;
   error?: { message?: string } | string;
 }
 
@@ -76,6 +86,7 @@ export async function* streamChat(
         stream: true,
         temperature: config.temperature ?? 0.2,
         max_tokens: config.maxTokens ?? 4000,
+        ...(config.streamUsage ? { stream_options: { include_usage: true } } : {}),
       }),
     });
   } catch (e) {
@@ -125,6 +136,8 @@ function* parseLine(line: string, usage: Usage | undefined): Generator<StreamPar
   if (json.usage && usage) {
     if (json.usage.prompt_tokens !== undefined) usage.promptTokens = json.usage.prompt_tokens;
     if (json.usage.completion_tokens !== undefined) usage.completionTokens = json.usage.completion_tokens;
+    const reasoning = json.usage.completion_tokens_details?.reasoning_tokens;
+    if (reasoning !== undefined) usage.reasoningTokens = reasoning;
   }
   const delta = json.choices?.[0]?.delta;
   if (!delta) return;

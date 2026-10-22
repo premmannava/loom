@@ -42,11 +42,12 @@ spec text → parse → tree → layout → boxes → paint → canvas pixels
 | Components | `src/components/` | One `ComponentDef` per component. `map/` is a separate entry point. |
 | Contract | `src/component.ts` | `ComponentDef`, `PropDef`, contexts, and `PropReader` for typed prop access. |
 | Debugging | `src/inspector.ts` | Layout/hit overlays, inspect mode, frame capture. |
-| Model guide | `src/prompt.ts` | `languageGuide(registry)` builds the system prompt from component definitions. |
+| Model guide | `src/prompt.ts` | `languageGuide(registry, opts)` builds the system prompt from component definitions: `mode: "full"` (default) or `"compact"`, and a `profile`. Full mode with no profile must stay byte-identical to `test/fixtures/guide-full.txt` unless a change is meant (then update the fixture). |
+| Profiles | `src/profiles.ts` | Which elements the model is told about. Separate from the renderer's registry and from validation (`enforceProfile`). |
 | Theme | `src/theme.ts` | Design tokens; light and dark; `--loom-*` CSS overrides. |
 | Testing | `src/testing/` | `loom-ui/testing`: `render()` runs the real engine in Node against a recording canvas. |
-| Model | `src/model/` | `loom-ui/model`: streams a spec from an OpenAI-compatible endpoint, removes thinking and fences, checks it and repairs it once. |
-| Evaluation | `eval/`, `scripts/eval.ts` | 30 requests scored against a real model (`npm run eval`). |
+| Model | `src/model/` | `loom-ui/model`: streams a spec from an OpenAI-compatible endpoint, removes thinking and fences, checks it and repairs it once. `context.ts`: bounded refinement (`refine`) and usage totals (unknown stays `undefined`, never 0). |
+| Evaluation | `eval/`, `scripts/eval.ts` | 41 requests scored against a real model (`npm run eval`); `--guide full,compact`, `--profile`, `--repair-guide` compare prompting variants. `npm run guide:size` measures the guide. |
 
 Each stage reruns only when its inputs change: `invalidate("parse" | "layout" | "paint")`. A spec edit re-parses, a state change re-lays out, and hover only repaints.
 
@@ -74,6 +75,7 @@ npm run test:visual        # visual regression (Playwright); baselines come from
 npm run test:visual:docker #   VISUAL_ARGS=--update-snapshots npm run test:visual:docker
 npm run bench              # benchmarks
 npm run eval               # score a real model (settings in .env.local, see .env.example)
+npm run guide:size         # model guide size by section, per mode and profile
 npm run typecheck          # tsc --noEmit
 npm run build              # library → dist/
 npm run build:playground   # static playground → dist-playground/
@@ -124,7 +126,7 @@ Language changes touch several places. Do them together, in this order:
 
 ## Current status
 
-Version 0.1, the foundation, plus the Phase 1 testing and tooling and lists and data. Working: the engine, parser, expressions, actions, keyboard focus (including parts of elements), inspector, 35 components (layout: `column`, `row`, `grid`, `card`, `list`, `list-item`, `accordion`, `divider`, `spacer`, `each`; content: `text`, `image`, `code`, `badge`, `avatar`; data: `stat`, `rating`, `map`, `pin`; input: `button`, `link`, `check`, `switch`, `radio`, `stepper`, `slider`, `input`; navigation: `screen`, `tabs`, `tab`, `breadcrumb`, `pagination`; feedback: `progress`, `skeleton`, `empty`), screens with `go:` and `back`, `notify:` messages, images (own origin plus `imageHosts`), dragging, lists and records in state and from the host, field reads and list functions in expressions, `each` (with keys, nesting and limits of 500 items and 10,000 copies), `bind=` and actions on paths (`t.done`), `add`/`remove`/`clear`, `if` blocks (a line holding only `if=`), warnings for names nothing defines, list functions (`filter`, `find`, `search`, `sort`, `take`) and formatting (`money`, `number`, `plural`), text input through an editor host (a real `<input>` while typing; a fake in `loom-ui/testing`), the playground (with Ask a model, through the dev server to any OpenAI-compatible server), `loom-ui/model`, `npm run eval`, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
+Version 0.1, the foundation, plus the Phase 1 testing and tooling and lists and data. Working: the engine, parser, expressions, actions, keyboard focus (including parts of elements), inspector, 35 components (layout: `column`, `row`, `grid`, `card`, `list`, `list-item`, `accordion`, `divider`, `spacer`, `each`; content: `text`, `image`, `code`, `badge`, `avatar`; data: `stat`, `rating`, `map`, `pin`; input: `button`, `link`, `check`, `switch`, `radio`, `stepper`, `slider`, `input`; navigation: `screen`, `tabs`, `tab`, `breadcrumb`, `pagination`; feedback: `progress`, `skeleton`, `empty`), screens with `go:` and `back`, `notify:` messages, images (own origin plus `imageHosts`), dragging, lists and records in state and from the host, field reads and list functions in expressions, `each` (with keys, nesting and limits of 500 items and 10,000 copies), `bind=` and actions on paths (`t.done`), `add`/`remove`/`clear`, `if` blocks (a line holding only `if=`), warnings for names nothing defines, list functions (`filter`, `find`, `search`, `sort`, `take`) and formatting (`money`, `number`, `plural`), text input through an editor host (a real `<input>` while typing; a fake in `loom-ui/testing`), the model guide in full and compact modes with component profiles, bounded refinement context and per-attempt usage, the playground (with Ask a model, through the dev server to any OpenAI-compatible server), `loom-ui/model`, `npm run eval`, `loom-ui/testing`, unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
 
 Known gaps: the map can't be reached by keyboard (recorded in `test/contract.test.ts`).
 
