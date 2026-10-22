@@ -1,0 +1,14 @@
+{
+  "name": "sayshape-model-proxy",
+  "private": true,
+  "description": "Cloudflare Worker that lets the SayShape website call a model without exposing the API key. Not part of the library.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir dist"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.3"
+  }
+}
