@@ -18,6 +18,10 @@ You don't need your own model or API key: the chat app's model writes the spec, 
 
 Nothing else leaves an interface. A spec can't run code, open links or make requests, and the chat app's sandbox around the view is a second layer, not the first.
 
+## Data from a database
+
+Start the server with `--data path/to/database.db` (SQLite, opened read-only) and the model gets three more tools. It looks at the tables (`describe_data`), runs one read-only `SELECT` (`query_data`), and shows the result by passing the dataset to `show_interface`. The model sees only the result's columns and a few sample rows. The interface fetches the rows itself, so the numbers on screen come straight from the database and never pass through the model. The [server's README](https://github.com/premmannava/sayshape/tree/main/mcp#readme) has the details.
+
 ## Install
 
 You need Node.js 20 or later. The server isn't on npm yet, so for now build it from the repository:

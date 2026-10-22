@@ -28,6 +28,13 @@ let loom: SayShape | null = null;
 let shown = "";
 /** Input that arrived before the engine was ready. */
 let pending: { spec: string; final: boolean } | null = null;
+/**
+ * Rows from the database, by the name the spec uses (show_interface's data
+ * argument). They're fetched from the server by the interface itself, so they
+ * never pass through the model, and put back after anything that resets state.
+ */
+const hostData = new Map<string, Value>();
+let pendingData: Record<string, string> | null = null;
 
 const prefersDark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const SENTINEL = "rgb(1, 2, 3)";
@@ -97,13 +104,48 @@ async function applyTheme(ctx: McpUiHostContext | undefined): Promise<Theme> {
 function show(spec: string, final: boolean): void {
   if (!loom) { pending = { spec, final }; return; }
   const next = nextChunk(shown, spec);
-  if (next.restart) { loom.beginStream(); shown = ""; }
+  if (next.restart) { loom.beginStream(); shown = ""; applyHostData(); }
   if (next.add) { loom.push(next.add); shown += next.add; }
   if (final) {
     if (loom.isStreaming) loom.endStream();
     // The streamed text can differ from the final arguments (healed JSON); the final spec wins.
-    if (loom.spec !== spec) loom.setSpec(spec, { resetState: true });
+    if (loom.spec !== spec) { loom.setSpec(spec, { resetState: true }); applyHostData(); }
   }
+}
+
+function applyHostData(): void {
+  if (!loom) return;
+  for (const [name, rows] of hostData) {
+    try { loom.state.set(name, rows); } catch { loom.notify(`Couldn't show the data for ${name}`); }
+  }
+}
+
+/** Fetch each dataset's rows from the server (fetch_dataset, which only the interface may call) and show them. */
+async function loadData(wanted: Record<string, string>): Promise<void> {
+  if (!loom) { pendingData = wanted; return; }
+  if (!app.getHostCapabilities()?.serverTools) {
+    loom.notify("This chat app doesn't let interfaces load data");
+    return;
+  }
+  await Promise.all(Object.entries(wanted).map(async ([name, id]) => {
+    try {
+      const r = await app.callServerTool({ name: "fetch_dataset", arguments: { id } });
+      const rows = (r.structuredContent as { rows?: unknown } | undefined)?.rows;
+      if (r.isError || !Array.isArray(rows)) throw new Error("no rows");
+      hostData.set(name, rows as Value);
+    } catch {
+      loom?.notify(`Couldn't load the data for ${name}`);
+    }
+  }));
+  applyHostData();
+}
+
+function dataOf(args: Record<string, unknown> | undefined): Record<string, string> | null {
+  const d = args?.data;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(d)) if (typeof v === "string") out[k] = v;
+  return Object.keys(out).length ? out : null;
 }
 
 function specOf(args: Record<string, unknown> | undefined): string | null {
@@ -118,6 +160,8 @@ app.ontoolinputpartial = (p) => {
 app.ontoolinput = (p) => {
   const spec = specOf(p.arguments);
   if (spec !== null) show(spec, true);
+  const data = dataOf(p.arguments);
+  if (data) void loadData(data);
 };
 app.onhostcontextchanged = () => {
   // getHostContext() holds the whole context with this change merged in.
@@ -166,6 +210,7 @@ async function start(): Promise<void> {
     void deliver(eventMessage(name, value, loom.state.snapshot()));
   });
   if (pending) { const p = pending; pending = null; show(p.spec, p.final); }
+  if (pendingData) { const d = pendingData; pendingData = null; void loadData(d); }
 }
 
 void start();
