@@ -7,9 +7,9 @@ import { loomLivePlugin } from "./markdown";
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const loomGrammar = JSON.parse(readFileSync(here("./loom.tmLanguage.json"), "utf8"));
 
-const REPO = "https://github.com/premmannava/loom";
+const REPO = "https://github.com/premmannava/sayshape";
 // The site's path on GitHub Pages: the repository's name. Change SITE_BASE if the repository is renamed.
-const BASE = process.env.SITE_BASE ?? "/loom/";
+const BASE = process.env.SITE_BASE ?? "/sayshape/";
 const SITE_URL = `https://premmannava.github.io${BASE}`;
 const TITLE = "SayShape";
 const DESCRIPTION = "A UI language for AI models to write, and a canvas engine that renders it: parser, layout, painting, state and input of its own.";
