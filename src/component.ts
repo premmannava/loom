@@ -41,6 +41,8 @@ export interface LayoutContext {
   layout(node: SayShapeNode, x: number, y: number, width: number): Box;
   /** Children to lay out: those whose `if` passes, with every `each` replaced by its copies. */
   visibleChildren(node: SayShapeNode): SayShapeNode[];
+  /** The narrowest width a node works at: its component's minWidth, or for containers their widest child plus padding. */
+  minWidth(node: SayShapeNode): number;
   /** Move a box and its whole subtree. */
   shift(box: Box, dx: number, dy: number): void;
   /** Today's date as YYYY-MM-DD (the engine's today option, or the device's local day). */
@@ -164,6 +166,13 @@ export interface ComponentDef {
 
   /** Set box.h (and box.children for containers). box.x/y/w are given. */
   layout(box: Box, ctx: LayoutContext): void;
+  /**
+   * The narrowest width this element works at, in pixels. A row moves its
+   * children onto more lines when they can't all get this much. Leave it out
+   * for elements that fit any width (text that wraps); containers default to
+   * their widest child plus their padding.
+   */
+  minWidth?(node: SayShapeNode, ctx: LayoutContext): number;
   /** Paint before children. */
   paint?(box: Box, ctx: PaintContext): void;
   /** Paint after children (overlays, pins on a map...). */

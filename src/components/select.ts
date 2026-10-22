@@ -238,6 +238,7 @@ export const select: ComponentDef = {
   },
   example: `state teams=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}] team=""
 select "Team" items=teams value=id label=name bind=team placeholder="Choose a team"`,
+  minWidth: () => 120,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     box.h = fieldBox(box, p, ctx.theme.control.height).y - box.y + ctx.theme.control.height;
@@ -261,7 +262,7 @@ select "Team" items=teams value=id label=name bind=team placeholder="Choose a te
       g.textAlign = "left";
       g.textBaseline = "top";
       g.fillStyle = c.ink;
-      g.fillText(label, box.x, box.y, box.w);
+      g.fillText(fitText(g, label, box.w), box.x, box.y);
     }
     ctx.roundRect(field.x + 0.5, field.y + 0.5, field.w - 1, field.h - 1, theme.radius.md);
     g.fillStyle = c.surface;

@@ -53,6 +53,7 @@ export const map: ComponentDef = {
   example: `state picked=none
 map highlight="Japan,Kenya" bind=picked
   pin "Tokyo" lat=35.68 lon=139.69`,
+  minWidth: () => 200,
   layout(box, ctx) {
     const s = box.w / WORLD.w;
     box.h = WORLD.h * s;

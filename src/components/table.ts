@@ -478,6 +478,7 @@ export const table: ComponentDef = {
 table items=gear key=id bind=picked sort=by direction=dir
   table-column "Item" field=name
   table-column "Price" field=price format=money`,
+  minWidth: () => 200,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const geo = tableLayout(box, p, ctx);

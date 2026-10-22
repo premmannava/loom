@@ -142,6 +142,15 @@ const BUILTINS: Record<string, Fn> = {
     const digits = d === undefined ? undefined : Math.min(10, Math.max(0, Math.floor(toNumber(d)) || 0));
     return new Intl.NumberFormat(LOCALE, digits === undefined ? { maximumFractionDigits: 2 } : { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(x);
   },
+  /** compact(12345678) is 12.3M, compact(4500) is 4.5K; compact(n, 'USD') is $12.3M. For big figures in small spaces. */
+  compact: (n, currency) => {
+    const x = toNumber(n);
+    if (!isFinite(x)) return NaN;
+    const opts: Intl.NumberFormatOptions = { notation: "compact", maximumFractionDigits: 1 };
+    try {
+      return new Intl.NumberFormat(LOCALE, currency === undefined ? opts : { ...opts, style: "currency", currency: textOf(currency) }).format(x);
+    } catch { return NaN; }
+  },
   /** plural(1, 'item') is "1 item", plural(3, 'item') is "3 items"; plural(n, 'child', 'children') for irregular words. */
   plural: (n, one, many) => {
     const x = toNumber(n);

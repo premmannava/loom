@@ -93,6 +93,16 @@ describe("formatting", () => {
     expect(val("plural(1200, 'runner')")).toBe("1,200 runners");
   });
 
+  it("shortens big numbers with compact()", () => {
+    expect(val("compact(12345678)")).toBe("12.3M");
+    expect(val("compact(4500)")).toBe("4.5K");
+    expect(val("compact(950)")).toBe("950");
+    expect(val("compact(-2500000)")).toBe("-2.5M");
+    expect(val("compact(1200000000, 'USD')")).toBe("$1.2B");
+    expect(interpolate("{compact('lots')}", store.scope)).toBe("—");
+    expect(interpolate("{compact(5, 'nope')}", store.scope)).toBe("—");
+  });
+
   it("changes case and trims text", () => {
     expect(val("lower('Sunny')")).toBe("sunny");
     expect(val("upper('ok')")).toBe("OK");

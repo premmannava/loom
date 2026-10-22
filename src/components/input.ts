@@ -2,7 +2,7 @@ import { toNumber } from "../data";
 import type { ComponentDef, PropReader } from "../component";
 import type { Box } from "../types";
 import { INPUT_KINDS } from "../editor";
-import { fillTint, onProp, partBox, runOn, themeFont } from "./util";
+import { fillTint, labelLines, onProp, partBox, runOn, textWidth, themeFont } from "./util";
 
 const VARIANTS = ["primary", "secondary", "danger"] as const;
 
@@ -20,6 +20,10 @@ export const button: ComponentDef = {
 button "Back" variant=secondary on=dec:step`,
   layout(box, ctx) {
     box.h = ctx.theme.control.height;
+  },
+  minWidth(node, ctx) {
+    const w = textWidth(ctx, ctx.props(node).text(), 600, 14) + 24;
+    return Math.max(64, Math.min(160, w));
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
@@ -49,7 +53,7 @@ button "Back" variant=secondary on=dec:step`,
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillStyle = variant === "secondary" ? color : c.onAccent;
-    g.fillText(p.text(), box.x + box.w / 2, box.y + box.h / 2 + 1, box.w - 16);
+    g.fillText(fitText(g, p.text(), box.w - 16), box.x + box.w / 2, box.y + box.h / 2 + 1);
     if (!disabled) ctx.addHit(box);
   },
 };
@@ -64,9 +68,12 @@ export const check: ComponentDef = {
   },
   example: `state agreed=false
 check "I agree to the terms" bind=agreed`,
-  layout(box) {
-    box.h = 26;
+  layout(box, ctx) {
+    const l = labelLines(ctx, ctx.props(box.node).text(), box.w - 30, 3);
+    box.data = l;
+    box.h = Math.max(26, l.lines.length * l.lh + 6);
   },
+  minWidth: (node, ctx) => 30 + Math.min(100, textWidth(ctx, ctx.props(node).text(), 400, ctx.theme.text.body)),
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
@@ -97,7 +104,8 @@ check "I agree to the terms" bind=agreed`,
     g.textAlign = "left";
     g.textBaseline = "middle";
     g.fillStyle = c.ink;
-    g.fillText(p.text(), box.x + 30, box.y + 14, box.w - 30);
+    const l = box.data as { lines: string[]; lh: number };
+    l.lines.forEach((line, i) => g.fillText(line, box.x + 30, box.y + 14 + i * l.lh));
     ctx.addHit(box);
   },
   press(ctx) {
@@ -117,20 +125,25 @@ export const switchToggle: ComponentDef = {
   },
   example: `state updates=true
 switch "Email me order updates" bind=updates`,
-  layout(box) {
-    box.h = 28;
+  layout(box, ctx) {
+    const l = labelLines(ctx, ctx.props(box.node).text(), box.w - 52, 3);
+    box.data = l;
+    box.h = Math.max(28, l.lines.length * l.lh + 8);
   },
+  minWidth: (node, ctx) => 52 + Math.min(100, textWidth(ctx, ctx.props(node).text(), 400, ctx.theme.text.body)),
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
     const on = !!p.bound();
-    const tw = 40, th = 24, tx = box.x + box.w - tw, ty = box.y + (box.h - th) / 2;
+    // The toggle sits beside the first line of the label, however many lines it wraps to.
+    const tw = 40, th = 24, tx = box.x + box.w - tw, ty = box.y + (28 - th) / 2;
     g.font = ctx.font(400, theme.text.body);
     g.fillStyle = c.ink;
     g.textAlign = "left";
     g.textBaseline = "middle";
-    g.fillText(p.text(), box.x, box.y + box.h / 2 + 1, Math.max(0, box.w - tw - 12));
+    const l = box.data as { lines: string[]; lh: number };
+    l.lines.forEach((line, i) => g.fillText(line, box.x, box.y + 15 + i * l.lh));
     ctx.roundRect(tx, ty, tw, th, th / 2);
     g.fillStyle = on ? c.accent : c.line;
     g.fill();
@@ -163,15 +176,18 @@ export const radio: ComponentDef = {
 radio "Small" bind=size value=s
 radio "Medium" bind=size value=m
 radio "Large" bind=size value=l`,
-  layout(box) {
-    box.h = 26;
+  layout(box, ctx) {
+    const l = labelLines(ctx, ctx.props(box.node).text(), box.w - 30, 3);
+    box.data = l;
+    box.h = Math.max(26, l.lines.length * l.lh + 6);
   },
+  minWidth: (node, ctx) => 30 + Math.min(100, textWidth(ctx, ctx.props(node).text(), 400, ctx.theme.text.body)),
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
     const chosen = p.bound() === (p.value("value") ?? "");
-    const cx = box.x + 9.5, cy = box.y + box.h / 2;
+    const cx = box.x + 9.5, cy = box.y + 13;
     g.beginPath();
     g.arc(cx, cy, 9, 0, Math.PI * 2);
     g.fillStyle = c.surface;
@@ -189,7 +205,8 @@ radio "Large" bind=size value=l`,
     g.fillStyle = c.ink;
     g.textAlign = "left";
     g.textBaseline = "middle";
-    g.fillText(p.text(), box.x + 30, cy + 1, Math.max(0, box.w - 30));
+    const l = box.data as { lines: string[]; lh: number };
+    l.lines.forEach((line, i) => g.fillText(line, box.x + 30, cy + 1 + i * l.lh));
     ctx.addHit(box);
   },
   press(ctx) {
@@ -201,7 +218,7 @@ radio "Large" bind=size value=l`,
   },
 };
 
-const STEP_W = 42, VALUE_W = 52;
+const STEP_W = 42, VALUE_W = 52, STEPPER_W = STEP_W * 2 + VALUE_W;
 
 /** A stepper's limits and current value, read the same way when painting and pressing. */
 function stepperState(p: PropReader) {
@@ -228,32 +245,49 @@ export const stepper: ComponentDef = {
   example: `state qty=2
 stepper "Quantity" bind=qty min=1 max=10`,
   layout(box, ctx) {
-    box.h = ctx.theme.control.height;
+    const control = ctx.theme.control.height;
+    const label = ctx.props(box.node).text();
+    const beside = box.w - STEPPER_W - 12;
+    // Too narrow for the label beside the buttons: put it above them instead of squeezing it.
+    const stacked = !!label && beside < 56;
+    const l = labelLines(ctx, label, stacked ? box.w : beside, 2);
+    const labelH = l.lines.length * l.lh;
+    const controlY = stacked ? labelH + 6 : Math.max(0, (labelH - control) / 2);
+    box.data = { ...l, stacked, controlY };
+    box.h = stacked ? controlY + control : Math.max(control, labelH);
+  },
+  minWidth(node, ctx) {
+    const label = ctx.props(node).text();
+    return STEPPER_W + (label ? 12 + Math.min(90, textWidth(ctx, label, 400, ctx.theme.text.body)) : 0);
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
     const { min, max, value } = stepperState(p);
-    const total = STEP_W * 2 + VALUE_W;
-    const label = p.text();
-    const x0 = label ? box.x + Math.max(0, box.w - total) : box.x;
-    if (label) {
+    const total = STEPPER_W;
+    const d = box.data as { lines: string[]; lh: number; stacked: boolean; controlY: number };
+    const h = theme.control.height;
+    const top = box.y + d.controlY;
+    const x0 = d.lines.length && !d.stacked ? box.x + Math.max(0, box.w - total) : box.x;
+    if (d.lines.length) {
       g.font = ctx.font(400, theme.text.body);
       g.fillStyle = c.ink;
       g.textAlign = "left";
       g.textBaseline = "middle";
-      g.fillText(label, box.x, box.y + box.h / 2 + 1, Math.max(0, box.w - total - 12));
+      // Beside the buttons the label is centred on them; above them it starts at the top.
+      const first = d.stacked ? box.y + d.lh / 2 + 1 : box.y + Math.max(d.lines.length * d.lh, h) / 2 - ((d.lines.length - 1) * d.lh) / 2 + 1;
+      d.lines.forEach((line, i) => g.fillText(line, box.x, first + i * d.lh));
     }
-    ctx.roundRect(x0 + 0.5, box.y + 0.5, total - 1, box.h - 1, theme.radius.md);
+    ctx.roundRect(x0 + 0.5, top + 0.5, total - 1, h - 1, theme.radius.md);
     g.fillStyle = c.surface;
     g.fill();
     g.strokeStyle = c.line;
     g.lineWidth = 1;
     g.stroke();
     g.fillStyle = c.line;
-    g.fillRect(x0 + STEP_W, box.y + 8, 1, box.h - 16);
-    g.fillRect(x0 + STEP_W + VALUE_W, box.y + 8, 1, box.h - 16);
+    g.fillRect(x0 + STEP_W, top + 8, 1, h - 16);
+    g.fillRect(x0 + STEP_W + VALUE_W, top + 8, 1, h - 16);
     const parts = [
       { name: "dec", x: x0, enabled: value - 1e-9 > min, sign: "−" },
       { name: "inc", x: x0 + STEP_W + VALUE_W, enabled: value + 1e-9 < max, sign: "+" },
@@ -261,7 +295,7 @@ stepper "Quantity" bind=qty min=1 max=10`,
     g.textAlign = "center";
     g.textBaseline = "middle";
     for (const part of parts) {
-      const pb = partBox(box, part.x, box.y, STEP_W, box.h);
+      const pb = partBox(box, part.x, top, STEP_W, h);
       if (part.enabled && ctx.isHovered(box.node, part.name)) {
         ctx.roundRect(pb.x + 3, pb.y + 3, pb.w - 6, pb.h - 6, theme.radius.sm);
         fillTint(g, c.accent, 0.1);
@@ -270,13 +304,13 @@ stepper "Quantity" bind=qty min=1 max=10`,
       if (!part.enabled) g.globalAlpha *= 0.35;
       g.font = ctx.font(600, 20);
       g.fillStyle = c.accent;
-      g.fillText(part.sign, pb.x + STEP_W / 2, box.y + box.h / 2 + 1);
+      g.fillText(part.sign, pb.x + STEP_W / 2, top + h / 2 + 1);
       g.restore();
       if (part.enabled) ctx.addHit(pb, { detail: part.name });
     }
     g.font = ctx.font(600, theme.text.body);
     g.fillStyle = c.ink;
-    g.fillText(String(Math.round(value * 1000) / 1000), x0 + STEP_W + VALUE_W / 2, box.y + box.h / 2 + 1, VALUE_W - 6);
+    g.fillText(fitText(g, String(Math.round(value * 1000) / 1000), VALUE_W - 6), x0 + STEP_W + VALUE_W / 2, top + h / 2 + 1);
   },
   press(ctx) {
     const p = ctx.props(ctx.target.node);
@@ -366,16 +400,17 @@ export const link: ComponentDef = {
   layout(box, ctx) {
     box.h = Math.round(ctx.theme.text.body * 1.35);
   },
+  minWidth: (node, ctx) => Math.min(120, textWidth(ctx, ctx.props(node).text(), 600, ctx.theme.text.body)),
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     g.font = ctx.font(600, theme.text.body);
-    const label = p.text();
+    const label = fitText(g, p.text(), box.w);
     const w = Math.min(box.w, g.measureText(label).width);
     g.fillStyle = theme.colors.accent;
     g.textAlign = "left";
     g.textBaseline = "middle";
-    g.fillText(label, box.x, box.y + box.h / 2 + 1, box.w);
+    g.fillText(label, box.x, box.y + box.h / 2 + 1);
     if (ctx.isHovered(box.node)) g.fillRect(box.x, box.y + box.h - 3, w, 1.5);
     ctx.addHit(partBox(box, box.x, box.y, w, box.h));
   },
@@ -419,24 +454,25 @@ export const slider: ComponentDef = {
   example: `state maxPrice=120
 slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
   layout(box, ctx) {
-    const label = ctx.props(box.node).text();
-    box.h = (label ? Math.round(ctx.theme.text.body * 1.35) + 4 : 0) + SLIDER_AREA;
+    const l = labelLines(ctx, ctx.props(box.node).text(), box.w, 2);
+    box.data = l;
+    box.h = (l.lines.length ? l.lines.length * l.lh + 4 : 0) + SLIDER_AREA;
   },
+  minWidth: () => 120,
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
     const c = theme.colors;
     const { min, max, value } = sliderState(p);
-    const label = p.text();
+    const l = box.data as { lines: string[]; lh: number };
     let y = box.y;
-    if (label) {
-      const lh = Math.round(theme.text.body * 1.35);
+    if (l.lines.length) {
       g.font = ctx.font(400, theme.text.body);
       g.fillStyle = c.ink;
       g.textAlign = "left";
       g.textBaseline = "middle";
-      g.fillText(label, box.x, y + lh / 2 + 1, box.w);
-      y += lh + 4;
+      for (const line of l.lines) { g.fillText(line, box.x, y + l.lh / 2 + 1); y += l.lh; }
+      y += 4;
     }
     const area = partBox(box, box.x, y, box.w, SLIDER_AREA);
     const { left, width } = travel(area);
@@ -538,6 +574,7 @@ export const input: ComponentDef = {
   example: `state task="" todos=[]
 input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
 text "{plural(len(todos), 'item')}" tone=muted`,
+  minWidth: () => 120,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     box.h = fieldBox(box, p, ctx.theme.control.height).y - box.y + ctx.theme.control.height;
@@ -558,7 +595,7 @@ text "{plural(len(todos), 'item')}" tone=muted`,
       g.textAlign = "left";
       g.textBaseline = "top";
       g.fillStyle = c.ink;
-      g.fillText(label, box.x, box.y, box.w);
+      g.fillText(fitText(g, label, box.w), box.x, box.y);
     }
     ctx.roundRect(field.x + 0.5, field.y + 0.5, field.w - 1, field.h - 1, theme.radius.md);
     g.fillStyle = c.surface;

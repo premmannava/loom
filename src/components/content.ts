@@ -1,6 +1,9 @@
 import type { ComponentDef } from "../component";
-import { wrapText } from "../text";
-import { fillTint, TEXT_STYLES, textMetrics, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
+import type { TextMeasurer } from "../text";
+import type { Theme } from "../theme";
+import { fitLines, wrapText } from "../text";
+import { fitText } from "./input";
+import { fillTint, TEXT_STYLES, textMetrics, textWidth, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
 
 const ALIGN = ["left", "center", "right"] as const;
 
@@ -27,6 +30,13 @@ text "$160" tone=muted strike=true`,
     const lines = wrapText(p.text(), box.w, f, ctx.measure);
     box.data = { lines, font: f, lineHeight: m.lineHeight };
     box.h = lines.length * m.lineHeight;
+  },
+  minWidth(node, ctx) {
+    // Text wraps, so it needs only its longest word (up to a point: long words break).
+    const p = ctx.props(node);
+    const m = textMetrics(ctx.theme, p.oneOf("style", TEXT_STYLES, "body"), p.has("weight") ? p.oneOf("weight", WEIGHTS, "regular") : undefined);
+    const words = p.text().split(/\s+/).filter(Boolean);
+    return Math.min(100, Math.max(0, ...words.map((w) => textWidth(ctx, w, m.weight, m.size))));
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
@@ -61,26 +71,65 @@ export const stat: ComponentDef = {
   },
   example: `state price=24 qty=2
 stat label="Total" value="\${price*qty}"`,
-  layout(box) {
-    box.h = 54;
+  layout(box, ctx) {
+    const p = ctx.props(box.node);
+    const d = statLayout(p.str("label"), p.str("value"), box.w, ctx.theme, ctx.measure);
+    box.data = { ...d };
+    box.h = d.height;
+  },
+  minWidth(node, ctx) {
+    // What its label and its value need at the smallest size, so "Days 2" stays small; long values wrap below 110.
+    const p = ctx.props(node);
+    const label = p.str("label").toUpperCase();
+    const labelW = textWidth(ctx, label, 600, STAT_LABEL) + label.length;
+    const valueW = textWidth(ctx, p.str("value"), 700, STAT_SIZES[STAT_SIZES.length - 1]!);
+    return Math.max(40, Math.min(110, Math.max(labelW, valueW)));
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const g = ctx.g;
+    const d = box.data as unknown as StatLayout;
     const center = p.oneOf("align", ["left", "center"] as const, "left") === "center";
     const x = center ? box.x + box.w / 2 : box.x;
     g.textAlign = center ? "center" : "left";
     g.textBaseline = "alphabetic";
-    g.font = ctx.font(600, 11);
+    g.font = ctx.font(600, STAT_LABEL);
     if ("letterSpacing" in g) (g as unknown as { letterSpacing: string }).letterSpacing = "1px";
     g.fillStyle = ctx.theme.colors.muted;
-    g.fillText(p.str("label").toUpperCase(), x, box.y + 12);
+    d.label.forEach((l, i) => g.fillText(l, x, box.y + 12 + i * STAT_LABEL_LH));
     if ("letterSpacing" in g) (g as unknown as { letterSpacing: string }).letterSpacing = "0px";
-    g.font = ctx.font(700, 28);
+    g.font = ctx.font(700, d.size);
     g.fillStyle = toneColor(ctx.theme, p.oneOf("tone", TONES, "default"));
-    g.fillText(p.str("value"), x, box.y + 48);
+    d.value.forEach((l, i) => g.fillText(l, x, box.y + d.valueTop + d.valueLH * (i + 1)));
   },
 };
+
+/** Value sizes a stat tries, largest first, before it wraps the value at the smallest. */
+const STAT_SIZES = [28, 24, 20, 18];
+const STAT_LABEL = 11, STAT_LABEL_LH = 14;
+
+interface StatLayout { label: string[]; value: string[]; size: number; valueLH: number; valueTop: number; height: number }
+
+/**
+ * A stat's lines: the label (upper case, at most two lines) and the value at
+ * the largest size that fits on one line, or wrapped at the smallest (at most
+ * three lines). With a one-line label and value at full size it's 54 px tall.
+ */
+export function statLayout(label: string, value: string, width: number, theme: Theme, m: TextMeasurer): StatLayout {
+  const w = Math.max(20, width);
+  // Labels are drawn with 1px letter spacing, which the measurer doesn't know about.
+  const spaced: TextMeasurer = { width: (t, f) => m.width(t, f) + t.length };
+  const labelLines = label ? fitLines(label.toUpperCase(), w, themeFont(theme, 600, STAT_LABEL), spaced, 2) : [];
+  let size = STAT_SIZES[STAT_SIZES.length - 1]!;
+  let lines: string[] | null = null;
+  for (const s of STAT_SIZES) {
+    if (m.width(value, themeFont(theme, 700, s)) <= w) { size = s; lines = [value]; break; }
+  }
+  lines ??= fitLines(value, w, themeFont(theme, 700, size), m, 3);
+  const valueLH = Math.round(size * 1.3);
+  const valueTop = 12 + Math.max(0, labelLines.length - 1) * STAT_LABEL_LH;
+  return { label: labelLines, value: lines, size, valueLH, valueTop, height: valueTop + lines.length * valueLH + 6 };
+}
 
 export const progress: ComponentDef = {
   type: "progress",
@@ -97,6 +146,7 @@ progress value={done} max=5 label="{done} of 5 steps"`,
   layout(box, ctx) {
     box.h = ctx.props(box.node).has("label") ? 30 : 10;
   },
+  minWidth: () => 80,
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const g = ctx.g;
@@ -106,7 +156,7 @@ progress value={done} max=5 label="{done} of 5 steps"`,
       g.textAlign = "left";
       g.textBaseline = "top";
       g.fillStyle = ctx.theme.colors.muted;
-      g.fillText(p.str("label"), box.x, y);
+      g.fillText(fitText(g, p.str("label"), box.w), box.x, y);
       y += 20;
     }
     const max = p.num("max", 100) || 1;
@@ -137,6 +187,7 @@ export const badge: ComponentDef = {
   layout(box) {
     box.h = 24;
   },
+  minWidth: (node, ctx) => Math.min(140, textWidth(ctx, ctx.props(node).text(), 600, 12) + 20),
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
@@ -149,7 +200,7 @@ export const badge: ComponentDef = {
     g.fillStyle = color;
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillText(label, box.x + w / 2, box.y + box.h / 2 + 1, w - 12);
+    g.fillText(fitText(g, label, w - 12), box.x + w / 2, box.y + box.h / 2 + 1);
   },
 };
 
@@ -184,6 +235,11 @@ export const avatar: ComponentDef = {
     const lines = p.bool("name", true) ? (p.has("detail") ? 2 : 1) : 0;
     box.h = Math.max(d, lines * Math.round(ctx.theme.text.body * 1.35));
   },
+  minWidth(node, ctx) {
+    const p = ctx.props(node);
+    const d = AVATAR_SIZES[p.oneOf("size", AVATAR_SIZE_NAMES, "md")];
+    return p.bool("name", true) ? d + 12 + Math.min(100, textWidth(ctx, p.text(), 600, ctx.theme.text.body)) : d;
+  },
   paint(box, ctx) {
     const p = ctx.props(box.node);
     const { g, theme } = ctx;
@@ -206,11 +262,11 @@ export const avatar: ComponentDef = {
     g.textAlign = "left";
     g.font = ctx.font(600, theme.text.body);
     g.fillStyle = theme.colors.ink;
-    g.fillText(p.text(), x, detail ? cy - lh / 2 : cy, maxW);
+    g.fillText(fitText(g, p.text(), maxW), x, detail ? cy - lh / 2 : cy);
     if (detail) {
       g.font = ctx.font(400, 13);
       g.fillStyle = theme.colors.muted;
-      g.fillText(detail, x, cy + lh / 2, maxW);
+      g.fillText(fitText(g, detail, maxW), x, cy + lh / 2);
     }
   },
 };

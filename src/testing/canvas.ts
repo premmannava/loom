@@ -13,6 +13,8 @@ export interface DrawOp {
   strokeStyle: string;
   font: string;
   globalAlpha: number;
+  /** For text: where x is on the text (left, center, right, start or end). */
+  textAlign: string;
 }
 
 /** Calls that mark pixels. Everything else (paths, transforms, state) only prepares. */
@@ -74,6 +76,7 @@ export function createRecordingContext(): { context: CanvasRenderingContext2D; t
           strokeStyle: colored && !fill ? style.strokeStyle : "",
           font: prop.endsWith("Text") ? style.font : "",
           globalAlpha: style.globalAlpha,
+          textAlign: prop.endsWith("Text") ? String(style.textAlign ?? "start") : "",
         });
         return undefined;
       };

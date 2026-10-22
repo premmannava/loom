@@ -275,6 +275,7 @@ Formatting, for text people read:
 |---|---|
 | `money(2400)`, `money(-84.1)`, `money(n, 'EUR')` | `$2,400.00`, `-$84.10`, `€…` |
 | `number(37000)`, `number(n, 2)` | `37,000`; always two decimals |
+| `compact(12345678)`, `compact(n, 'USD')` | `12.3M`, `$12.3M`: big figures in small spaces, like a `stat` |
 | `plural(n, 'item')`, `plural(n, 'child', 'children')` | `1 item`, `3 items`, `2 children` |
 | `lower(text)`, `upper(text)`, `trim(text)` | Text in lower or upper case, or without spaces at the ends |
 
@@ -451,13 +452,14 @@ column gap=6
 
 ### `row`
 
-Places its children side by side, splitting the width equally.
+Places its children side by side, splitting the width equally. On a narrow screen, children that don't fit move onto the next line.
 
 | Prop | Type | Description |
 |---|---|---|
 | `gap` | number | Space between children in pixels (default 10). |
 | `pad` | number | Inner padding in pixels (default 0). |
 | `align` | `top` / `center` / `bottom` | Vertical alignment of children: top, center or bottom. |
+| `wrap` | boolean | Move children onto more lines when they don't fit side by side (default true). Set false to always keep them on one line. |
 
 Children: any elements.
 
