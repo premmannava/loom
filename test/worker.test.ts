@@ -4,7 +4,7 @@
  * streams SayShape lines back.
  */
 import { describe, expect, it } from "vitest";
-import { handle, friendlyError, MAX_REQUEST_CHARS, type Env } from "../worker/src/handler";
+import { handle, friendlyError, MAX_REQUEST_CHARS, MAX_REFINE_CHANGES, MAX_REFINE_SPEC_CHARS, type Env } from "../worker/src/handler";
 import { ModelError } from "../src/model";
 import { fakeModel } from "./fake-model";
 
@@ -40,7 +40,7 @@ describe("model proxy", () => {
 
   it("checks the request before calling the model", async () => {
     const model = fakeModel([]);
-    for (const [body, status] of [["not json", 400], [{}, 400], [{ request: "   " }, 400], [{ request: "x".repeat(MAX_REQUEST_CHARS + 1) }, 400], ["x".repeat(9000), 413]] as const) {
+    for (const [body, status] of [["not json", 400], [{}, 400], [{ request: "   " }, 400], [{ request: "x".repeat(MAX_REQUEST_CHARS + 1) }, 400], ["x".repeat(25_000), 413]] as const) {
       expect((await handle(post(body), env, { fetch: model.fetch })).status).toBe(status);
     }
     expect(model.requests).toHaveLength(0);
@@ -107,5 +107,32 @@ describe("model proxy", () => {
     const last = JSON.parse(body.trim().split("\n").at(-1)!) as unknown;
     expect(last).toEqual({ t: "error", message: friendlyError(new ModelError("x", 429)) });
     expect(friendlyError(new ModelError("x", 503))).toMatch(/Try again/);
+  });
+
+  it("changes the current interface when given a refinement, as data inside its own instructions", async () => {
+    const model = fakeModel([{ content: ['state n=0\ncard\n  text "Count {n}" style=title\n'] }]);
+    const refine = { task: "A counter", changes: ["Add a reset button"], spec: 'state n=0\ncard\n  text "Count {n}"\n' };
+    const res = await handle(post({ request: "Make the count bigger", refine }), env, { fetch: model.fetch });
+    expect((await events(res)).at(-1)).toMatchObject({ t: "done" });
+    const messages = model.requests[0]!.body.messages;
+    expect(messages[0]!.role).toBe("system");
+    const all = messages.map((m) => m.content).join("\n");
+    for (const part of ["A counter", "Add a reset button", 'text "Count {n}"', "Make the count bigger"]) expect(all).toContain(part);
+  });
+
+  it("refuses refinements that are malformed or too long, before calling the model", async () => {
+    const model = fakeModel([]);
+    const spec = "card\n";
+    for (const refine of [
+      "a string",
+      { task: "", spec },
+      { task: "A form", spec: "" },
+      { task: "A form", spec: "x".repeat(MAX_REFINE_SPEC_CHARS + 1) },
+      { task: "A form", spec, changes: Array.from({ length: MAX_REFINE_CHANGES + 1 }, () => "more") },
+      { task: "A form", spec, changes: [42] },
+    ]) {
+      expect((await handle(post({ request: "Change it", refine }), env, { fetch: model.fetch })).status).toBe(400);
+    }
+    expect(model.requests).toHaveLength(0);
   });
 });

@@ -8,7 +8,11 @@
  * (src/model): the guide, the request and at most one repair. So the key
  * can only ever be used for this one model and this one job.
  *
- *   POST /generate   {"request": "...", "token": "..."}
+ *   POST /generate   {"request": "...", "token": "...", "refine": {"task": "...", "changes": ["..."], "spec": "..."}}
+ *
+ *   refine is optional: it changes the current interface instead of starting
+ *   over (src/model/context.ts). Its text is only ever data in the request;
+ *   the instructions are still the worker's own.
  *   → 200 application/x-ndjson, one JSON object per line:
  *       {"t":"phase","v":"writing"}   what the model is doing
  *       {"t":"text","v":"card\n"}     clean SayShape lines, to push into the engine
@@ -48,7 +52,9 @@ export interface Deps {
 }
 
 export const MAX_REQUEST_CHARS = 400;
-const MAX_BODY_BYTES = 8_000;
+const MAX_BODY_BYTES = 24_000;
+export const MAX_REFINE_SPEC_CHARS = 12_000;
+export const MAX_REFINE_CHANGES = 10;
 const MAX_TOKENS = 3_000;
 const SITE = "https://premmannava.github.io/sayshape/";
 const registry = new Registry(coreComponents);
@@ -94,6 +100,19 @@ async function verifyTurnstile(env: Env, token: string, ip: string, doFetch: typ
   }
 }
 
+/** A refinement from the browser, checked for shape and size; null when there is none. */
+function readRefine(v: unknown): { task: string; changes: string[]; spec: string } | null | "invalid" {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "object" || Array.isArray(v)) return "invalid";
+  const r = v as Record<string, unknown>;
+  const task = typeof r.task === "string" ? r.task.trim() : "";
+  const spec = typeof r.spec === "string" ? r.spec : "";
+  const changes = Array.isArray(r.changes) ? r.changes : [];
+  if (!task || task.length > MAX_REQUEST_CHARS || !spec.trim() || spec.length > MAX_REFINE_SPEC_CHARS) return "invalid";
+  if (changes.length > MAX_REFINE_CHANGES || !changes.every((c) => typeof c === "string" && c.length <= MAX_REQUEST_CHARS)) return "invalid";
+  return { task, changes: changes as string[], spec };
+}
+
 export async function handle(req: Request, env: Env, deps: Deps = {}): Promise<Response> {
   const doFetch = deps.fetch ?? fetch;
   const url = new URL(req.url);
@@ -112,11 +131,14 @@ export async function handle(req: Request, env: Env, deps: Deps = {}): Promise<R
 
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) return json(413, { error: "Request too large" }, cors);
-  let body: { request?: unknown; token?: unknown };
+  let body: { request?: unknown; token?: unknown; refine?: unknown };
   try { body = JSON.parse(raw) as typeof body; } catch { return json(400, { error: "Send JSON" }, cors); }
   const request = typeof body.request === "string" ? body.request.trim() : "";
   if (!request) return json(400, { error: "Describe the interface you want." }, cors);
   if (request.length > MAX_REQUEST_CHARS) return json(400, { error: `Keep the request under ${MAX_REQUEST_CHARS} characters.` }, cors);
+
+  const refine = readRefine(body.refine);
+  if (refine === "invalid") return json(400, { error: "The conversation is too long to continue. Start a new interface." }, cors);
 
   const ip = req.headers.get("CF-Connecting-IP") ?? "";
   if (env.TURNSTILE_SECRET) {
@@ -145,6 +167,7 @@ export async function handle(req: Request, env: Env, deps: Deps = {}): Promise<R
         },
         registry,
         request,
+        refine: refine ?? undefined,
         guide: playgroundGuide([]),
         // One repair, only for lines the parser had to skip: a free model has few requests a day.
         repairOn: "errors",

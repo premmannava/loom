@@ -45,7 +45,7 @@ Then tell the website where the worker is. In GitHub: **Settings → Secrets and
 | `SAYSHAPE_MODEL_LABEL` | `NVIDIA Nemotron 3 Ultra (free)` |
 | `TURNSTILE_SITE_KEY` | the widget's **site key** (public), if you made one |
 
-These are public values, so they're Variables, not Secrets. Re-run the **Website** workflow (or push to `main`) and the playground shows a **Generate** box. Without `SAYSHAPE_MODEL_ENDPOINT`, the site keeps running saved specs only.
+These are public values, so they're Variables, not Secrets. Re-run the **Website** workflow (or push to `main`) and the site gets a **Build with AI** page in its navigation. Without `SAYSHAPE_MODEL_ENDPOINT`, the site keeps running saved specs only.
 
 Also in OpenRouter, give this key a **credit limit of $0** (Settings → Keys), so even if something went wrong it couldn't spend money.
 
