@@ -15,9 +15,10 @@ import type { Box, HitTarget, SayShapeNode, Rect, Value } from "./types";
 
 /**
  * `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to.
+ * `names` is one or more of them separated by commas, with no spaces: `y=revenue,last_year`.
  * `condition` and `expression` are read as an expression even without braces (`if=done`, `items=todos`).
  */
-export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "expression" | "action" | "state" | "name";
+export type PropType = "number" | "string" | "boolean" | "enum" | "condition" | "expression" | "action" | "state" | "name" | "names";
 
 export interface PropDef {
   type: PropType;
@@ -163,6 +164,12 @@ export interface ComponentDef {
   parents?: readonly string[];
   /** A short spec snippet for docs and the model prompt. */
   example?: string;
+  /**
+   * Checks that need several props together (a pie given more than one field),
+   * run by the parser after each prop is checked on its own. Gets the props as
+   * written; returns warnings that say how to fix the line. Never throws.
+   */
+  check?(props: Readonly<Record<string, string>>): string[];
 
   /** Set box.h (and box.children for containers). box.x/y/w are given. */
   layout(box: Box, ctx: LayoutContext): void;

@@ -10,7 +10,7 @@ SayShape is an **early prototype, version 0.1**. This page separates what's buil
 ## Built
 
 - The engine: parser, expressions, actions, layout, painting, hit testing, keyboard focus (including parts of elements), popups and the inspector.
-- 40 components ([reference](../components/)): layout, content, data (stat, rating, bar and line charts, tables with sorting and selection, the world map), input (buttons, checks, switches, radios, select, date picker, stepper, slider, text input), navigation (screens, tabs, breadcrumb, pagination) and feedback (progress, skeleton, empty).
+- 40 components ([reference](../components/)): layout, content, data (stat, rating, charts: multi-series bar and line, pie and donut, tables with sorting and selection, the world map), input (buttons, checks, switches, radios, select, date picker, stepper, slider, text input), navigation (screens, tabs, breadcrumb, pagination) and feedback (progress, skeleton, empty).
 - State with lists and records, host data, `each` with keys and nesting, `bind=` and actions on paths, `add`, `remove` and `clear`, `if` blocks, `derive` lines, list and formatting functions, screens with `go:` and `back`, `notify:` messages, and images from allowed hosts.
 - The model guide (full and compact, with profiles), `loom-ui/model` (streaming, cleaning, checking, one repair, bounded refinement), an evaluation script, and `loom-ui/testing`.
 - Unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.
@@ -23,7 +23,7 @@ SayShape is an **early prototype, version 0.1**. This page separates what's buil
 - **Scrolling regions and overlays.** No scrolling areas inside a screen, and no dialogs, menus or tooltips. The popup layer only serves a component's own popup.
 - **Multi-select**, typing to search in a select, option groups.
 - **Larger tables**: more than 200 rows, scrolling, sticky headers, editable cells, multi-row selection.
-- **More charts**: pie, stacked, several series, legends, tooltips, time or numeric axes.
+- **More charts**: stacked bars, area charts, tooltips, series from different lists, time or numeric axes.
 - **Dates beyond one day**: ranges, times, time zones, other locales.
 - **Packaging**: an npm release and a production model server.
 
@@ -38,7 +38,7 @@ SayShape is an **early prototype, version 0.1**. This page separates what's buil
 | Data literals | 20 levels deep, 10,000 values |
 | `select` options | 200, eight shown at once |
 | `table` | 200 rows and 8 columns; a message instead of more |
-| `chart` | 200 items, one series |
+| `chart` | 200 items, 6 series, 6 pie or donut slices (the rest summed into Other) |
 
 Numbers, money and dates are formatted in US English. Weeks start on Sunday.
 

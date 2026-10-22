@@ -74,7 +74,7 @@ describe("SayShape MCP server", () => {
   it("sends the docs for an element along with the lines that went wrong", async () => {
     const client = await connect();
     const r = await client.callTool({ name: "show_interface", arguments: { spec: `card
-  chart "Sales" kind=pie items=[] x=a y=b
+  chart "Sales" kind=area items=[] x=a y=b
 ` } });
     const t = text(r);
     expect(t).toMatch(/line 2/);
@@ -114,7 +114,7 @@ describe("SayShape MCP server", () => {
 
   it("asks for a fix when a warning leaves the interface wrong: an unknown function or a bad choice", async () => {
     const client = await connect();
-    const spec = `state rows=[{m: "Jan", v: 3}]\ncard\n  text "Best: {argmax(rows).m}"\n  chart "Sales" kind=pie items=rows x=m y=v\n`;
+    const spec = `state rows=[{m: "Jan", v: 3}]\ncard\n  text "Best: {argmax(rows).m}"\n  chart "Sales" kind=area items=rows x=m y=v\n`;
     const r = await client.callTool({ name: "show_interface", arguments: { spec } });
     const t = text(r);
     expect(t).toMatch(/2 problems leave part of it wrong/);

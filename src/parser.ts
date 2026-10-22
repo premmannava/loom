@@ -335,6 +335,9 @@ function checkProp(name: string, raw: string, def: PropDef, line: number, diags:
     case "name":
       if (!/^[A-Za-z_]\w*$/.test(raw)) warn(`${name} should be a plain name (letters, digits and _), got "${raw}"`);
       break;
+    case "names":
+      if (!/^[A-Za-z_]\w*(,[A-Za-z_]\w*)*$/.test(raw)) warn(`${name} should be one or more plain names (letters, digits and _) separated by commas with no spaces, like ${name}=revenue,cost; got "${raw}"`);
+      break;
     case "string":
       for (const part of splitTemplate(raw)) {
         if ("expr" in part) { const err = checkSyntax(part.expr); if (err) warn(`In ${name}: ${err}`); }
@@ -496,6 +499,12 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     }
     for (const [name, pdef] of Object.entries(def.props)) {
       if (pdef.required && !(name in tok.props)) diagnostics.push({ line: lineNo, severity: "warning", message: `"${tok.type}" needs ${name}=` });
+    }
+    if (def.check) {
+      // A component's own check must never stop parsing (rule 2).
+      let found: string[] = [];
+      try { found = def.check(tok.props); } catch { found = []; }
+      for (const message of found) diagnostics.push({ line: lineNo, severity: "warning", message });
     }
     if (tok.type === "if" && tok.props.if === undefined) {
       diagnostics.push({ line: lineNo, severity: "warning", message: `An if block needs a condition, like if={count > 0}; the lines under it always show` });

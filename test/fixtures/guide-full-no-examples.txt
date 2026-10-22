@@ -194,13 +194,14 @@ ELEMENTS
     bind=<state>  A number state the user sets by pressing a star.
     on=<action>  Actions to run after the user picks a rating, e.g. emit:changed. Separate several with ;
 
-  chart "<text>"  — A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.
+  chart "<text>"  — A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).
     "<text>"  A title above the chart.
-    kind=<bar|line>  bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values.
+    kind=<bar|line|pie|donut>  bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.
     items=<expression, required>  The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}.
-    x=<name, required>  The field holding each item's label, e.g. x=month.
-    y=<name, required>  The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero.
-    format=<number|money>  How values on the axis read: number (37K) or money ($37K).
+    x=<name, required>  The field holding each item's label (each slice's name in a pie), e.g. x=month.
+    y=<names, required>  The field holding each item's number, e.g. y=revenue. Bar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.
+    labels=<string>  Bar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels="This year,Last year". Without it the legend shows the field names.
+    format=<number|money>  How values read on the axis, in a pie's legend and in a donut's middle: number (37K) or money ($37K).
 
   table "<text>"  — Rows of a list of records, one table-column per field, for things like inventory, orders or expenses. With sort= and direction=, pressing a header sorts by it; with bind= and key=, pressing a row selects it.
     "<text>"  A title above the table.

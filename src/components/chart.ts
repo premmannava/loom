@@ -1,40 +1,70 @@
 /**
- * chart: a single-series bar or line chart of a list of records.
+ * chart: bar and line charts of one or more fields of a list of records, and
+ * pie and donut charts of one field.
  *
  *   chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+ *   chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year
+ *   chart "Sales by region" kind=donut items=regions x=name y=total format=money
  *
  * Everything is worked out in layout (headless, from ctx.measure), into a
  * ChartGeometry kept on box.data relative to the box, so it's testable in
  * Node and survives containers moving the box. paint only draws it.
  *
  * Data rules, deterministic and never inventing numbers:
- * - Every item of the list is a category slot, in list order, equally spaced.
- * - A slot's value is its y field when that is a finite number. Anything
- *   else (missing field, null, text, not a record) is a gap: no bar, and the
- *   line breaks there. Text like "12" is not read as a number.
+ * - Bar and line: every item of the list is a category slot, in list order,
+ *   equally spaced. Each field in y is a series, drawn in the theme's series
+ *   colors in the order written; one field draws in the accent, as it always has.
+ * - A value is its field when that is a finite number. Anything else (missing
+ *   field, null, text, not a record) is a gap: no bar, and the line breaks
+ *   there. Text like "12" is not read as a number.
  * - A slot's label is its x field (text or a number), or "—" when missing.
  * - Bars always include 0; negative values go below it. Lines span the
- *   lowest to highest value, rounded out to whole ticks.
- * - More than MAX_CHART_ITEMS items, or too little width for them, shows a
- *   message instead of a chart: nothing is dropped silently.
+ *   lowest to highest value, rounded out to whole ticks. Every series shares
+ *   one scale.
+ * - Pie and donut: one slice per item with a positive y, in list order. Zero
+ *   and gaps are left out. More than MAX_SLICES slices keeps the largest
+ *   MAX_SLICES - 1 and adds an "Other" slice holding the rest. A negative
+ *   value, or nothing above zero, shows a message instead.
+ * - More than MAX_CHART_ITEMS items, more than MAX_SERIES fields, or too
+ *   little width for them, shows a message instead of a chart: nothing is
+ *   dropped silently.
  */
 import type { ComponentDef, LayoutContext } from "../component";
 import { fieldOf, isList, isRecord } from "../data";
-import { wrapText, type TextMeasurer } from "../text";
-import type { Theme } from "../theme";
+import { ellipsize, fitLines, wrapText, type TextMeasurer } from "../text";
+import { SERIES_COUNT, seriesColors, type Theme } from "../theme";
 import type { Value } from "../types";
 import { themeFont } from "./util";
 
 /** The most items one chart draws. Larger lists show a message instead. */
 export const MAX_CHART_ITEMS = 200;
+/** The most fields one bar or line chart draws, one color each. */
+export const MAX_SERIES = SERIES_COUNT;
+/** The most slices a pie or donut draws; past it, the smallest are summed into "Other". */
+export const MAX_SLICES = SERIES_COUNT;
 /** The narrowest slot per item, in pixels, before the chart says it's too narrow. */
 export const MIN_SLOT = { bar: 4, line: 3 } as const;
+/** Grouped bars: the narrowest bar, and the surface gap between bars in a group. */
+const MIN_GROUP_BAR = 3;
+const BAR_GAP = 2;
 
-const KINDS = ["bar", "line"] as const;
+const KINDS = ["bar", "line", "pie", "donut"] as const;
 const FORMATS = ["number", "money"] as const;
 type Kind = (typeof KINDS)[number];
+type AxisKind = "bar" | "line";
 type Format = (typeof FORMATS)[number];
 const LOCALE = "en-US";
+const isRound = (k: Kind): k is "pie" | "donut" => k === "pie" || k === "donut";
+
+/** The fields named in y=, in order: "revenue,last_year" → ["revenue", "last_year"]. */
+export function fieldsOf(y: string): string[] {
+  return y.split(",").map((f) => f.trim()).filter(Boolean);
+}
+
+/** The names in labels=, in order; blanks stay blank so they line up with y. */
+function labelsOf(raw: string): string[] {
+  return raw ? raw.split(",").map((l) => l.trim()) : [];
+}
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
@@ -47,12 +77,48 @@ export interface ChartSlot {
   labelX: number;
   /** Centre of the slot along x. */
   cx: number;
-  /** The value, or null for a gap. */
+  /** The first series' value, or null for a gap. */
   value: number | null;
-  /** Bar charts: the bar, from the zero line to the value. */
+  /** Every series' value, in y's order. */
+  values: Array<number | null>;
+  /** Bar charts: the first series' bar, from the zero line to the value. */
   bar?: Rect;
-  /** Line charts: where the value is. */
+  /** Bar charts: each series' bar, side by side in the slot; null for a gap. */
+  bars?: Array<Rect | null>;
+  /** Line charts: where the first series' value is. */
   point?: { x: number; y: number };
+  /** Line charts: each series' point; null for a gap. */
+  points?: Array<{ x: number; y: number } | null>;
+}
+
+/** One entry of the legend below a chart, relative to the box. */
+export interface LegendItem {
+  /** Index into the theme's series colors. */
+  color: number;
+  /** Where the swatch is. */
+  swatch: Rect;
+  /** The name, as written and as drawn (cut to fit). */
+  label: string;
+  shownLabel: string;
+  labelX: number;
+  /** Pie and donut: the value and share ("$12K · 34%"), as drawn, right-aligned at detailX. */
+  detail?: string;
+  detailX?: number;
+  /** Centre line of the entry's text. */
+  y: number;
+}
+
+export interface PieSlice {
+  label: string;
+  value: number;
+  /** Share of the total, 0 to 1. */
+  share: number;
+  /** Angles in radians, clockwise from the top. */
+  start: number;
+  end: number;
+  color: number;
+  /** True for the slice that sums the smallest items. */
+  other?: boolean;
 }
 
 /** Everything paint needs, relative to the chart's box. */
@@ -64,6 +130,8 @@ export type ChartGeometry = {
   labelFont: string;
   /** Shown instead of a plot: no data, too many items, too narrow. */
   message?: string;
+  /** The message as drawn: wrapped to the box, at most three lines. */
+  messageLines?: string[];
   plot: Rect;
   /** Value axis ticks, top to bottom is not guaranteed; y is where each is drawn. */
   ticks: Array<{ value: number; y: number; label: string }>;
@@ -72,9 +140,28 @@ export type ChartGeometry = {
   min: number;
   max: number;
   slots: ChartSlot[];
-  /** Line charts: runs of neighbouring values, broken at gaps. */
+  /** Line charts: runs of neighbouring values of the first series, broken at gaps. */
   segments: Array<Array<{ x: number; y: number }>>;
+  /** Line charts: the runs of every series, in y's order (the first is `segments`). */
+  seriesSegments: Array<Array<Array<{ x: number; y: number }>>>;
+  /** The series drawn, in y's order: their names and colors. */
+  series: Array<{ field: string; label: string; color: number }>;
   labelY: number;
+  /** Below the plot: series names (2 or more series), or slices with value and share. */
+  legend: LegendItem[];
+  legendFont: string;
+  /** Pie and donut. */
+  pie?: {
+    cx: number;
+    cy: number;
+    r: number;
+    /** 0 for a pie; the hole's radius for a donut. */
+    inner: number;
+    slices: PieSlice[];
+    total: number;
+    /** Donut: the total in the middle, as drawn, and its font. */
+    center?: { text: string; font: string; caption: string; captionFont: string; lh: number };
+  };
 };
 
 // ---------------------------------------------------------------- data
@@ -87,6 +174,13 @@ export interface ChartData {
   gaps: number;
 }
 
+export interface SeriesData {
+  slots: Array<{ label: string; values: Array<number | null> }>;
+  problem?: ChartData["problem"];
+  /** For each field, the items whose value wasn't a finite number. */
+  gaps: number[];
+}
+
 function labelOf(v: Value | undefined): string {
   if (typeof v === "string") return v;
   if (typeof v === "number" && isFinite(v)) return new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2 }).format(v);
@@ -94,19 +188,76 @@ function labelOf(v: Value | undefined): string {
   return "—";
 }
 
-/** Read a list of records into slots, without changing it. */
-export function chartData(items: Value | undefined, x: string, y: string): ChartData {
-  if (!isList(items)) return { slots: [], problem: "not-list", gaps: 0 };
-  if (!items.length) return { slots: [], problem: "empty", gaps: 0 };
-  if (items.length > MAX_CHART_ITEMS) return { slots: [], problem: "too-many", gaps: 0 };
-  let gaps = 0;
+const numberAt = (item: Value, field: string): number | null => {
+  const raw = isRecord(item) ? fieldOf(item, field) : undefined;
+  return typeof raw === "number" && isFinite(raw) ? raw : null;
+};
+
+/** Read a list of records into slots with one value per field, without changing it. */
+export function chartSeries(items: Value | undefined, x: string, ys: readonly string[]): SeriesData {
+  const none = ys.map(() => 0);
+  if (!isList(items)) return { slots: [], problem: "not-list", gaps: none };
+  if (!items.length) return { slots: [], problem: "empty", gaps: none };
+  if (items.length > MAX_CHART_ITEMS) return { slots: [], problem: "too-many", gaps: none };
+  const gaps = ys.map(() => 0);
   const slots = items.map((item) => {
-    const raw = isRecord(item) ? fieldOf(item, y) : undefined;
-    const value = typeof raw === "number" && isFinite(raw) ? raw : null;
-    if (value === null) gaps++;
-    return { label: isRecord(item) ? labelOf(fieldOf(item, x)) : "—", value };
+    const values = ys.map((y, k) => {
+      const v = numberAt(item, y);
+      if (v === null) gaps[k]!++;
+      return v;
+    });
+    return { label: isRecord(item) ? labelOf(fieldOf(item, x)) : "—", values };
   });
-  return { slots, gaps, problem: gaps === slots.length ? "no-values" : undefined };
+  const empty = slots.every((s) => s.values.every((v) => v === null));
+  return { slots, gaps, problem: empty ? "no-values" : undefined };
+}
+
+/** Read a list of records into slots for one field, without changing it. */
+export function chartData(items: Value | undefined, x: string, y: string): ChartData {
+  const d = chartSeries(items, x, [y]);
+  const slots = d.slots.map((s) => ({ label: s.label, value: s.values[0] ?? null }));
+  return { slots, gaps: d.gaps[0] ?? 0, ...(d.problem ? { problem: d.problem } : {}) };
+}
+
+export interface PieData {
+  slices: Array<{ label: string; value: number; other?: boolean }>;
+  total: number;
+  problem?: ChartData["problem"] | "negative" | "zero" | "overflow";
+  /** Items whose y wasn't a finite number. */
+  gaps: number;
+  /** Items summed into the "Other" slice. */
+  folded: number;
+}
+
+/**
+ * Slices for a pie or donut: positive values in list order. Past MAX_SLICES,
+ * the largest MAX_SLICES - 1 stay (still in list order) and the rest become
+ * one "Other" slice, so nothing is left out of the total.
+ */
+export function pieData(items: Value | undefined, x: string, y: string): PieData {
+  const base = { slices: [], total: 0, gaps: 0, folded: 0 };
+  if (!isList(items)) return { ...base, problem: "not-list" };
+  if (!items.length) return { ...base, problem: "empty" };
+  if (items.length > MAX_CHART_ITEMS) return { ...base, problem: "too-many" };
+  let gaps = 0;
+  const all: Array<{ label: string; value: number }> = [];
+  for (const item of items) {
+    const value = numberAt(item, y);
+    if (value === null) { gaps++; continue; }
+    if (value < 0) return { ...base, gaps, problem: "negative" };
+    if (value > 0) all.push({ label: isRecord(item) ? labelOf(fieldOf(item, x)) : "—", value });
+  }
+  if (gaps === items.length) return { ...base, gaps, problem: "no-values" };
+  const total = all.reduce((t, s) => t + s.value, 0);
+  if (!all.length) return { ...base, gaps, problem: "zero" };
+  if (!isFinite(total)) return { ...base, gaps, problem: "overflow" };
+  if (all.length <= MAX_SLICES) return { slices: all, total, gaps, folded: 0 };
+  // Rank by size, ties in list order, then keep the biggest in list order.
+  const keep = new Set(all.map((s, i) => [s.value, i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]).slice(0, MAX_SLICES - 1).map(([, i]) => i));
+  const kept = all.filter((_s, i) => keep.has(i));
+  const rest = all.filter((_s, i) => !keep.has(i));
+  const other = rest.reduce((t, s) => t + s.value, 0);
+  return { slices: [...kept, { label: "Other", value: other, other: true }], total, gaps, folded: rest.length };
 }
 
 // ---------------------------------------------------------------- scale
@@ -217,30 +368,125 @@ function fit(text: string, width: number, font: string, m: TextMeasurer): string
   return lo ? text.slice(0, lo) + "…" : "";
 }
 
+/** One value as it reads in a legend or a donut's middle: $12,000, 37.5, $1.2M. */
+export function valueText(v: number, format: Format): string {
+  const money = format === "money";
+  const a = Math.abs(v);
+  const whole = Number.isInteger(v);
+  const opts: Intl.NumberFormatOptions =
+    a >= 1e15 ? { notation: "scientific", minimumFractionDigits: 0, maximumFractionDigits: 2 }
+    : a >= 100_000 ? { notation: "compact", minimumFractionDigits: 0, maximumFractionDigits: 1 }
+    : { minimumFractionDigits: money && !whole ? 2 : 0, maximumFractionDigits: whole ? 0 : 2 };
+  try {
+    return new Intl.NumberFormat(LOCALE, money ? { ...opts, style: "currency", currency: "USD" } : opts).format(v);
+  } catch {
+    return (money ? "$" : "") + String(v);
+  }
+}
+
+/** A share of a total as a whole percentage, with "<1%" for a sliver rather than "0%". */
+export function shareText(share: number): string {
+  const pct = share * 100;
+  return pct > 0 && pct < 1 ? "<1%" : `${Math.round(pct)}%`;
+}
+
 /** Plot height for a width: wide enough to read, not taller than a phone screen wants. */
 const plotHeight = (w: number) => Math.round(Math.max(140, Math.min(260, w * 0.45)));
+/** A pie's diameter for a width: a little smaller than a plot, and never wider than the box. */
+const pieSize = (w: number) => Math.min(w, Math.round(Math.max(140, Math.min(220, w * 0.45))));
 /** Room inside the plot so dots at the top and bottom stay within it. */
 const INSET = 5;
+/** Legend swatches: size, and the space between a swatch and its name. */
+const SWATCH = 10;
+const SWATCH_GAP = 6;
 
-function geometry(box: { w: number }, d: ChartData, kind: Kind, format: Format, title: string, line: number, ctx: Pick<LayoutContext, "theme" | "measure" | "warn">): ChartGeometry {
-  const t: Theme = ctx.theme;
-  const m = ctx.measure;
+type Ctx = Pick<LayoutContext, "theme" | "measure" | "warn">;
+
+/** The title and the parts every kind of chart shares. */
+function header(box: { w: number }, kind: Kind, title: string, ctx: Ctx) {
+  const t = ctx.theme, m = ctx.measure;
   const titleFont = themeFont(t, 600, t.text.body), labelFont = themeFont(t, 400, t.text.caption);
-  const titleLH = Math.round(t.text.body * 1.4), labelLH = Math.round(t.text.caption * 1.4);
+  const titleLH = Math.round(t.text.body * 1.4);
   const titleLines = title ? wrapText(title, box.w, titleFont, m) : [];
   const top = titleLines.length ? titleLines.length * titleLH + t.space.sm : 0;
   const base: ChartGeometry = {
     kind, title: titleLines, titleFont, titleLH, labelFont,
-    plot: { x: 0, y: top, w: box.w, h: 0 }, ticks: [], zeroY: null, min: 0, max: 0, slots: [], segments: [], labelY: 0,
+    plot: { x: 0, y: top, w: box.w, h: 0 }, ticks: [], zeroY: null, min: 0, max: 0, slots: [], segments: [], seriesSegments: [],
+    series: [], labelY: 0, legend: [], legendFont: labelFont,
   };
-  const say = (message: string): ChartGeometry => ({ ...base, message, plot: { x: 0, y: top, w: box.w, h: 72 } });
+  const say = (message: string): ChartGeometry => ({
+    ...base, message, messageLines: fitLines(message, Math.max(0, box.w - 2 * t.space.sm), labelFont, m, 3), plot: { x: 0, y: top, w: box.w, h: 72 },
+  });
+  return { base, say, top };
+}
 
-  if (d.problem === "not-list") return say("No data to chart");
-  if (d.problem === "empty") return say("No data to chart");
-  if (d.problem === "too-many") return say(`Too many items to chart: at most ${MAX_CHART_ITEMS}`);
-  if (d.problem === "no-values") return say("No numbers to chart");
+/**
+ * Series names side by side below the plot, starting a new line when the
+ * next one doesn't fit; a name wider than the whole box is cut to fit.
+ */
+function flowLegend(entries: Array<{ label: string; color: number }>, width: number, top: number, ctx: Ctx): { items: LegendItem[]; bottom: number } {
+  const t = ctx.theme, m = ctx.measure;
+  const font = themeFont(t, 400, t.text.caption);
+  const lh = Math.round(t.text.caption * 1.4);
+  const lead = SWATCH + SWATCH_GAP;
+  const items: LegendItem[] = [];
+  let x = 0, y = top;
+  for (const e of entries) {
+    const shownLabel = fit(e.label, Math.max(0, width - lead), font, m);
+    const w = lead + m.width(shownLabel, font);
+    if (x > 0 && x + w > width) { x = 0; y += lh; }
+    items.push({ color: e.color, swatch: { x, y: y + (lh - SWATCH) / 2, w: SWATCH, h: SWATCH }, label: e.label, shownLabel, labelX: x + lead, y: y + lh / 2 });
+    x += w + t.space.md;
+  }
+  return { items, bottom: y + lh };
+}
 
-  const values = d.slots.flatMap((s) => (s.value === null ? [] : [s.value]));
+/**
+ * Slices in columns below a pie: name on the left, value and share on the
+ * right. As many equal columns as the widest entry allows, at least one;
+ * when one column is too narrow, the name is cut first, then the numbers.
+ */
+function gridLegend(entries: Array<{ label: string; detail: string; color: number }>, width: number, top: number, ctx: Ctx): { items: LegendItem[]; bottom: number } {
+  const t = ctx.theme, m = ctx.measure;
+  const font = themeFont(t, 400, t.text.caption);
+  const lh = Math.round(t.text.caption * 1.6);
+  const lead = SWATCH + SWATCH_GAP, between = t.space.sm, colGap = t.space.md;
+  const natural = Math.max(...entries.map((e) => lead + m.width(e.label, font) + between + m.width(e.detail, font)));
+  const cols = Math.max(1, Math.min(entries.length, Math.floor((width + colGap) / (Math.min(width, natural) + colGap))));
+  const colW = (width - colGap * (cols - 1)) / cols;
+  const room = Math.max(0, colW - lead);
+  const items = entries.map((e, i): LegendItem => {
+    const x = (i % cols) * (colW + colGap), y = top + Math.floor(i / cols) * lh;
+    const dw = m.width(e.detail, font);
+    // Keep the numbers whole when the name can still show a few letters beside them.
+    const detail = dw + between + 24 <= room ? e.detail : fit(e.detail, room / 2, font, m);
+    const labelRoom = Math.max(0, room - m.width(detail, font) - between);
+    return {
+      color: e.color, swatch: { x, y: y + (lh - SWATCH) / 2, w: SWATCH, h: SWATCH },
+      label: e.label, shownLabel: fit(e.label, labelRoom, font, m), labelX: x + lead,
+      detail, detailX: x + colW, y: y + lh / 2,
+    };
+  });
+  return { items, bottom: top + Math.ceil(entries.length / cols) * lh };
+}
+
+function axisGeometry(
+  box: { w: number }, d: SeriesData, series: ChartGeometry["series"], kind: AxisKind, format: Format, title: string, line: number, ctx: Ctx,
+): { g: ChartGeometry; h: number } {
+  const t: Theme = ctx.theme;
+  const m = ctx.measure;
+  const { base, say, top } = header(box, kind, title, ctx);
+  const labelFont = base.labelFont;
+  const labelLH = Math.round(t.text.caption * 1.4);
+  const done = (g: ChartGeometry) => ({ g, h: g.plot.y + g.plot.h });
+
+  if (d.problem === "not-list") return done(say("No data to chart"));
+  if (d.problem === "empty") return done(say("No data to chart"));
+  if (d.problem === "too-many") return done(say(`Too many items to chart: at most ${MAX_CHART_ITEMS}`));
+  if (d.problem === "no-values") return done(say("No numbers to chart"));
+
+  const ns = series.length;
+  const values = d.slots.flatMap((s) => s.values.flatMap((v) => (v === null ? [] : [v])));
   const plotH = plotHeight(box.w);
   const scale = chartScale(values, kind, Math.max(2, Math.min(6, Math.floor(plotH / 44))));
   const tickText = tickLabels(scale.ticks, scale.step, format);
@@ -248,10 +494,13 @@ function geometry(box: { w: number }, d: ChartData, kind: Kind, format: Format, 
   const plot: Rect = { x: axisW, y: top + Math.ceil(labelLH / 2), w: Math.max(0, box.w - axisW), h: plotH };
   const n = d.slots.length;
   const slotW = plot.w / n;
-  if (slotW < MIN_SLOT[kind]) {
-    const fits = Math.max(0, Math.floor(plot.w / MIN_SLOT[kind]));
-    ctx.warn?.(`chart on line ${line}: ${n} items don't fit in ${Math.round(box.w)} pixels; at most ${fits} do`);
-    return say(`Too narrow to chart ${n} items`);
+  // Grouped bars need room for every bar of a slot, with gaps, in 80% of it.
+  const grouped = kind === "bar" && ns > 1;
+  const minSlot = grouped ? (ns * MIN_GROUP_BAR + (ns - 1) * BAR_GAP) / 0.8 : MIN_SLOT[kind];
+  if (slotW < minSlot) {
+    const fits = Math.max(0, Math.floor(plot.w / minSlot));
+    ctx.warn?.(`chart on line ${line}: ${n} items${grouped ? ` with ${ns} series` : ""} don't fit in ${Math.round(box.w)} pixels; at most ${fits} do`);
+    return done(say(`Too narrow to chart ${n} items`));
   }
 
   // Halves again, so (max - min) can't overflow for values near the largest number.
@@ -264,73 +513,210 @@ function geometry(box: { w: number }, d: ChartData, kind: Kind, format: Format, 
   const every = Math.max(1, Math.ceil((widest + t.space.sm) / slotW));
   const room = slotW * every - t.space.xs;
   const barW = Math.min(slotW * 0.7, 56);
+  const group = grouped ? Math.min(slotW * 0.8, ns * 40 + (ns - 1) * BAR_GAP) : barW;
+  const each = grouped ? (group - (ns - 1) * BAR_GAP) / ns : barW;
 
   const slots: ChartSlot[] = d.slots.map((s, i) => {
     const cx = plot.x + slotW * (i + 0.5);
     const shownLabel = i % every === 0 ? fit(s.label, room, labelFont, m) : null;
     const half = shownLabel ? m.width(shownLabel, labelFont) / 2 : 0;
     const labelX = Math.min(Math.max(cx, half), box.w - half);
-    const slot: ChartSlot = { label: s.label, shownLabel, labelX, cx, value: s.value };
-    if (s.value !== null) {
-      const vy = y(s.value);
-      if (kind === "bar") {
-        const z = zeroY ?? y(scale.min);
-        slot.bar = { x: cx - barW / 2, y: Math.min(vy, z), w: barW, h: Math.abs(vy - z) };
-      } else slot.point = { x: cx, y: vy };
+    const slot: ChartSlot = { label: s.label, shownLabel, labelX, cx, value: s.values[0] ?? null, values: s.values };
+    if (kind === "bar") {
+      const z = zeroY ?? y(scale.min);
+      slot.bars = s.values.map((v, k) => {
+        if (v === null) return null;
+        const vy = y(v);
+        return { x: cx - group / 2 + k * (each + BAR_GAP), y: Math.min(vy, z), w: each, h: Math.abs(vy - z) };
+      });
+      if (slot.bars[0]) slot.bar = slot.bars[0];
+    } else {
+      slot.points = s.values.map((v) => (v === null ? null : { x: cx, y: y(v) }));
+      if (slot.points[0]) slot.point = slot.points[0];
     }
     return slot;
   });
-  const segments: ChartGeometry["segments"] = [];
+  const seriesSegments: ChartGeometry["seriesSegments"] = [];
   if (kind === "line") {
-    let run: Array<{ x: number; y: number }> = [];
-    for (const s of slots) {
-      if (s.point) run.push(s.point);
-      else if (run.length) { segments.push(run); run = []; }
+    for (let k = 0; k < ns; k++) {
+      const runs: ChartGeometry["segments"] = [];
+      let run: Array<{ x: number; y: number }> = [];
+      for (const s of slots) {
+        const p = s.points?.[k];
+        if (p) run.push(p);
+        else if (run.length) { runs.push(run); run = []; }
+      }
+      if (run.length) runs.push(run);
+      seriesSegments.push(runs);
     }
-    if (run.length) segments.push(run);
   }
-  if (d.gaps) ctx.warn?.(`chart on line ${line}: ${d.gaps} of ${n} items have no number in their y field, so they're shown as gaps`);
+  series.forEach((sr, k) => {
+    const gaps = d.gaps[k] ?? 0;
+    if (!gaps) return;
+    const where = ns > 1 ? ` ${sr.field} field` : " y field";
+    ctx.warn?.(`chart on line ${line}: ${gaps} of ${n} items have no number in their${where}, so they're shown as gaps`);
+  });
 
+  const labelY = plot.y + plot.h + t.space.xs;
+  let h = labelY + labelLH;
+  let legend: LegendItem[] = [];
+  if (ns > 1) {
+    const l = flowLegend(series, box.w, h + t.space.sm, ctx);
+    legend = l.items;
+    h = l.bottom;
+  }
   return {
-    ...base,
-    plot,
-    ticks: scale.ticks.map((v, i) => ({ value: v, y: y(v), label: tickText[i]! })),
-    zeroY,
-    min: scale.min,
-    max: scale.max,
-    slots,
-    segments,
-    labelY: plot.y + plot.h + t.space.xs,
+    g: {
+      ...base,
+      plot,
+      ticks: scale.ticks.map((v, i) => ({ value: v, y: y(v), label: tickText[i]! })),
+      zeroY,
+      min: scale.min,
+      max: scale.max,
+      slots,
+      segments: seriesSegments[0] ?? [],
+      seriesSegments,
+      series,
+      labelY,
+      legend,
+    },
+    h,
   };
+}
+
+function roundGeometry(box: { w: number }, d: PieData, kind: "pie" | "donut", format: Format, title: string, line: number, ctx: Ctx): { g: ChartGeometry; h: number } {
+  const t = ctx.theme, m = ctx.measure;
+  const { base, say, top } = header(box, kind, title, ctx);
+  const done = (g: ChartGeometry) => ({ g, h: g.plot.y + g.plot.h });
+  const name = kind === "pie" ? "Pie" : "Donut";
+
+  if (d.problem === "not-list" || d.problem === "empty") return done(say("No data to chart"));
+  if (d.problem === "too-many") return done(say(`Too many items to chart: at most ${MAX_CHART_ITEMS}`));
+  if (d.problem === "no-values") return done(say("No numbers to chart"));
+  if (d.problem === "negative") {
+    ctx.warn?.(`chart on line ${line}: a ${kind} can't show negative values. Use kind=bar to show values below zero`);
+    return done(say(`${name} charts can't show negative values`));
+  }
+  if (d.problem === "zero") return done(say("Every value is 0, so there's nothing to chart"));
+  if (d.problem === "overflow") return done(say("These values are too large to add up"));
+  if (d.gaps) ctx.warn?.(`chart on line ${line}: ${d.gaps} items have no number in their y field, so they're left out`);
+
+  const size = pieSize(box.w);
+  const r = size / 2;
+  const cx = box.w / 2, cy = top + r;
+  let a = 0;
+  const slices: PieSlice[] = d.slices.map((s, i) => {
+    const share = s.value / d.total;
+    const slice: PieSlice = { label: s.label, value: s.value, share, start: a, end: i === d.slices.length - 1 ? Math.PI * 2 : a + share * Math.PI * 2, color: i, ...(s.other ? { other: true } : {}) };
+    a = slice.end;
+    return slice;
+  });
+  const inner = kind === "donut" ? Math.round(r * 0.6) : 0;
+
+  let center: NonNullable<ChartGeometry["pie"]>["center"];
+  if (inner) {
+    const text = valueText(d.total, format);
+    const width = inner * 2 * 0.85;
+    const fonts = [themeFont(t, 700, t.text.title), themeFont(t, 600, t.text.lead), themeFont(t, 600, t.text.body)];
+    const font = fonts.find((f) => m.width(text, f) <= width) ?? fonts[fonts.length - 1]!;
+    const fontSize = font === fonts[0] ? t.text.title : font === fonts[1] ? t.text.lead : t.text.body;
+    const captionFont = themeFont(t, 400, t.text.caption);
+    const caption = m.width("Total", captionFont) <= width ? "Total" : "";
+    center = { text: ellipsize(text, width, font, m), font, caption, captionFont, lh: Math.round(fontSize * 1.2) };
+  }
+
+  const legendTop = top + size + t.space.md;
+  const l = gridLegend(
+    slices.map((s) => ({ label: s.label, detail: `${valueText(s.value, format)} · ${shareText(s.share)}`, color: s.color })),
+    box.w, legendTop, ctx,
+  );
+  return {
+    g: {
+      ...base,
+      plot: { x: cx - r, y: top, w: size, h: size },
+      legend: l.items,
+      pie: { cx, cy, r, inner, slices, total: d.total, ...(center ? { center } : {}) },
+    },
+    h: l.bottom,
+  };
+}
+
+/** Warnings about props that only make sense together, shown by the parser. */
+function check(props: Readonly<Record<string, string>>): string[] {
+  const out: string[] = [];
+  const kind = props.kind ?? "bar";
+  const y = props.y;
+  // Expressions are worked out later; only what's written can be checked here.
+  if (y === undefined || y.startsWith("{")) return out;
+  const fields = fieldsOf(y);
+  if (isRound(kind as Kind) && fields.length > 1) {
+    out.push(`chart kind=${kind} shows one field, so only y=${fields[0]} is used. Write y=${fields[0]}, or use kind=bar or kind=line to compare ${fields.join(", ")}`);
+  }
+  if (!isRound(kind as Kind) && fields.length > MAX_SERIES) {
+    out.push(`chart draws at most ${MAX_SERIES} series, and y lists ${fields.length}. Keep ${MAX_SERIES} fields or fewer, or make two charts`);
+  }
+  const labels = props.labels;
+  if (labels !== undefined && !labels.includes("{")) {
+    if (isRound(kind as Kind)) out.push(`labels= names the y fields of a bar or line chart; a ${kind}'s slices are named by x=, so labels= was ignored`);
+    else if (labelsOf(labels).length !== fields.length) {
+      out.push(`labels has ${labelsOf(labels).length} names for ${fields.length} y field${fields.length === 1 ? "" : "s"}; give one per field, in the same order, like labels="This year,Last year"`);
+    }
+  }
+  return out;
 }
 
 export const chart: ComponentDef = {
   type: "chart",
   category: "data",
   description:
-    "A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.",
+    "A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).",
   text: { description: "A title above the chart." },
   props: {
-    kind: { type: "enum", values: KINDS, default: "bar", description: "bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values." },
+    kind: {
+      type: "enum", values: KINDS, default: "bar",
+      description: "bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.",
+    },
     items: { type: "expression", required: true, description: "The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}." },
-    x: { type: "name", required: true, description: "The field holding each item's label, e.g. x=month." },
-    y: { type: "name", required: true, description: "The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero." },
-    format: { type: "enum", values: FORMATS, default: "number", description: "How values on the axis read: number (37K) or money ($37K)." },
+    x: { type: "name", required: true, description: "The field holding each item's label (each slice's name in a pie), e.g. x=month." },
+    y: {
+      type: "names", required: true,
+      description: "The field holding each item's number, e.g. y=revenue. Bar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.",
+    },
+    labels: {
+      type: "string",
+      description: "Bar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels=\"This year,Last year\". Without it the legend shows the field names.",
+    },
+    format: { type: "enum", values: FORMATS, default: "number", description: "How values read on the axis, in a pie's legend and in a donut's middle: number (37K) or money ($37K)." },
   },
-  example: `state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
-chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
+  example: `state sales=[{month: "Jan", revenue: 12000, last_year: 10000}, {month: "Feb", revenue: 18000, last_year: 14000}, {month: "Mar", revenue: 15000, last_year: 16000}]
+chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year labels="This year,Last year" format=money`,
+  check,
   minWidth: () => 200,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const kind = p.oneOf("kind", KINDS, "bar");
     const format = p.oneOf("format", FORMATS, "number");
-    const x = p.str("x"), y = p.str("y");
+    const x = p.str("x");
+    const fields = fieldsOf(p.str("y"));
     const items = p.expr("items");
-    if (p.has("items") && !isList(items)) ctx.warn?.(`chart on line ${box.node.line}: items is not a list, so there's nothing to chart. Use a list of records, like items=sales`);
-    const g = geometry(box, chartData(items, x, y), kind, format, p.text(), box.node.line, ctx);
-    box.data = g;
-    const labelLH = Math.round(ctx.theme.text.caption * 1.4);
-    box.h = g.message ? g.plot.y + g.plot.h : g.labelY + labelLH;
+    const line = box.node.line;
+    if (p.has("items") && !isList(items)) ctx.warn?.(`chart on line ${line}: items is not a list, so there's nothing to chart. Use a list of records, like items=sales`);
+    let out: { g: ChartGeometry; h: number };
+    if (isRound(kind)) {
+      out = roundGeometry(box, pieData(items, x, fields[0] ?? ""), kind, format, p.text(), line, ctx);
+    } else if (fields.length > MAX_SERIES) {
+      ctx.warn?.(`chart on line ${line}: y lists ${fields.length} fields; a chart draws at most ${MAX_SERIES}`);
+      const { say } = header(box, kind, p.text(), ctx);
+      const g = say(`Too many series to chart: at most ${MAX_SERIES}`);
+      out = { g, h: g.plot.y + g.plot.h };
+    } else {
+      const ys = fields.length ? fields : [""];
+      const labels = labelsOf(p.str("labels"));
+      const series = ys.map((field, k) => ({ field, label: labels[k] || field, color: k }));
+      out = axisGeometry(box, chartSeries(items, x, ys), series, kind, format, p.text(), line, ctx);
+    }
+    box.data = out.g;
+    box.h = out.h;
   },
   paint(box, ctx) {
     const { g, theme } = ctx;
@@ -338,6 +724,9 @@ chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
     const d = box.data as ChartGeometry | undefined;
     if (!d) return;
     const ox = box.x, oy = box.y;
+    const palette = seriesColors(theme);
+    // One series draws in the accent, exactly as before series existed.
+    const colorOf = (k: number) => (d.series.length > 1 ? palette[k % palette.length]! : c.accent);
     g.textBaseline = "middle";
 
     g.font = d.titleFont;
@@ -353,7 +742,15 @@ chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
       g.font = d.labelFont;
       g.fillStyle = c.muted;
       g.textAlign = "center";
-      g.fillText(d.message, ox + d.plot.w / 2, oy + d.plot.y + d.plot.h / 2);
+      const lines = d.messageLines ?? [d.message];
+      const lh = Math.round(theme.text.caption * 1.4);
+      lines.forEach((l, i) => g.fillText(l, ox + d.plot.w / 2, oy + d.plot.y + d.plot.h / 2 + (i - (lines.length - 1) / 2) * lh));
+      return;
+    }
+
+    if (d.pie) {
+      paintRound(ctx, d, ox, oy, palette);
+      paintLegend(ctx, d, ox, oy, (k) => palette[k % palette.length]!);
       return;
     }
 
@@ -385,37 +782,43 @@ chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
     g.strokeStyle = c.accent;
     if (d.kind === "bar") {
       for (const s of d.slots) {
-        if (!s.bar || s.bar.h <= 0) continue;
-        const r = Math.min(theme.radius.sm, s.bar.w / 2, s.bar.h / 2);
-        ctx.roundRect(ox + s.bar.x, oy + s.bar.y, s.bar.w, s.bar.h, r);
-        g.fillStyle = c.accent;
-        g.fill();
+        (s.bars ?? []).forEach((b, k) => {
+          if (!b || b.h <= 0) return;
+          const r = Math.min(theme.radius.sm, b.w / 2, b.h / 2);
+          ctx.roundRect(ox + b.x, oy + b.y, b.w, b.h, r);
+          g.fillStyle = colorOf(k);
+          g.fill();
+        });
       }
     } else {
       g.lineWidth = 2;
       g.lineJoin = "round";
       g.lineCap = "round";
-      for (const run of d.segments) {
-        if (run.length < 2) continue;
-        g.beginPath();
-        run.forEach((pt, i) => (i ? g.lineTo(ox + pt.x, oy + pt.y) : g.moveTo(ox + pt.x, oy + pt.y)));
-        g.strokeStyle = c.accent;
-        g.stroke();
-      }
-      // Dots: on every point when there's room, and always on a point with no neighbours.
-      const slotW = pw / Math.max(1, d.slots.length);
-      for (const run of d.segments) {
-        for (const pt of run) {
-          if (slotW < 10 && run.length > 1) continue;
+      d.seriesSegments.forEach((runs, k) => {
+        for (const run of runs) {
+          if (run.length < 2) continue;
           g.beginPath();
-          g.arc(ox + pt.x, oy + pt.y, run.length === 1 ? 4 : 3, 0, Math.PI * 2);
-          g.fillStyle = c.surface;
-          g.fill();
-          g.lineWidth = 2;
-          g.strokeStyle = c.accent;
+          run.forEach((pt, i) => (i ? g.lineTo(ox + pt.x, oy + pt.y) : g.moveTo(ox + pt.x, oy + pt.y)));
+          g.strokeStyle = colorOf(k);
           g.stroke();
         }
-      }
+      });
+      // Dots: on every point when there's room, and always on a point with no neighbours.
+      const slotW = pw / Math.max(1, d.slots.length);
+      d.seriesSegments.forEach((runs, k) => {
+        for (const run of runs) {
+          for (const pt of run) {
+            if (slotW < 10 && run.length > 1) continue;
+            g.beginPath();
+            g.arc(ox + pt.x, oy + pt.y, run.length === 1 ? 4 : 3, 0, Math.PI * 2);
+            g.fillStyle = c.surface;
+            g.fill();
+            g.lineWidth = 2;
+            g.strokeStyle = colorOf(k);
+            g.stroke();
+          }
+        }
+      });
     }
 
     g.font = d.labelFont;
@@ -424,5 +827,78 @@ chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
     g.textBaseline = "top";
     for (const s of d.slots) if (s.shownLabel) g.fillText(s.shownLabel, ox + s.labelX, oy + d.labelY);
     g.textBaseline = "middle";
+    if (d.legend.length) paintLegend(ctx, d, ox, oy, colorOf);
   },
 };
+
+type PaintCtx = Parameters<NonNullable<ComponentDef["paint"]>>[1];
+
+function paintRound(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, palette: readonly string[]): void {
+  const { g, theme } = ctx;
+  const c = theme.colors;
+  const pie = d.pie!;
+  const cx = ox + pie.cx, cy = oy + pie.cy;
+  // Angles are measured clockwise from the top; the canvas's 0 is at three o'clock.
+  const at = (a: number) => a - Math.PI / 2;
+  for (const s of pie.slices) {
+    g.beginPath();
+    if (pie.inner) {
+      g.arc(cx, cy, pie.r, at(s.start), at(s.end));
+      g.arc(cx, cy, pie.inner, at(s.end), at(s.start), true);
+    } else {
+      g.moveTo(cx, cy);
+      g.arc(cx, cy, pie.r, at(s.start), at(s.end));
+    }
+    g.closePath();
+    g.fillStyle = palette[s.color % palette.length]!;
+    g.fill();
+  }
+  // A thin surface line between slices, so neighbours read apart without relying on color.
+  if (pie.slices.length > 1) {
+    g.lineWidth = 2;
+    g.lineCap = "butt";
+    g.strokeStyle = c.surface;
+    for (const s of pie.slices) {
+      const a = at(s.start);
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * pie.inner, cy + Math.sin(a) * pie.inner);
+      g.lineTo(cx + Math.cos(a) * (pie.r + 1), cy + Math.sin(a) * (pie.r + 1));
+      g.stroke();
+    }
+  }
+  if (pie.center) {
+    const m = pie.center;
+    const capLH = Math.round(theme.text.caption * 1.4);
+    const shift = m.caption ? capLH / 2 : 0;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.font = m.font;
+    g.fillStyle = c.ink;
+    g.fillText(m.text, cx, cy - shift);
+    if (m.caption) {
+      g.font = m.captionFont;
+      g.fillStyle = c.muted;
+      g.fillText(m.caption, cx, cy - shift + m.lh / 2 + capLH / 2);
+    }
+  }
+}
+
+function paintLegend(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, colorOf: (k: number) => string): void {
+  const { g, theme } = ctx;
+  const c = theme.colors;
+  g.font = d.legendFont;
+  g.textBaseline = "middle";
+  for (const it of d.legend) {
+    ctx.roundRect(ox + it.swatch.x, oy + it.swatch.y, it.swatch.w, it.swatch.h, 2);
+    g.fillStyle = colorOf(it.color);
+    g.fill();
+    g.textAlign = "left";
+    g.fillStyle = d.pie ? c.ink : c.muted;
+    if (it.shownLabel) g.fillText(it.shownLabel, ox + it.labelX, oy + it.y);
+    if (it.detail && it.detailX !== undefined) {
+      g.textAlign = "right";
+      g.fillStyle = c.muted;
+      g.fillText(it.detail, ox + it.detailX, oy + it.y);
+    }
+  }
+}

@@ -20,7 +20,7 @@ card
 
 > **Name:** SayShape was called Loom while it was being built. The package (`loom-ui`), CSS variables (`--loom-*`) and the model guide still use that name; they'll be renamed before the first npm release.
 
-> **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, charts (bar and line with up to 6 series, pie and donut), tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -293,15 +293,19 @@ ui.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
 
 #### Charts
 
-`chart` draws a list of records as bars or a line, and redraws whenever the list changes, from state, the screen's own controls or the host:
+`chart` draws a list of records as bars, lines, a pie or a donut, and redraws whenever the list changes, from state, the screen's own controls or the host:
 
 ```
-state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
+state sales=[{month: "Jan", revenue: 12000, last_year: 10000}, {month: "Feb", revenue: 18000, last_year: 14000}, {month: "Mar", revenue: 15000, last_year: 16000}]
 chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
-chart "Revenue trend" kind=line items=sales x=month y=revenue format=money
+chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year labels="This year,Last year" format=money
+chart "Revenue by month" kind=donut items=sales x=month y=revenue format=money
 ```
 
 `x=` and `y=` name fields, as `sum(list, 'price')` does, so they're written without quotes; `items=` is any expression that gives a list, like `items={filter(sales, 'open')}`. The props are in the [reference](#chart). How it treats data:
+
+- Bar and line take up to 6 fields in `y=`, separated by commas with no spaces. Each is a series in the theme's series colors, all on one scale, with grouped bars side by side and a legend below (only for 2 or more). `labels=` names them in the legend; otherwise it shows the field names. One field draws exactly as it always has, in the accent, with no legend. More than 6 shows a message instead.
+- Pie and donut take one field. Each item with a value above 0 is a slice, in list order, and the legend below shows each slice's label, value and share. More than 6 slices keeps the 5 largest and adds an "Other" slice holding the rest. A donut shows the total in its middle, formatted by `format=`. Zero values are left out; a negative value, or nothing above 0, shows a message instead. A comma list in `y=` is a warning, and only the first field is used.
 
 - Each item is one category, in list order, evenly spaced. Line charts don't treat x as dates or numbers.
 - A value must be a number. A missing field, `null`, or text (even `"12"`) is a gap: no bar, and the line breaks there instead of joining across it. Nothing is turned into 0. A missing label shows as "—".
@@ -712,20 +716,21 @@ rating bind=stars
 
 ### `chart`
 
-A bar or line chart of one number per item of a list of records, such as revenue by month; it redraws when the list changes. One series, at most 200 items, labels evenly spaced in list order.
+A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).
 
 | Prop | Type | Description |
 |---|---|---|
 | `"text"` | text | A title above the chart. |
-| `kind` | `bar` / `line` | bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values. |
+| `kind` | `bar` / `line` / `pie` / `donut` | bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values. |
 | `items` | expression, required | The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}. |
-| `x` | name, required | The field holding each item's label, e.g. x=month. |
-| `y` | name, required | The field holding each item's number, e.g. y=revenue. Items without a number there are shown as gaps, not zero. |
-| `format` | `number` / `money` | How values on the axis read: number (37K) or money ($37K). |
+| `x` | name, required | The field holding each item's label (each slice's name in a pie), e.g. x=month. |
+| `y` | names, required | The field holding each item's number, e.g. y=revenue. Bar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero. |
+| `labels` | string | Bar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels="This year,Last year". Without it the legend shows the field names. |
+| `format` | `number` / `money` | How values read on the axis, in a pie's legend and in a donut's middle: number (37K) or money ($37K). |
 
 ```
-state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
-chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+state sales=[{month: "Jan", revenue: 12000, last_year: 10000}, {month: "Feb", revenue: 18000, last_year: 14000}, {month: "Mar", revenue: 15000, last_year: 16000}]
+chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year labels="This year,Last year" format=money
 ```
 
 ### `table`
@@ -1558,6 +1563,8 @@ canvas {
 }
 ```
 
+Charts color their series and pie slices with six categorical tokens, `series1` to `series6` (`--loom-series-1` to `--loom-series-6` in CSS). `series1` is the accent: change only the accent and it follows. The defaults are checked against the card surface in both modes, and the first four stay distinguishable with protanopia and deuteranopia.
+
 Or build a theme in code:
 
 ```ts
@@ -1629,7 +1636,7 @@ SayShape draws everything itself, so it gives up what the browser normally provi
 - **Dates beyond one day.** `date-picker` picks a single calendar day: no ranges, times, recurring dates or time zones, and names are in US English with weeks starting on Sunday.
 - **Selects beyond the basics.** One choice from at most 200 options, with no multi-select, typing to search, option groups, or options showing anything but text.
 - **Tables beyond the basics.** `table` shows at most 200 rows and 8 columns, without scrolling, sticky headers, editable cells, multi-row selection, nested elements in cells, or resizing and reordering columns. A table too wide for its space shows a message instead of scrolling.
-- **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
+- **Charts beyond the basics.** `chart` draws bars or lines of up to 6 series on one shared scale (with a legend), or a pie or donut of one field (at most 6 slices; smaller ones are summed into Other), from at most 200 items with labels evenly spaced in list order. No stacked bars, area charts, series from different lists, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
 
 Don't use SayShape where accessibility is required until the accessibility layer lands.
@@ -1641,7 +1648,7 @@ Don't use SayShape where accessibility is required until the accessibility layer
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), charts (multi-series bar and line, pie and donut), tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
 3. **Docs site**: started. `site/` is a VitePress site with a playground, an example gallery and documentation whose examples render live with SayShape, deployed to GitHub Pages by `.github/workflows/pages.yml`.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

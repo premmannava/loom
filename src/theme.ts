@@ -20,6 +20,17 @@ export interface Theme {
     landHighlight: string;
     landHover: string;
     debug: string;
+    /**
+     * Categorical colors for chart series and pie slices, used in this order.
+     * series1 is the accent. The first four stay apart under common color
+     * blindness (protanopia, deuteranopia), checked with every pair against each other.
+     */
+    series1: string;
+    series2: string;
+    series3: string;
+    series4: string;
+    series5: string;
+    series6: string;
   };
   space: { xs: number; sm: number; md: number; lg: number; xl: number };
   radius: { sm: number; md: number; lg: number };
@@ -57,6 +68,12 @@ export const lightTheme: Theme = {
     landHighlight: "#A6D6D1",
     landHover: "#B3BDCB",
     debug: "#C2410C",
+    series1: "#0E7C76",
+    series2: "#A2461A",
+    series3: "#64399D",
+    series4: "#AD8B1C",
+    series5: "#C74C8E",
+    series6: "#2F8EFC",
   },
 };
 
@@ -78,8 +95,32 @@ export const darkTheme: Theme = {
     landHighlight: "#1E5B57",
     landHover: "#3D495C",
     debug: "#FB923C",
+    series1: "#3CC2B8",
+    series2: "#B74C05",
+    series3: "#7C61A8",
+    series4: "#B08E26",
+    series5: "#DD569F",
+    series6: "#2F8EFC",
   },
 };
+
+/** The chart series colors, in order. */
+export function seriesColors(theme: Theme): string[] {
+  const c = theme.colors;
+  return [c.series1, c.series2, c.series3, c.series4, c.series5, c.series6];
+}
+
+/** How many series colors a theme has: the most series one chart draws. */
+export const SERIES_COUNT = 6;
+
+/**
+ * Series 1 is the accent: when an override changes the accent but says
+ * nothing about series1, series1 follows it, so a rebranded theme's charts
+ * still open in its own color.
+ */
+function followAccent(from: Theme["colors"], to: Theme["colors"], patch: Partial<Theme["colors"]>): void {
+  if (patch.accent !== undefined && patch.series1 === undefined && from.series1 === from.accent) to.series1 = to.accent;
+}
 
 /** Build a theme by overriding parts of another. */
 export function extendTheme(from: Theme, patch: DeepPartial<Theme>): Theme {
@@ -89,19 +130,26 @@ export function extendTheme(from: Theme, patch: DeepPartial<Theme>): Theme {
     if (v && typeof v === "object") Object.assign(out[key] as object, v);
     else (out as unknown as Record<string, unknown>)[key] = v;
   }
+  if (patch.colors) followAccent(from.colors, out.colors, patch.colors);
   return out;
 }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? Partial<T[K]> : T[K] };
 
-/** Color tokens can be supplied from CSS as `--loom-<token>` (e.g. --loom-accent). */
+/** The CSS custom property for a color token: accent → --loom-accent, landHover → --loom-land-hover, series2 → --loom-series-2. */
+export function cssVarOf(key: keyof Theme["colors"]): string {
+  return "--loom-" + key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()).replace(/(\d+)$/, "-$1");
+}
+
+/** Color tokens can be supplied from CSS as `--loom-<token>` (e.g. --loom-accent, --loom-series-2). */
 export function themeFromCSS(el: Element, from: Theme): Theme {
   const cs = getComputedStyle(el);
   const colors = { ...from.colors };
+  const patch: Partial<Theme["colors"]> = {};
   for (const key of Object.keys(colors) as Array<keyof Theme["colors"]>) {
-    const cssName = "--loom-" + key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
-    const v = cs.getPropertyValue(cssName).trim();
-    if (v) colors[key] = v;
+    const v = cs.getPropertyValue(cssVarOf(key)).trim();
+    if (v) colors[key] = patch[key] = v;
   }
+  followAccent(from.colors, colors, patch);
   return { ...from, colors };
 }
