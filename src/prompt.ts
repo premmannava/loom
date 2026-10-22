@@ -300,7 +300,7 @@ function dataSection(ctx: GuideContext): string {
     `- Use filter() for counts and totals. To hide items that people can still change (bind=t.done), keep each items=todos and put if= on the repeated element`,
     `- Share one computed list or total between elements instead of repeating it: derive open={filter(orders, 'status', 'open')}, then items=open and {len(open)}`,
     ...(has("radio") ? [`- To compare two fields of an item (an answer and its correct answer), set a field when choosing, then count it: radio "{o}" bind=q.pick value={o} on="set:q.ok:{o == q.answer}" and later count(qs, 'ok')`] : []),
-    `- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()`,
+    `- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, compact(12345678) shows 12.3M and compact(n, 'USD') shows $12.3M (use it for big figures in stats), plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()`,
     `- Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"`,
     `- Change the list: on="add:todos:{text: 'Map', done: false}", on=remove:t (inside each), on=clear:todos`,
     has("check") ? `- Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}` : `- Show only some items with if= on the repeated element: text "{t.text}" if={!t.done}`,
@@ -361,6 +361,7 @@ ${comps.map((c) => componentBlock(c, examples && ctx.valid(componentExampleSpec(
     "- Use only the elements and props above. Never invent colors, sizes or fonts; use style=, tone= and variant=. If asked for a specific color or size, use the closest role instead.",
     ...(has("card") ? ["- Start with a card unless the screen needs several."] : []),
     "- Keep screens focused: one task per screen, short labels, real-looking values.",
+    ...(has("grid") || has("stat") ? [`- Screens may be narrow (a phone, a chat).${has("grid") ? " For side-by-side figures use grid min=140 rather than row." : ""}${has("stat") ? " Keep stat values short: compact() for large numbers." : ""}`] : []),
   ];
   if (has("screen")) rules.push("- For several screens, write the starting screen first: it shows as soon as it arrives.");
   if (has("image")) rules.push(imageRules(opts.imageHosts ?? []));
@@ -412,7 +413,7 @@ function compactSections(ctx: GuideContext): GuideSection[] {
 - Operators: + - * / % == != < <= > >= && || ! a ? b : c. Words inside {…} are names, so quote text: {done ? 'Yes' : 'No'}
 - Functions: ${EXPRESSION_FUNCTIONS.join(", ")}
 - On lists: count(l, 'done'), count(l, 'cat', 'Gas'), sum(l, 'price'), sum(l, 'price', 'qty') multiplies per item, avg/min/max(l, 'f'), filter(l, 'f'[, value]), find(l, 'id', x), search(l, 'f', text), sort(l, 'f'[, 'desc']), take(l, n), join(l, 'f'), includes(l, x). Compute totals; never type them
-- Formatting: money(2400) = $2,400.00, number(37000) = 37,000, plural(n, 'item') = 1 item / 3 items`);
+- Formatting: money(2400) = $2,400.00, number(37000) = 37,000, compact(12345678) = 12.3M, compact(n, 'USD') = $12.3M for big figures in stats, plural(n, 'item') = 1 item / 3 items`);
   const local = ["inc:key[:by]", "dec:key[:by] (never below 0)", "toggle:key", "set:key:value or set:key:{expr}", ...(has("each") ? ["add:list:value", "remove:t (current item) or remove:list:index", "clear:list"] : []), "notify:'text {expr}'", ...(has("screen") ? ["go:screen", "back"] : [])];
   add("actions", `ACTIONS on=…, several joined with ; and quoted when they have spaces: on="inc:n;notify:'Saved {n}'"
 - Change the screen (runs here): ${local.join(", ")}
@@ -434,6 +435,7 @@ ${comps.map((c) => `- ${compactLine(c)}${showExample(c) ? `\n    example:\n${ind
   const rules = [
     "- Use only these elements and props. No colors, sizes or fonts: choose roles with tone=, variant= and style=; for \"red\" or \"big\", use the closest role.",
     `- ${has("card") ? "Start with a card unless the screen needs several. " : ""}One task per screen, short labels, realistic values.`,
+    ...(has("grid") || has("stat") ? [`- Screens may be narrow.${has("grid") ? " Side-by-side figures: grid min=140, not row." : ""}${has("stat") ? " Short stat values: compact() for large numbers." : ""}`] : []),
     ...(has("screen") ? ["- For several screens, write the starting screen first."] : []),
   ];
   add("rules", `RULES\n${rules.join("\n")}`);

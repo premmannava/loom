@@ -14,10 +14,13 @@ import { darkTheme, lightTheme, type Theme } from "../src/theme";
 import { walkBoxes } from "../src/layout";
 import type { Box } from "../src/types";
 import { exampleSpec as exampleOf } from "./examples";
+import { textOverflows } from "./overflow";
 
 const ALL: ComponentDef[] = [...coreComponents, ...mapComponents];
 const registry = new Registry(ALL);
 const WIDTHS = [320, 600, 1024];
+/** Phone and chat widths, where text is most likely not to fit. */
+const FIT_WIDTHS = [240, 360, 600];
 const THEMES: Theme[] = [lightTheme, darkTheme];
 
 /**
@@ -114,6 +117,17 @@ describe.each(ALL.map((d) => [d.type, d] as const))("%s", (_type, def) => {
       ui.destroy();
     });
   });
+
+  // The map draws through a transform (it scales the world to fit), which the check can't follow.
+  if (!["map", "pin"].includes(def.type)) {
+    describe.each(FIT_WIDTHS)("drawn at %ipx", (width) => {
+      it("keeps its text inside itself, without squeezing it", () => {
+        const ui = render(exampleSpec(def), { components: ALL, width });
+        expect(textOverflows(ui.loom.boxes!, ui.drawOps)).toEqual([]);
+        ui.destroy();
+      });
+    });
+  }
 
   describe.each(THEMES.map((t) => [t.name, t] as const))("painted in %s", (_name, theme) => {
     it("uses only theme colors and the theme font", () => {

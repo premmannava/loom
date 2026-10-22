@@ -246,6 +246,7 @@ export const datePicker: ComponentDef = {
   },
   example: `state due=""
 date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"`,
+  minWidth: () => 120,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     box.h = fieldBox(box, p, ctx.theme.control.height).y - box.y + ctx.theme.control.height;

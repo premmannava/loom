@@ -16,7 +16,7 @@ EXPRESSIONS
 - {…} reads state: {count}, {price*qty}, {done ? 'Yes' : 'No'}, {round(total, 2)}
 - Text can mix words and expressions: "Total: ${price*qty}"
 - Operators: + - * / % == != < <= > >= && || ! and a ? b : c
-- Functions: min, max, len, count, filter, find, search, sort, take, sum, avg, join, includes, round, floor, ceil, abs, fixed, money, number, plural, lower, upper, trim
+- Functions: min, max, len, count, filter, find, search, sort, take, sum, avg, join, includes, round, floor, ceil, abs, fixed, money, number, compact, plural, lower, upper, trim
 - Words inside {…} are state names. Quote text: {done ? 'Packed' : 'To pack'}, tone={late ? 'bad' : 'good'}
 
 ACTIONS (on=…)
@@ -45,7 +45,7 @@ DATA AND LISTS
 - Use filter() for counts and totals. To hide items that people can still change (bind=t.done), keep each items=todos and put if= on the repeated element
 - Share one computed list or total between elements instead of repeating it: derive open={filter(orders, 'status', 'open')}, then items=open and {len(open)}
 - To compare two fields of an item (an answer and its correct answer), set a field when choosing, then count it: radio "{o}" bind=q.pick value={o} on="set:q.ok:{o == q.answer}" and later count(qs, 'ok')
-- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()
+- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, compact(12345678) shows 12.3M and compact(n, 'USD') shows $12.3M (use it for big figures in stats), plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()
 - Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"
 - Change the list: on="add:todos:{text: 'Map', done: false}", on=remove:t (inside each), on=clear:todos
 - Show only some items with if= on the repeated element: check "{t.text}" bind=t.done if={!t.done}
@@ -111,10 +111,11 @@ ELEMENTS
         text "First"
         text "Second"
 
-  row  — Places its children side by side, splitting the width equally.
+  row  — Places its children side by side, splitting the width equally. On a narrow screen, children that don't fit move onto the next line.
     gap=<number>  Space between children in pixels (default 10).
     pad=<number>  Inner padding in pixels (default 0).
     align=<top|center|bottom>  Vertical alignment of children: top, center or bottom.
+    wrap=<boolean>  Move children onto more lines when they don't fit side by side (default true). Set false to always keep them on one line.
     children: any elements
     example:
       row gap=10
@@ -490,6 +491,7 @@ RULES
 - Use only the elements and props above. Never invent colors, sizes or fonts; use style=, tone= and variant=. If asked for a specific color or size, use the closest role instead.
 - Start with a card unless the screen needs several.
 - Keep screens focused: one task per screen, short labels, real-looking values.
+- Screens may be narrow (a phone, a chat). For side-by-side figures use grid min=140 rather than row. Keep stat values short: compact() for large numbers.
 - For several screens, write the starting screen first: it shows as soon as it arrives.
 - Images only load from these hosts: images.unsplash.com. Only use image URLs from them that you were given or know exist. Never make up URLs; leave images out instead.
 - Always describe what the image shows in its quoted text; it's displayed if the image can't load.

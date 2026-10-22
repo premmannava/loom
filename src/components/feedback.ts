@@ -1,6 +1,7 @@
 import type { ComponentDef } from "../component";
 import { wrapText } from "../text";
 import { fillTint, onProp, partBox, themeFont } from "./util";
+import { fitText } from "./input";
 
 const SHAPES = ["text", "block", "circle"] as const;
 const LINE_H = 12, LINE_GAP = 10;
@@ -123,7 +124,7 @@ export const empty: ComponentDef = {
     g.lineWidth = 1;
     g.stroke();
     g.fillStyle = c.accent;
-    g.fillText(label, cx, btn.y + BUTTON_H / 2 + 1, w - 16);
+    g.fillText(fitText(g, label, w - 16), cx, btn.y + BUTTON_H / 2 + 1);
     if (p.has("on")) ctx.addHit(btn, { detail: "action" });
   },
 };

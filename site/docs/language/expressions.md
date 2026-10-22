@@ -82,6 +82,7 @@ card
 |---|---|
 | `money(2400)`, `money(-84.1)`, `money(n, 'EUR')` | `$2,400.00`, `-$84.10`, or another currency |
 | `number(37000)`, `number(n, 2)` | `37,000`; with exactly two decimals |
+| `compact(12345678)`, `compact(n, 'USD')` | `12.3M`, `$12.3M`: big figures in small spaces, like a `stat` |
 | `plural(n, 'item')`, `plural(n, 'child', 'children')` | `1 item`, `3 items`, `2 children` |
 | `lower(text)`, `upper(text)`, `trim(text)` | Lower case, upper case, without spaces at the ends |
 

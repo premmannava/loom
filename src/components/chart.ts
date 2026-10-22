@@ -319,6 +319,7 @@ export const chart: ComponentDef = {
   },
   example: `state sales=[{month: "Jan", revenue: 12000}, {month: "Feb", revenue: 18000}, {month: "Mar", revenue: 15000}]
 chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money`,
+  minWidth: () => 200,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const kind = p.oneOf("kind", KINDS, "bar");

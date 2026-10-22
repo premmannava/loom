@@ -1,6 +1,6 @@
 import type { ComponentDef } from "../component";
 import { wrapText } from "../text";
-import { chevron, fillTint, gapProp, onProp, padProp, partBox, row as rowLayout, ROW_ALIGN, runOn, stack, themeFont } from "./util";
+import { chevron, fillTint, gapProp, onProp, padProp, partBox, row as rowLayout, ROW_ALIGN, rowMinWidth, runOn, stack, themeFont } from "./util";
 
 export const column: ComponentDef = {
   type: "column",
@@ -20,11 +20,12 @@ export const column: ComponentDef = {
 export const row: ComponentDef = {
   type: "row",
   category: "layout",
-  description: "Places its children side by side, splitting the width equally.",
+  description: "Places its children side by side, splitting the width equally. On a narrow screen, children that don't fit move onto the next line.",
   props: {
     gap: gapProp(10),
     pad: padProp(0),
     align: { type: "enum", values: ROW_ALIGN, default: "center", description: "Vertical alignment of children: top, center or bottom." },
+    wrap: { type: "boolean", default: true, description: "Move children onto more lines when they don't fit side by side (default true). Set false to always keep them on one line." },
   },
   children: "any",
   example: `row gap=10
@@ -32,7 +33,11 @@ export const row: ComponentDef = {
   button "Save"`,
   layout(box, ctx) {
     const p = ctx.props(box.node);
-    rowLayout(box, ctx, p.num("pad", 0), p.num("gap", 10), p.oneOf("align", ROW_ALIGN, "center"));
+    rowLayout(box, ctx, p.num("pad", 0), p.num("gap", 10), p.oneOf("align", ROW_ALIGN, "center"), p.bool("wrap", true));
+  },
+  minWidth(node, ctx) {
+    const p = ctx.props(node);
+    return rowMinWidth(node, ctx, p.num("pad", 0), p.num("gap", 10), p.bool("wrap", true));
   },
 };
 
@@ -130,8 +135,9 @@ export const grid: ComponentDef = {
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const gap = Math.max(0, p.num("gap", 14));
-    const min = Math.max(1, p.num("min", 200));
     const kids = ctx.visibleChildren(box.node);
+    // A column is never narrower than its widest child needs, whatever min= says.
+    const min = Math.max(1, p.num("min", 200), ...kids.map((k) => Math.min(box.w, ctx.minWidth(k))));
     const cols = Math.max(1, Math.min(kids.length || 1, Math.floor((box.w + gap) / (min + gap))));
     const cw = Math.max(0, (box.w - gap * (cols - 1)) / cols);
     let y = box.y;

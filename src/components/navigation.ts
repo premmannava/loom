@@ -2,6 +2,7 @@ import { toNumber } from "../data";
 import type { ComponentDef, LayoutContext, PropReader } from "../component";
 import type { Box, SayShapeNode, Value } from "../types";
 import { wrapText } from "../text";
+import { fitText } from "./input";
 import { chevron, fillTint, gapProp, onProp, partBox, runOn, stack, themeFont } from "./util";
 
 // ---------------------------------------------------------------- tabs
@@ -84,7 +85,7 @@ tabs bind=view
         fillTint(g, c.accent, 0.06);
       }
       g.fillStyle = on ? c.ink : c.muted;
-      g.fillText(cell.label, cell.x + cell.w / 2, box.y + BAR_H / 2, Math.max(0, cell.w - 8));
+      g.fillText(fitText(g, cell.label, Math.max(0, cell.w - 8)), cell.x + cell.w / 2, box.y + BAR_H / 2);
       if (on) {
         g.fillStyle = c.accent;
         g.fillRect(cell.x + 6, box.y + BAR_H - 3, Math.max(0, cell.w - 12), 3);
@@ -168,7 +169,7 @@ breadcrumb "Shop / Shoes / Trail runners" bind=at`,
       const active = pressable && !cr.last;
       g.font = cr.last ? ctx.font(600, 14) : font;
       g.fillStyle = cr.last ? c.ink : active ? c.accent : c.muted;
-      g.fillText(cr.text, cr.x, cr.y + CRUMB_H / 2, box.x + box.w - cr.x);
+      g.fillText(fitText(g, cr.text, box.x + box.w - cr.x), cr.x, cr.y + CRUMB_H / 2);
       if (!cr.last) {
         g.font = font;
         g.fillStyle = c.muted;

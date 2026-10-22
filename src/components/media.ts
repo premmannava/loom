@@ -1,6 +1,7 @@
 import type { ComponentDef, PaintContext } from "../component";
 import type { Box } from "../types";
 import { fillTint } from "./util";
+import { fitText } from "./input";
 
 const RATIOS = ["16:9", "4:3", "3:2", "1:1", "2:3", "3:4"] as const;
 const FITS = ["cover", "contain"] as const;
@@ -55,7 +56,7 @@ function placeholder(box: Box, ctx: PaintContext, alt: string): void {
   g.fillStyle = theme.colors.muted;
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(alt, box.x + box.w / 2, box.y + box.h / 2 + 18, box.w - 24);
+  g.fillText(fitText(g, alt, Math.max(0, box.w - 24)), box.x + box.w / 2, box.y + box.h / 2 + 18);
 }
 
 export const image: ComponentDef = {

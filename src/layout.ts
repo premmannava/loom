@@ -53,6 +53,8 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
   // Containers may ask more than once per layout; copies must stay the same objects.
   const kids = new WeakMap<SayShapeNode, SayShapeNode[]>();
   const budget: EachBudget = { left: MAX_EACH_ELEMENTS };
+  // Rows ask for their children's minimum widths, which may ask in turn; work each out once per layout.
+  const mins = new WeakMap<SayShapeNode, number>();
   const ctx: LayoutContext = {
     theme,
     measure,
@@ -72,6 +74,22 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
       let k = kids.get(node);
       if (!k) kids.set(node, (k = shownChildren(node, scope, registry, warn, budget)));
       return k;
+    },
+    minWidth(node) {
+      let w = mins.get(node);
+      if (w === undefined) {
+        const def = registry.get(node.type);
+        if (def?.minWidth) w = def.minWidth(node, ctx);
+        else if (def?.children) {
+          // Containers: their widest child, plus padding on both sides when they have a pad prop.
+          const padDef = def.props.pad?.default;
+          const pad = def.props.pad ? ctx.props(node).num("pad", typeof padDef === "number" ? padDef : 0) : 0;
+          w = Math.max(0, ...ctx.visibleChildren(node).map((k) => ctx.minWidth(k))) + pad * 2;
+        } else w = 0;
+        w = Number.isFinite(w) && w > 0 ? w : 0;
+        mins.set(node, w);
+      }
+      return w;
     },
     shift: shiftBox,
     warn,
