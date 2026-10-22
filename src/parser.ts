@@ -78,9 +78,23 @@ export interface ParseOptions {
   knownNames?: readonly string[];
 }
 
+/** A derive line's value: a name, its expression, and the names that expression reads. */
+export interface DerivedDef {
+  name: string;
+  expr: string;
+  line: number;
+  /** Every name the expression reads (state, host data or other derived values). */
+  reads: string[];
+}
+
+/** The most derived values one spec may declare. */
+export const MAX_DERIVED = 200;
+
 export interface ParseResult {
   root: LoomNode;
   state: Array<{ key: string; value: Value; line: number }>;
+  /** Derived values that can be worked out: no duplicates, collisions or cycles. */
+  derived: DerivedDef[];
   diagnostics: Diagnostic[];
   nodeCount: number;
   /** Number of complete lines consumed. */
@@ -96,7 +110,8 @@ interface LineTokens {
 
 /** Tokenize one element line: `type "text" key=value key="quoted" key={expr}`. */
 export function tokenizeLine(body: string): LineTokens {
-  const out: LineTokens = { type: "", props: {}, problems: [] };
+  // No prototype, so prop names like toString or __proto__ are plain keys, not inherited ones.
+  const out: LineTokens = { type: "", props: Object.create(null) as Record<string, string>, problems: [] };
   let i = 0;
   const n = body.length;
   const skipWs = () => { while (i < n && /\s/.test(body[i]!)) i++; };
@@ -203,6 +218,67 @@ function parseStateLine(body: string, line: number, diags: Diagnostic[]): Array<
   return out;
 }
 
+/** Names nothing may be called: what expressions refuse to read, and state the engine sets. */
+const RESERVED = new Set(["__proto__", "constructor", "prototype", "screen"]);
+
+/** One derive line: name={expression} pairs. Problems skip the pair, not the line. */
+function parseDeriveLine(body: string, line: number, diags: Diagnostic[]): DerivedDef[] {
+  const t = tokenizeLine("derive " + body);
+  for (const p of t.problems) diags.push({ line, severity: "warning", message: p });
+  if (t.text !== undefined) diags.push({ line, severity: "warning", message: `derive lines take name={expression} pairs, not quoted text, like derive total={price * qty}` });
+  const out: DerivedDef[] = [];
+  for (const [name, raw] of Object.entries(t.props)) {
+    if (!/^[A-Za-z_]\w*$/.test(name) || RESERVED.has(name)) {
+      diags.push({ line, severity: "warning", message: `"${name}" can't be a derived name. Use letters, digits and _, like derive total={…}` });
+      continue;
+    }
+    const expr = wholeExpression(raw);
+    if (expr === null) {
+      diags.push({ line, severity: "warning", message: `derive ${name} needs an expression in braces, like derive ${name}={price * qty}. For a fixed starting value, use state ${name}=…` });
+      continue;
+    }
+    const err = checkSyntax(expr);
+    if (err) {
+      diags.push({ line, severity: "warning", message: `derive ${name}: ${err}` });
+      continue;
+    }
+    out.push({ name, expr, line, reads: identifiers(expr) });
+  }
+  return out;
+}
+
+/**
+ * Derived values that read themselves, directly or through others. Each is
+ * reported with the loop it's in (total → tax → total) and left out.
+ */
+function findCycles(defs: readonly DerivedDef[], diags: Diagnostic[]): Set<string> {
+  const byName = new Map(defs.map((d) => [d.name, d]));
+  const cyclic = new Set<string>();
+  const state = new Map<string, "visiting" | "done">();
+  const path: string[] = [];
+  const visit = (name: string): void => {
+    const s = state.get(name);
+    if (s === "done") return;
+    if (s === "visiting") {
+      const loop = [...path.slice(path.indexOf(name)), name];
+      const fresh = loop.slice(0, -1).filter((n) => !cyclic.has(n));
+      loop.slice(0, -1).forEach((n) => cyclic.add(n));
+      if (fresh.length) {
+        const first = byName.get(loop[0]!)!;
+        diags.push({ line: first.line, severity: "warning", message: `derive ${loop[0]} depends on itself (${loop.join(" → ")}), so ${loop.length > 2 ? "none of these are" : "it isn't"} worked out. Compute each from state instead` });
+      }
+      return;
+    }
+    state.set(name, "visiting");
+    path.push(name);
+    for (const r of byName.get(name)!.reads) if (byName.has(r)) visit(r);
+    path.pop();
+    state.set(name, "done");
+  };
+  for (const d of defs) visit(d.name);
+  return cyclic;
+}
+
 /** Every expression a line reads, for checking which names it uses. */
 function expressionsOf(text: string | undefined, props: Record<string, string>, defs: Record<string, PropDef>): string[] {
   const out: string[] = [];
@@ -286,6 +362,9 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
   const eaches: LoomNode[] = [];
   // State that bind= and actions write, so reading it before the first write isn't a mistake.
   const written = new Set<string>(opts.knownNames ?? []);
+  // Where bind= and actions write, to report writes to derived names.
+  const writes: Array<{ name: string; line: number }> = [];
+  const derivedLines: DerivedDef[] = [];
 
   const lines = src.split("\n");
   if (lines.at(-1) === "") lines.pop();
@@ -300,6 +379,17 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     if (skipDeeperThan !== null) {
       if (indent > skipDeeperThan) return;
       skipDeeperThan = null;
+    }
+
+    if (/^derive(\s|$)/.test(body)) {
+      // Top level only: a derived value belongs to the whole screen, not to an element.
+      if (indent > 0) {
+        diagnostics.push({ line: lineNo, severity: "warning", message: `derive lines go at the top level, unindented, so this one was skipped` });
+        skipDeeperThan = indent;
+        return;
+      }
+      derivedLines.push(...parseDeriveLine(body.slice(6), lineNo, diagnostics));
+      return;
     }
 
     if (/^state(\s|$)/.test(body)) {
@@ -424,8 +514,9 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     if (names.length) outsideUses.push({ line: lineNo, names });
     for (const [name, raw] of Object.entries(tok.props)) {
       const pdef = def.props[name] ?? COMMON_PROPS[name];
-      if (pdef?.type === "state" && PATH.test(raw)) written.add(raw.split(".")[0]!);
-      if (pdef?.type === "action") { const r = parseActions(raw); if ("actions" in r) actionTargets(r.actions).forEach((t) => written.add(t)); }
+      const wrote = (n: string) => { written.add(n); if (!inScope.has(n)) writes.push({ name: n, line: lineNo }); };
+      if (pdef?.type === "state" && PATH.test(raw)) wrote(raw.split(".")[0]!);
+      if (pdef?.type === "action") { const r = parseActions(raw); if ("actions" in r) actionTargets(r.actions).forEach(wrote); }
     }
 
     const node: LoomNode = {
@@ -444,10 +535,51 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     if (def.children) stack.push(node);
   });
 
-  checkNames(outsideUses, eaches, new Set(state.map((s) => s.key)), written, diagnostics);
+  const derived = checkDerived(derivedLines, state, writes, diagnostics);
+  // Derived names count as defined, even ones left out for a cycle (that's reported already).
+  for (const d of derivedLines) if (d.reads.length) outsideUses.push({ line: d.line, names: d.reads });
+  const defined = new Set([...state.map((s) => s.key), ...derivedLines.map((d) => d.name)]);
+  checkNames(outsideUses, eaches, defined, written, diagnostics);
   // Stable sort keeps each line's diagnostics in the order they were found.
   diagnostics.sort((a, b) => a.line - b.line);
-  return { root, state, diagnostics, nodeCount, lines: lines.length };
+  return { root, state, derived, diagnostics, nodeCount, lines: lines.length };
+}
+
+/**
+ * The derived values a spec can use: the first of each name, not a state
+ * name, at most MAX_DERIVED, and not part of a cycle. Writes to them through
+ * bind= or actions are reported.
+ */
+function checkDerived(lines: DerivedDef[], state: ParseResult["state"], writes: Array<{ name: string; line: number }>, diags: Diagnostic[]): DerivedDef[] {
+  const stateKeys = new Set(state.map((s) => s.key));
+  const kept: DerivedDef[] = [];
+  const seen = new Map<string, number>();
+  for (const d of lines) {
+    const first = seen.get(d.name);
+    if (first !== undefined) {
+      diags.push({ line: d.line, severity: "warning", message: `${d.name} is already derived on line ${first}, so this one is ignored. Give it another name` });
+      continue;
+    }
+    if (stateKeys.has(d.name)) {
+      const at = state.find((s) => s.key === d.name)!.line;
+      diags.push({ line: d.line, severity: "warning", message: `${d.name} is already state (line ${at}), so derive ${d.name} is ignored. A name is either state or derived; rename one` });
+      continue;
+    }
+    if (kept.length >= MAX_DERIVED) {
+      diags.push({ line: d.line, severity: "warning", message: `A spec can derive at most ${MAX_DERIVED} values, so derive ${d.name} is ignored` });
+      continue;
+    }
+    seen.set(d.name, d.line);
+    kept.push(d);
+  }
+  const cyclic = findCycles(kept, diags);
+  const usable = kept.filter((d) => !cyclic.has(d.name));
+  const lineOf = new Map(kept.map((d) => [d.name, d.line]));
+  for (const w of writes) {
+    const at = lineOf.get(w.name);
+    if (at !== undefined) diags.push({ line: w.line, severity: "warning", message: `${w.name} is derived (line ${at}), so bind= and actions can't change it. Change the state it's computed from instead` });
+  }
+  return usable;
 }
 
 /** State the engine sets itself: the visible screen's name. */

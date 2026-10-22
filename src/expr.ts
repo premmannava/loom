@@ -33,13 +33,21 @@ type Fn = (...a: Value[]) => Value;
 /** min(3, 5) or min(list): a single list argument stands for its items. */
 const spread = (a: Value[]): Value[] => (a.length === 1 && isList(a[0]) ? [...a[0]] : a);
 
-/** sum/avg over a list: the items, one field of each, or two fields multiplied (price × qty). */
+/** Only numbers count in sums: text ("12"), true/false, null or a missing field is NaN. */
+const amount = (v: Value | undefined): number => (typeof v === "number" ? v : NaN);
+
+/**
+ * sum/avg/min/max over a list: the items, one field of each, or two fields
+ * multiplied (price × qty). A value that isn't a number makes the result NaN
+ * (shown as —) rather than being read as one: "12" is never 12, and nothing
+ * is joined as text. An empty list sums to 0.
+ */
 function amounts(v: Value, a?: Value, b?: Value): number[] | null {
   if (!isList(v)) return null;
   return v.map((item) => {
-    if (a === undefined) return toNumber(item);
-    const x = toNumber(fieldOf(item, a));
-    return b === undefined ? x : x * toNumber(fieldOf(item, b));
+    if (a === undefined) return amount(item);
+    const x = amount(fieldOf(item, a));
+    return b === undefined ? x : x * amount(fieldOf(item, b));
   });
 }
 

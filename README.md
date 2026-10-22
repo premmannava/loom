@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, 39 components including text input, selects, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 39 components including text input, selects, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -130,6 +130,27 @@ A value must fit on one line, however long, so a streamed spec can render line b
 
 State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere). When a new spec declares a different starting value, such as a refined screen with new data, the new value replaces the old one. Values your app set itself are never replaced by a declaration. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
 
+### Derived values
+
+A `derive` line works a value out from state and keeps it up to date, so a total, a filtered list or a chart's data is written once and every element reads the same thing:
+
+```
+state quantity=2 price=350 taxRate=0.08
+derive subtotal={quantity * price}
+derive tax={subtotal * taxRate}
+derive total={subtotal + tax}
+stat label="Total" value={total}
+```
+
+- **Grammar.** `derive name={expression}`, unindented, at the top level of the spec; several pairs may share a line, as with `state`. The expression is the same safe kind as everywhere else in Loom, with the same functions; there are no functions of your own, callbacks or side effects.
+- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. Its expression can read state, data your app sets with `loom.state.set`, and other derived values.
+- **Order.** Declarations can come in any order: a value is worked out from whatever it reads, wherever that's declared. While a spec streams in, a value whose inputs haven't arrived yet shows as nothing (—) until they do.
+- **Updates.** A value is worked out the first time it's read and kept until something it reads changes, directly or through other derived values; then it's worked out again the next time it's read. Changes to state it doesn't read leave it alone, and a render reads each value at most once per change.
+- **Failures.** If a value can't be worked out (it reads an item that's gone, say), it's nothing (—), never the last good result, and so is everything derived from it. The reason is reported once through `onWarning`, and the value comes back when what it reads is fixed.
+- **Read-only.** Derived values aren't state. `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change one, nor items of a derived list (`each items=open` with `bind=t.done`): the parser reports it, and the engine refuses with a warning. `loom.state.set` throws a `DerivedWriteError`. To let people change items, loop over the list in state and hide items with `if=`. `loom.state.snapshot()` holds state only; `loom.state.derivedSnapshot()` has the derived values.
+- **Problems the parser reports**, each skipping only that value: an expression not in braces or with a syntax error, a name used twice, a name that's already state, a name expressions can't read (`__proto__`, `constructor`, `prototype`) or the engine uses (`screen`), a name nothing defines, and cycles, direct (`derive x={x + 1}`) or through others (`p` → `q` → `p`), which are left out with the loop named. A spec can derive at most 200 values.
+- Lists that derived values hold are new, frozen lists: filtering or sorting never changes the list in state.
+
 ### Expressions
 
 Anything inside `{…}` is evaluated against state.
@@ -216,7 +237,7 @@ List functions, for computing instead of typing numbers:
 |---|---|
 | `len(list)` | Number of items |
 | `count(list, 'done')` | Items whose field is true |
-| `sum(list)`, `sum(list, 'price')`, `sum(list, 'price', 'qty')` | Total of the items, of a field, or of two fields multiplied per item (cart totals) |
+| `sum(list)`, `sum(list, 'price')`, `sum(list, 'price', 'qty')` | Total of the items, of a field, or of two fields multiplied per item (cart totals). Only numbers count: a missing field, `null`, `true`/`false` or text (even `"12"`) makes the total — rather than being read as a number; an empty list totals 0. `avg`, `min` and `max` of a field work the same way |
 | `avg(list, 'field')` | Average |
 | `join(list)`, `join(list, 'name', ' / ')` | Text listing the items or a field |
 | `includes(list, value)` | Whether a value is in the list |
@@ -1543,7 +1564,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, and a select whose options open in a popup layer on the canvas. Next: scrolling and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select whose options open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

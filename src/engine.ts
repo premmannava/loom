@@ -165,6 +165,8 @@ export class Loom {
     canvas.style.touchAction = "pan-y pinch-zoom";
     if (!canvas.getAttribute("aria-label")) canvas.setAttribute("aria-label", "Generated interface");
 
+    // A derived value that can't be worked out shows as nothing; say why, once per spec.
+    this.state.onDerivedError = (d, error) => this.warnOnce(`derive ${d.name} on line ${d.line} couldn't be worked out, so it shows as nothing: ${error}`);
     this.state.subscribe((key, value) => {
       this.events.emit("change", { key, value });
       this.invalidate("layout");
@@ -274,6 +276,7 @@ export class Loom {
     });
     for (const { key, value } of this.parsed.state) this.state.declare(key, value);
     this.warned.clear();
+    this.state.derive(this.parsed.derived);
     this.syncScreen();
     this.metrics.parseMs = now() - t;
     this.metrics.nodes = this.parsed.nodeCount;
@@ -287,8 +290,7 @@ export class Loom {
     const t = now();
     const width = this.opts.width ?? (this.canvas.parentElement?.clientWidth || 600);
     this.width = width;
-    const warnOnce = (m: string) => { if (!this.warned.has(m)) { this.warned.add(m); this.warn(m); } };
-    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, warnOnce);
+    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, (m) => this.warnOnce(m));
     this.rootBox = ctx.layout(this.parsed.root, 0, 0, width);
     let height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
     // A popup that needs more room than the screen has makes the canvas taller while it's open.
@@ -303,6 +305,20 @@ export class Loom {
     Object.assign(this.metrics, { width, height, pixelWidth: pw, pixelHeight: ph, layoutMs: now() - t });
     this.dirty.layout = false;
     this.refreshTargets();
+  }
+
+  /** Report a problem once per spec, however often layout runs into it. */
+  private warnOnce(m: string): void {
+    if (!this.warned.has(m)) { this.warned.add(m); this.warn(m); }
+  }
+
+  /** A write to a derived name: refused, with a reason. */
+  private derivedWrite(path: string, key: string): boolean {
+    const d = this.state.derivation(key);
+    if (!d) return false;
+    const item = path.replace(/^remove:/, "") !== key;
+    this.warn(`Can't change ${path}: ${key} is derived (derive ${key} on line ${d.line}), so it changes only when what it's computed from changes.${item ? " To change items, loop over the list in state (each items=todos) and hide items with if=" : ""}`);
+    return true;
   }
 
   private runPaint(): void {
@@ -734,6 +750,7 @@ export class Loom {
       this.warn(`Can't change ${path}: it isn't in state. Inside each, items= must name a list in state (like items=todos) for its items to change`);
       return;
     }
+    if (this.derivedWrite(path, place.key)) return;
     if (!place.steps.length) { this.state.set(place.key, value); return; }
     const r = setIn(this.state.get(place.key), place.steps, value);
     if ("error" in r) this.warn(`Can't change ${path}: ${r.error}`);
@@ -748,6 +765,7 @@ export class Loom {
       this.warn(`remove:${path} needs ${path} to be an item of a list in state, like remove:t inside each items=todos as=t. To remove by position, write remove:list:index`);
       return;
     }
+    if (this.derivedWrite(`remove:${path}`, place.key)) return;
     const parent = place.steps.slice(0, -1);
     const root = this.state.get(place.key);
     const list = parent.length ? getIn(root, parent) : root;

@@ -301,4 +301,37 @@ card
   empty "Nobody in this department yet" if={department != '' && len(filter(people, 'dept', department)) == 0}
 `,
   },
+  order: {
+    label: "Order",
+    prompt: "An equipment order calculator: change quantities and unit prices, filter by category, and see subtotal, tax and total, with a table and a chart of the lines.",
+    spec: `state category="all" taxRate=0.08 categories=[{id: "all", name: "All categories"}, {id: "computers", name: "Computers"}, {id: "displays", name: "Displays"}, {id: "accessories", name: "Accessories"}] lines=[{id: "laptop", name: "Laptop", category: "computers", price: 1200, qty: 2}, {id: "monitor", name: "Monitor", category: "displays", price: 350, qty: 3}, {id: "dock", name: "USB-C dock", category: "accessories", price: 190, qty: 2}, {id: "keyboard", name: "Keyboard", category: "accessories", price: 80, qty: 4}]
+derive shown={category == 'all' ? lines : filter(lines, 'category', category)}
+derive subtotal={sum(shown, 'price', 'qty')}
+derive tax={round(subtotal * taxRate, 2)}
+derive total={subtotal + tax}
+card
+  text "Equipment order" style=title
+  select "Category" items=categories value=id label=name bind=category
+  each items=lines as=line key={line.id}
+    column gap=6 if={category == 'all' || line.category == category}
+      text "{line.name}" weight=semibold
+      row
+        column gap=2
+          text "Quantity" style=caption tone=muted
+          stepper bind=line.qty min=0 max=20
+        column gap=2
+          text "Unit price ($)" style=caption tone=muted
+          stepper bind=line.price min=0 max=5000 step=10
+  table items=shown key=id
+    table-column "Item" field=name
+    table-column "Qty" field=qty format=number
+    table-column "Unit price" field=price format=money
+  chart "Units by item" kind=bar items=shown x=name y=qty
+  list
+    list-item "Subtotal" trailing="{money(subtotal)}"
+    list-item "Tax ({taxRate * 100}%)" trailing="{money(tax)}"
+    list-item "Total" trailing="{money(total)}"
+  button "Place order" on="emit:order:{shown}" disabled={total == 0}
+`,
+  },
 };

@@ -249,9 +249,10 @@ function dataSection(ctx: GuideContext): string {
     `- Repeat elements with each, once per item. Never copy an element by hand for every item:\n  each items=todos as=t`,
     `- Inside each, the current item is t (from as=t; item if as= is left out). index=i gives its position from 0. t only exists inside its each.`,
     `- Read fields: {t.text}, {cart[0].price}, {todos.length}`,
-    `- Compute numbers from the list instead of writing them yourself: len(list), count(list, 'done') counts items whose field is true, count(list, 'cat', 'Gas') counts items whose field equals a value, sum(list, 'price'), sum(list, 'price', 'qty') multiplies two fields per item, avg(list, 'field'), min(list, 'field'), max(list, 'field'), join(list, 'name'), includes(list, value)`,
+    `- Compute numbers from the list instead of writing them yourself: len(list), count(list, 'done') counts items whose field is true, count(list, 'cat', 'Gas') counts items whose field equals a value, sum(list, 'price'), sum(list, 'price', 'qty') multiplies two fields per item, avg(list, 'field'), min(list, 'field'), max(list, 'field'), join(list, 'name'), includes(list, value). These count only numbers: write prices and quantities as numbers (24, not "24")`,
     `- Narrow and order lists: filter(list, 'done'), filter(list, 'cat', 'Gas'), find(list, 'id', picked) for one item, search(list, 'name', query), sort(list, 'price'), sort(list, 'price', 'desc'), take(list, 3). Combine them: sum(filter(tx, 'cat', 'Gas'), 'amount'), find(rooms, 'id', room).rate`,
     `- Use filter() for counts and totals. To hide items that people can still change (bind=t.done), keep each items=todos and put if= on the repeated element`,
+    `- Share one computed list or total between elements instead of repeating it: derive open={filter(orders, 'status', 'open')}, then items=open and {len(open)}`,
     ...(has("radio") ? [`- To compare two fields of an item (an answer and its correct answer), set a field when choosing, then count it: radio "{o}" bind=q.pick value={o} on="set:q.ok:{o == q.answer}" and later count(qs, 'ok')`] : []),
     `- Format for people: money(2400) shows $2,400.00, number(37000) shows 37,000, plural(n, 'item') shows 1 item or 3 items, lower(), upper(), trim()`,
     `- Change an item through its fields: bind=t.done, on=toggle:t.done, on=inc:item.qty, on="set:t.text:'Done'"`,
@@ -281,6 +282,7 @@ function fullSections(ctx: GuideContext): GuideSection[] {
   if={count(todos, 'done') == len(todos)}
     text "All done!" tone=good
 - Declare state first, at the top, unindented: state count=0 done=false name="Ada"
+- Work a value out once with derive, unindented, one per line: derive total={sum(cart, 'price', 'qty')}. Read it like state ({total}), in text, props and other derive lines; it updates by itself. bind= and actions can't change it, and a derive can't read itself
 - Every element and every state value fits on one line, even a long list: state trails=[{name: "Camelback", miles: 2.5}, {name: "Piestewa", miles: 2.1}]
 - Lines starting with # are comments.`);
   add("expressions", `EXPRESSIONS
@@ -355,6 +357,7 @@ function compactSections(ctx: GuideContext): GuideSection[] {
 - One element per line: type "text" prop=value prop="quoted value" prop={expression}. Indent children 2 spaces.
 - Props stay on their element's line. A line holding only if={…} shows the lines indented under it while true.
 - State first, unindented, every value on one line: state count=0 name="Ada" todos=[{text: "Water", done: false}]
+- derive name={expr}, unindented, one per line, keeps a value worked out from state: derive total={sum(cart, 'price', 'qty')}, then {total}. Read-only (no bind= or actions); no loops through itself
 - # starts a comment.`);
   add("expressions", `EXPRESSIONS
 - {…} reads state and loop variables: {count}, {price*qty}, {t.text}, {cart[0].price}, {todos.length}. Text mixes words and {…}: "Total: \${price*qty}"
