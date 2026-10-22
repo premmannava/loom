@@ -43,6 +43,8 @@ export interface LayoutContext {
   visibleChildren(node: LoomNode): LoomNode[];
   /** Move a box and its whole subtree. */
   shift(box: Box, dx: number, dy: number): void;
+  /** Today's date as YYYY-MM-DD (the engine's today option, or the device's local day). */
+  today(): string;
   /**
    * Report a problem in the data a model can fix (not a list, a missing
    * field). The engine shows each message once per spec, not every frame.
@@ -79,6 +81,8 @@ export interface PaintContext {
   isEditing(node: LoomNode): boolean;
   /** Whether this element's popup is open (to draw it as open). */
   isPopupOpen(node: LoomNode): boolean;
+  /** Today's date as YYYY-MM-DD. */
+  today(): string;
   /** False when animation is off (option or reduced motion): draw a still frame. */
   motion: boolean;
   /** Fade-in opacity for a node that just appeared (0..1). */
@@ -107,6 +111,8 @@ export interface PressContext {
   openPopup(state: PopupState): void;
   /** Whether this element's popup is open. */
   popupOpen: boolean;
+  /** Today's date as YYYY-MM-DD. */
+  today(): string;
 }
 
 /** Pressing or typing in an open popup. ctx.target.node is the popup's owner. */

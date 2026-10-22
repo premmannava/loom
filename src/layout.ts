@@ -2,6 +2,7 @@
  * Headless layout: turns a node tree into positioned boxes using only a
  * TextMeasurer, so it runs (and is tested) without a canvas.
  */
+import { localToday } from "./dates";
 import { PropReader, type LayoutContext } from "./component";
 import { eachInstances, MAX_EACH_ELEMENTS, scopeOf, type EachBudget } from "./each";
 import { bareExpression, evaluate, type Scope } from "./expr";
@@ -47,7 +48,7 @@ export function shownChildren(node: LoomNode, scope: Scope, registry?: Registry,
   return out;
 }
 
-export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void): LayoutContext {
+export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void, today: () => string = localToday): LayoutContext {
   const readers = new WeakMap<LoomNode, PropReader>();
   // Containers may ask more than once per layout; copies must stay the same objects.
   const kids = new WeakMap<LoomNode, LoomNode[]>();
@@ -74,6 +75,7 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
     },
     shift: shiftBox,
     warn,
+    today,
   };
   return ctx;
 }

@@ -38,6 +38,8 @@ export interface RenderOptions {
   loadImage?: LoomOptions["loadImage"];
   /** The visible part of the canvas, for popup placement. Default: from the top, unbounded. */
   viewport?: { top: number; bottom: number };
+  /** Today's date as YYYY-MM-DD, for date pickers. Default: the machine's local day. */
+  today?: string;
 }
 
 /** Which element to find. A string is shorthand for `{ type }`. */
@@ -151,6 +153,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     loadImage: opts.loadImage,
     onWarning: (m) => warnings.push(m),
     viewport: opts.viewport ? () => opts.viewport! : undefined,
+    today: opts.today ? () => opts.today! : undefined,
   });
 
   const emitted: Emitted[] = [];

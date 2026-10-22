@@ -97,7 +97,7 @@ ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
 - content: text, image, code, badge, avatar
 - data: stat, rating, chart, table, table-column, map, pin
-- input: button, link, check, switch, radio, select, stepper, slider, input
+- input: button, link, check, switch, radio, select, date-picker, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
 - feedback: progress, skeleton, empty
 
@@ -253,6 +253,16 @@ ELEMENTS
     unavailable=<name>  A field that, when true, greys an option out so it can't be chosen, e.g. unavailable=full.
     disabled=<condition>  Expression; when true the field is greyed out and doesn't open.
     on=<action>  Actions to run after an option is chosen, with bind= already set, e.g. emit:changed. Separate several with ;
+
+  date-picker "<text>"  — A field that opens a month calendar to pick one date, kept in bind= as YYYY-MM-DD text ("" for none). For deadlines, bookings or report filters.
+    "<text>"  The label above the field.
+    bind=<state, required>  State that holds the date as YYYY-MM-DD, like due or t.date. Start it as "" for no date.
+    min=<string>  The earliest date that can be chosen, YYYY-MM-DD, included.
+    max=<string>  The latest date that can be chosen, YYYY-MM-DD, included.
+    placeholder=<string>  Shown while no date is chosen.
+    required=<boolean>  When true, the calendar has no Clear button.
+    disabled=<condition>  Expression; when true the field is greyed out and doesn't open.
+    on=<action>  Actions to run after the date changes, with bind= already set, e.g. emit:changed. Separate several with ;
 
   stepper "<text>"  — A number with minus and plus buttons, for small counts like a quantity.
     "<text>"  An optional label on the left.

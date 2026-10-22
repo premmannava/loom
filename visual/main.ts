@@ -44,6 +44,8 @@ async function main(): Promise<void> {
     // instead of downloaded; other hosts stay blocked, as in the playground.
     imageHosts: ["images.unsplash.com"],
     loadImage: fixtureImageLoader,
+    // A fixed today, so calendars look the same whenever the screenshots are taken.
+    today: () => "2026-10-21",
   });
   // Interaction tests (typing.spec.ts) drive the engine directly.
   window.__loom = loom;

@@ -69,6 +69,7 @@ describe("bind= inside each, for every component that binds", () => {
     ["pagination", `pagination bind=r.v pages=3`, "v", 1, "last"],
     ["map", `map bind=r.v`, "v", "", "country"],
     ["select", `select items=rows value=name bind=r.v`, "v", "", "pick"],
+    ["date-picker", `date-picker bind=r.v`, "v", "", "pick"],
     ["table", `table items=rows key=name bind=r.v\n      table-column "Name" field=name`, "v", "", "press"],
   ];
 

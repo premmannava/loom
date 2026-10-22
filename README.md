@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, derived values, 39 components including text input, selects, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 40 components including text input, selects, a date picker, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -306,6 +306,24 @@ select "Department" items=departments value=id label=name unavailable=full bind=
 - Long labels are cut with an ellipsis, in the field and in the list.
 - Problems a model can fix (no value field, repeated values, a chosen value no option has, too many options) are reported once through `onWarning`.
 
+#### Dates
+
+`date-picker` picks one calendar day, in a field that opens a month calendar in a [popup](#popups):
+
+```
+state due=""
+date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"
+```
+
+The props are in the [reference](#date-picker). How it treats dates:
+
+- **The value** is text, `YYYY-MM-DD`, or `""` for no date: a day on the calendar with no time and no time zone. Loom works dates out itself (leap years, month lengths, weekdays) instead of using JavaScript's `Date`, so a date never shifts by a day across time zones and text like `2026-02-30` is never quietly read as March 2.
+- **Limits.** `min=` and `max=` are inclusive. Days outside them are greyed out and can't be chosen, and paging stops at them. A limit that isn't a real date is ignored, and if `min` is after `max` both are, each with a warning.
+- **Values it can't use.** A bound value that isn't a real date shows "Invalid date"; one outside the limits is still shown but can't be chosen again. Both are reported once through `onWarning`. Drawing never changes state.
+- **Opening.** The calendar opens on the chosen date's month, or else on today's, moved inside the limits. Today is the device's local day, or the engine's `today` option, which tests and screenshots use to fix it.
+- **Choosing** a day, or Today, writes `bind=`, closes the calendar and runs `on=` if the date changed. Clear, and Delete or Backspace on the field, write `""`, unless `required=true`.
+- **Locale.** Month and day names are US English, weeks start on Sunday, and the field shows dates like "Tue, Mar 3, 2026". There's no other locale yet.
+
 #### Tables
 
 `table` shows a list of records as rows, with one `table-column` line per field, in the order written:
@@ -388,7 +406,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`date-picker`](#date-picker), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
@@ -824,6 +842,26 @@ state teams=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}] tea
 select "Team" items=teams value=id label=name bind=team placeholder="Choose a team"
 ```
 
+### `date-picker`
+
+A field that opens a month calendar to pick one date, kept in bind= as YYYY-MM-DD text ("" for none). For deadlines, bookings or report filters.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. |
+| `bind` | state, required | State that holds the date as YYYY-MM-DD, like due or t.date. Start it as "" for no date. |
+| `min` | string | The earliest date that can be chosen, YYYY-MM-DD, included. |
+| `max` | string | The latest date that can be chosen, YYYY-MM-DD, included. |
+| `placeholder` | string | Shown while no date is chosen. |
+| `required` | boolean | When true, the calendar has no Clear button. |
+| `disabled` | condition | Expression; when true the field is greyed out and doesn't open. |
+| `on` | action | Actions to run after the date changes, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+```
+state due=""
+date-picker "Due date" bind=due min="2026-01-01" max="2027-12-31"
+```
+
 ### `stepper`
 
 A number with minus and plus buttons, for small counts like a quantity.
@@ -1091,6 +1129,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
 | `onWarning` | `console.warn` | Receives problems found while running, like a blocked image |
 | `editor` | an `<input>` over the field | How text fields are typed into ([Typing](#typing)); `loom-ui/testing` passes a fake one |
+| `today` | the device's local day | Today's date as `() => "YYYY-MM-DD"`, for date pickers; fix it in tests and screenshots |
 | `viewport` | from the window | The part of the canvas people can see, `() => ({ top, bottom })` in canvas pixels, for placing a select's list ([Popups](#popups)) |
 
 ### Methods
@@ -1145,20 +1184,20 @@ Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Ac
 
 ### Keyboard
 
-The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End. A focused `select` opens with Enter, Space or the up and down arrows; its list then takes the keys (see [Popups](#popups)).
+The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End. A focused `select` or `date-picker` opens with Enter, Space or the up and down arrows; its popup then takes the keys (see [Popups](#popups)). Delete or Backspace clears a focused `date-picker` unless it has `required=true`.
 
 On touch screens, vertical swipes still scroll the page and pinches still zoom, while horizontal drags go to the canvas, so sliders can be dragged.
 
 ### Popups
 
-A `select` shows its options in a popup: a panel the engine draws on the canvas above everything else, owned by the element that opened it. One can be open at a time.
+A `select` shows its options, and a `date-picker` its calendar, in a popup: a panel the engine draws on the canvas above everything else, owned by the element that opened it. One can be open at a time.
 
 - **On top.** It's drawn last, and only its own options can be hovered or pressed while it's open. A press anywhere outside it (on the canvas or elsewhere on the page) closes it and does nothing else, so a button underneath isn't pressed by the same click.
-- **Keys.** While it's open, keys go to it: up and down move the highlight (skipping unavailable options), Home and End jump to the ends, Page Up and Page Down move a page, Enter or Space chooses, Escape closes, and Tab closes it and moves on. Focus goes back to the select when it closes.
+- **Keys.** While it's open, keys go to it. In a select's list, up and down move the highlight (skipping unavailable options), Home and End jump to the ends, Page Up and Page Down move a page. In a calendar, the arrows move by a day or a week, Page Up and Page Down by a month, Home and End to the start and end of the week, staying within `min=` and `max=`. Enter or Space chooses, Escape closes, and Tab closes it and moves on. Focus goes back to the field when it closes.
 - **Placement.** It opens below the field, or above it when only that fits in the visible part of the window, lining up with the field and staying inside the canvas. A canvas can't draw outside itself, so when the list needs more room than the screen has, the canvas grows while the list is open and shrinks back after.
 - **Long lists** show 8 options at a time. They scroll with the wheel, the keyboard (the highlight stays in view), or the arrows at the top and bottom of the list, so every option can be reached by pointer as well as keyboard.
 - **Closing.** It also closes when an option is chosen, when the select is hidden, disabled or left with no options, when the canvas loses focus, and when the spec is replaced.
-- What's highlighted and how far the list is scrolled belong to the popup, not to state: they're forgotten when it closes. Only choosing changes `bind=`.
+- What's highlighted, how far a list is scrolled and which month a calendar shows belong to the popup, not to state: they're forgotten when it closes. Only choosing changes `bind=`.
 
 ### Typing
 
@@ -1550,6 +1589,7 @@ Loom draws everything itself, so it gives up what the browser normally provides 
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
 - **Scrolling regions, dialogs, menus or tooltips.** The one popup so far is a select's list of options (one open at a time); there's no general overlay element yet.
+- **Dates beyond one day.** `date-picker` picks a single calendar day: no ranges, times, recurring dates or time zones, and names are in US English with weeks starting on Sunday.
 - **Selects beyond the basics.** One choice from at most 200 options, with no multi-select, typing to search, option groups, or options showing anything but text.
 - **Tables beyond the basics.** `table` shows at most 200 rows and 8 columns, without scrolling, sticky headers, editable cells, multi-row selection, nested elements in cells, or resizing and reordering columns. A table too wide for its space shows a message instead of scrolling.
 - **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
@@ -1564,7 +1604,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select whose options open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, a select and a date picker that open in a popup layer on the canvas, and `derive` lines for values worked out from state. Next: scrolling and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.

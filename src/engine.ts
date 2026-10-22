@@ -18,6 +18,7 @@ import { isList, makeList } from "./data";
 import { getIn, placeOf, setIn } from "./paths";
 import { createLayoutContext, isVisible } from "./layout";
 import { placePopup, POPUP_MARGIN, type PopupState, type Viewport } from "./popup";
+import { localToday, parseDate } from "./dates";
 import { parse, type ParseResult } from "./parser";
 import { Registry } from "./registry";
 import { Store } from "./state";
@@ -88,6 +89,11 @@ export interface LoomOptions {
    * Node, everything from the top down).
    */
   viewport?: () => Viewport;
+  /**
+   * Today's date as YYYY-MM-DD, for date pickers. Default: the device's local
+   * calendar day. Pass a fixed one in tests and screenshots.
+   */
+  today?: () => string;
 }
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -290,7 +296,7 @@ export class Loom {
     const t = now();
     const width = this.opts.width ?? (this.canvas.parentElement?.clientWidth || 600);
     this.width = width;
-    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, (m) => this.warnOnce(m));
+    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, (m) => this.warnOnce(m), this.today);
     this.rootBox = ctx.layout(this.parsed.root, 0, 0, width);
     let height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
     // A popup that needs more room than the screen has makes the canvas taller while it's open.
@@ -386,6 +392,7 @@ export class Loom {
       isPressed: (n, d) => same(this.pressed, n, d),
       isEditing: (n) => !!this.editing && this.editing.node.id === n.id,
       isPopupOpen: (n) => !!this.popup && this.popup.owner.node.id === n.id,
+      today: this.today,
       motion: animate,
       appear: (n) => {
         if (!animate || n.id === "root") return 1;
@@ -542,10 +549,17 @@ export class Loom {
       run: (actions) => this.runActionString(actions, target.node),
       openPopup: (state) => this.openPopup(target, state),
       popupOpen: !!this.popup && this.popup.owner.node.id === target.node.id,
+      today: this.today,
     };
   }
 
   // ---------------------------------------------------------------- popups
+
+  /** Today's date as YYYY-MM-DD: the today option, or the device's local day. */
+  readonly today = (): string => {
+    const t = this.opts.today?.();
+    return t && parseDate(t) ? t : localToday();
+  };
 
   /** The open popup, for tools and tests: its owner, where it is, its regions and transient state. */
   get openPopupInfo(): { owner: LoomNode; area: Rect | null; regions: readonly HitRegion[]; state: Readonly<PopupState> } | null {

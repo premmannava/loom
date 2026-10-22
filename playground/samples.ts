@@ -334,4 +334,22 @@ card
   button "Place order" on="emit:order:{shown}" disabled={total == 0}
 `,
   },
+  request: {
+    label: "Request",
+    prompt: "An equipment request form with an item, a quantity, a delivery date and a summary of the request.",
+    spec: `state item="" qty=1 needBy="" note="" items=[{id: "laptop", name: "Laptop"}, {id: "monitor", name: "27-inch monitor"}, {id: "headset", name: "Headset"}, {id: "chair", name: "Desk chair", backordered: true}]
+card
+  text "Request equipment" style=title
+  select "Item" items=items value=id label=name unavailable=backordered bind=item placeholder="Choose equipment"
+  stepper "Quantity" bind=qty min=1 max=10
+  date-picker "Delivery date" bind=needBy min="2026-11-02" max="2027-12-31" placeholder="Choose a delivery date"
+  input "Note" bind=note placeholder="What is it for?"
+  card if={item != ''}
+    text "Summary" weight=semibold
+    text "{plural(qty, find(items, 'id', item).name)}"
+    text "{needBy == '' ? 'Pick a delivery date' : 'Delivered by ' + needBy}" tone={needBy == '' ? 'warn' : 'muted'}
+    text "{note}" tone=muted if={trim(note) != ''}
+  button "Send request" on="emit:request:{item}" disabled={item == '' || needBy == ''}
+`,
+  },
 };
