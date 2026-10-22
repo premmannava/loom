@@ -23,6 +23,28 @@ In chat apps that stream tool input, the interface builds line by line while the
 
 Interfaces match the chat app they're in. The view follows its light or dark mode, and when the app shares its design tokens (MCP Apps hosts pass them as CSS variables) it takes the app's background, text, border and status colors, its fonts and its corner radii. The accent stays SayShape's teal, because hosts don't send one.
 
+## Show data from a database
+
+Start the server with `--data` and a SQLite file, and the model can answer questions about it with interfaces:
+
+```bash
+node dist/server.js --data /path/to/database.db     # opened read-only
+```
+
+Three more tools appear:
+
+| | |
+|---|---|
+| `describe_data` | The tables and views, their columns, row counts and how they join. |
+| `query_data` | Runs one read-only `SELECT` and keeps the result (at most 500 rows) as a dataset. The model gets its id, columns and three sample rows, never the full result. |
+| `fetch_dataset` | Only the interface can call this one (MCP Apps `visibility: ["app"]`): it loads a dataset's rows. |
+
+The model then calls `show_interface` with `data={"sales": "d1"}` and writes `items=sales` in the spec. The interface fetches the rows itself and fills them in, so **the numbers on screen come straight from the database and never pass through the model**. That keeps them exact, and the model's token use stays the same however many rows there are.
+
+Safety: the file is opened read-only, so SQLite refuses any write. Only a single `SELECT` (or `WITH … SELECT`) is accepted, with no `ATTACH` or `PRAGMA`, and results are capped. Reading a database needs Node.js 22.13 or later, which has SQLite built in, so there's nothing else to install.
+
+To try it, the [Chinook sample database](https://github.com/lerocha/chinook-database) (a small music store, MIT licence) works well: ask *"Show revenue by country as a chart and a table"* or *"Top 10 artists by tracks sold"*.
+
 ## Install
 
 You need Node.js 20 or later.
@@ -78,6 +100,6 @@ npm run build
 npm run test:e2e   # the built view in Chromium, inside a sandboxed iframe driven by the MCP Apps host bridge
 ```
 
-`test:e2e` streams a spec into the view, checks the canvas was painted and the height reported, presses an `emit:` button with the keyboard, checks the message that comes back and switches to dark mode. Its screenshots go to `e2e-output/`.
+`test:e2e` runs two browser checks. The first streams a spec into the view, checks the canvas was painted and the height reported, presses an `emit:` button with the keyboard, checks the message that comes back and switches to dark mode. The second (`scripts/e2e-data.mjs [database.db]`) starts the built server with `--data`, plays the model (describe, query, show), lets the view fetch the dataset through the host bridge, and checks the rows in the interface match the database exactly. Screenshots go to `e2e-output/`.
 
 The server bundles the engine from `../src`, so the guide, the parser and the view always match the library they were built with. The MCP packages (`@modelcontextprotocol/sdk`, `@modelcontextprotocol/ext-apps`, `zod`) are dependencies of this package only. The SayShape library itself still has none.
