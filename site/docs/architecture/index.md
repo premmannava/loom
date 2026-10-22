@@ -46,11 +46,11 @@ Browser developer tools can't see inside a canvas, so SayShape has its own. All 
 
 | Tool | How | What it shows |
 |---|---|---|
-| Layout boxes | `loom.inspector.setBoxes(true)` | Every box, with its type and size |
-| Hit regions | `loom.inspector.setHits(true)` | Exactly what is clickable |
-| Inspect mode | `loom.inspector.setInspecting(true)` | Hover to highlight, click to select; `selectLine(n)` selects the element on a spec line |
-| Describe | `loom.inspector.describe(node)` | A node's type, line, props and box |
-| Frame capture | `await loom.inspector.captureFrame()` | Every canvas call made in one frame |
-| Console | `loom.expose()` | Puts the instance on `window.loom` |
+| Layout boxes | `ui.inspector.setBoxes(true)` | Every box, with its type and size |
+| Hit regions | `ui.inspector.setHits(true)` | Exactly what is clickable |
+| Inspect mode | `ui.inspector.setInspecting(true)` | Hover to highlight, click to select; `selectLine(n)` selects the element on a spec line |
+| Describe | `ui.inspector.describe(node)` | A node's type, line, props and box |
+| Frame capture | `await ui.inspector.captureFrame()` | Every canvas call made in one frame |
+| Console | `ui.expose()` | Puts the instance on `window.loom` |
 
-To find a bug, decide which stage it's in: an element missing or wrong is the parse (check `loom.diagnostics`); a wrong position or size is layout (turn on boxes); a right box that looks wrong is paint (capture a frame); a click that does nothing is input (turn on hit regions).
+To find a bug, decide which stage it's in: an element missing or wrong is the parse (check `ui.diagnostics`); a wrong position or size is layout (turn on boxes); a right box that looks wrong is paint (capture a frame); a click that does nothing is input (turn on hit regions).

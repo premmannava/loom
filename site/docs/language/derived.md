@@ -22,11 +22,11 @@ card
 ## Rules
 
 - **Grammar.** `derive name={expression}`, unindented, at the top level. Several pairs can share a line, as with `state`. The expression is the same [safe kind](./expressions) as everywhere else: no functions of your own, callbacks or side effects.
-- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. It can read state, data your app sets with `loom.state.set`, and other derived values.
+- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. It can read state, data your app sets with `ui.state.set`, and other derived values.
 - **Order.** Declarations can come in any order. While a spec streams in, a value whose inputs haven't arrived yet shows as `—` until they do.
 - **Updates.** A value is worked out the first time it's read, then kept until something it reads changes, directly or through other derived values.
 - **Failures.** If a value can't be worked out (it reads an item that's gone, say), it's `—`, never the last good result, and so is everything derived from it. The reason is reported once through the engine's `onWarning`.
-- **Read-only.** `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change a derived value or items of a derived list. The parser reports it, the engine refuses with a warning, and `loom.state.set` throws a `DerivedWriteError`.
+- **Read-only.** `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change a derived value or items of a derived list. The parser reports it, the engine refuses with a warning, and `ui.state.set` throws a `DerivedWriteError`.
 - **Limit.** A spec can derive at most 200 values.
 
 ## Filtering with derive
@@ -60,4 +60,4 @@ derive q={p * 2}
 text "p is {p}"
 ```
 
-`loom.state.snapshot()` holds state only; `loom.state.derivedSnapshot()` holds the derived values.
+`ui.state.snapshot()` holds state only; `ui.state.derivedSnapshot()` holds the derived values.

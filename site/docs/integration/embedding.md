@@ -12,11 +12,11 @@ import { SayShape, coreComponents } from "loom-ui";
 import { mapComponents } from "loom-ui/map";
 
 const canvas = document.querySelector("canvas")!;
-const loom = new SayShape(canvas, {
+const ui = new SayShape(canvas, {
   components: [...coreComponents, ...mapComponents],
 });
 
-loom.setSpec(`state count=0
+ui.setSpec(`state count=0
 card
   text "Clicked {count} times"
   button "Click me" on=inc:count`);
@@ -56,7 +56,7 @@ The canvas fills its parent's width, follows it when the parent resizes, and gro
 | `notify(text)` | Show a short message, as `notify:` does |
 | `imagesLoaded()` | Resolves once every requested image has loaded or failed |
 | `setTheme(theme)` | Switch themes |
-| `find(type)` | All nodes of a type, e.g. `loom.find("button")` |
+| `find(type)` | All nodes of a type, e.g. `ui.find("button")` |
 | `diagnostics`, `spec`, `tree` | The current problems, source text and parsed tree |
 | `inspector` | Debugging overlays and frame capture ([Architecture](../architecture/#debugging)) |
 | `destroy()` | Remove listeners and stop rendering |
@@ -78,12 +78,12 @@ The canvas fills its parent's width, follows it when the parent resizes, and gro
 Create the instance once the canvas is in the document, and destroy it when the canvas goes away. In Vue, for example (this site does exactly this):
 
 ```ts
-let loom: SayShape | null = null;
+let ui: SayShape | null = null;
 onMounted(() => {
-  loom = new SayShape(canvasRef.value!, { components: coreComponents });
-  loom.setSpec(spec);
+  ui = new SayShape(canvasRef.value!, { components: coreComponents });
+  ui.setSpec(spec);
 });
-onBeforeUnmount(() => loom?.destroy());
+onBeforeUnmount(() => ui?.destroy());
 ```
 
 With server-side rendering or static generation, import and construct SayShape only in the browser: it needs a canvas, `window` and fonts.

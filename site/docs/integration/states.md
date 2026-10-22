@@ -30,14 +30,14 @@ card
 The buttons at the bottom stand in for your app. In a real page:
 
 ```ts
-loom.state.set("status", "loading");
+ui.state.set("status", "loading");
 try {
-  loom.state.set("orders", await fetchOrders());
-  loom.state.set("status", "ready");
+  ui.state.set("orders", await fetchOrders());
+  ui.state.set("status", "ready");
 } catch {
-  loom.state.set("status", "failed");
+  ui.state.set("status", "failed");
 }
-loom.on("action", ({ name }) => { if (name === "retry") load(); });
+ui.on("action", ({ name }) => { if (name === "retry") load(); });
 ```
 
 ## Submitting
@@ -50,13 +50,13 @@ text "Saved" tone=good if={saved}
 ```
 
 ```ts
-loom.on("action", async ({ name }) => {
+ui.on("action", async ({ name }) => {
   if (name !== "save") return;
-  loom.state.set("saving", true);
+  ui.state.set("saving", true);
   await save();
-  loom.state.set("saving", false);
-  loom.state.set("saved", true);
+  ui.state.set("saving", false);
+  ui.state.set("saved", true);
 });
 ```
 
-`notify:` messages, or `loom.notify("Saved")` from your app, are a lighter way to confirm something happened.
+`notify:` messages, or `ui.notify("Saved")` from your app, are a lighter way to confirm something happened.

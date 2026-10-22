@@ -27,7 +27,7 @@ card
 - **Data only.** Lists and records are parsed as data, never run. They can nest at most 20 levels and hold at most 10,000 values.
 - **Read anywhere.** A state name can be read in text, props, conditions and expressions anywhere in the spec, on any screen.
 - **Changed by the interface.** Controls write state through [`bind=`](./bindings), and buttons through [actions](./actions).
-- **Changed by your app.** `loom.state.set("products", rows)` and `loom.state.get("qty")` ([Host data and events](../integration/host-data)).
+- **Changed by your app.** `ui.state.set("products", rows)` and `ui.state.get("qty")` ([Host data and events](../integration/host-data)).
 
 ## When the spec changes
 
@@ -37,8 +37,8 @@ A `state` line sets a **starting** value. What happens to it later depends on wh
 |---|---|
 | The spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere) | A value the person already changed is kept |
 | A new spec declares a different starting value (a refined screen with new data, say) | The new value replaces the old one |
-| Your app set the value with `loom.state.set` | A declaration never replaces it |
-| `loom.setSpec(text, { resetState: true })` | Everything starts over |
+| Your app set the value with `ui.state.set` | A declaration never replaces it |
+| `ui.setSpec(text, { resetState: true })` | Everything starts over |
 
 This is what the playground's **Reset state** button does: it keeps the spec and starts its state over.
 

@@ -8,8 +8,8 @@ description: Clone the SayShape repository, install it, run the tests and open t
 SayShape isn't published to npm yet, so you work from the repository. You need **Node.js 18 or newer** and npm.
 
 ```bash
-git clone https://github.com/premmannava/loom.git
-cd loom
+git clone https://github.com/premmannava/sayshape.git
+cd sayshape
 npm ci            # installs exactly what package-lock.json lists
 npm run dev       # opens the development playground
 ```
@@ -47,11 +47,11 @@ npm run docs:check  # the README's component reference is up to date
 Build the library, then install the repository folder into your app as a local dependency. npm records it as a `file:` dependency, and the package's own `exports` give you `loom-ui`, `loom-ui/map`, `loom-ui/testing` and `loom-ui/model`.
 
 ```bash
-# in the loom folder
+# in the sayshape folder
 npm run build
 
 # in your app's folder
-npm install ../loom
+npm install ../sayshape
 ```
 
 Rebuild SayShape after pulling changes. The package is still named `loom-ui`, SayShape's earlier working name; it will be renamed before it's published. When SayShape is published, this becomes an ordinary `npm install`.

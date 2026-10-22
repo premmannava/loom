@@ -3,7 +3,7 @@ import { withBase } from "vitepress";
 import Workbench from "./Workbench.vue";
 import { highlightSpec } from "../loom/highlight";
 
-const REPO = "https://github.com/premmannava/loom";
+const REPO = "https://github.com/premmannava/sayshape";
 
 const concepts = [
   {

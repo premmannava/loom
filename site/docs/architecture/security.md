@@ -21,7 +21,7 @@ The engine never uses `eval`, `new Function`, `with` or dynamic `import` for spe
 
 ## Data stays data
 
-State values are plain SayShape data: numbers, text, true/false, null, and lists and records that are frozen and have no prototype. Data your app passes in with `loom.state.set` is copied into that form; functions, class instances and cycles are refused. Literals in a spec are parsed as data, never run, and are limited in depth (20 levels) and size (10,000 values).
+State values are plain SayShape data: numbers, text, true/false, null, and lists and records that are frozen and have no prototype. Data your app passes in with `ui.state.set` is copied into that form; functions, class instances and cycles are refused. Literals in a spec are parsed as data, never run, and are limited in depth (20 levels) and size (10,000 values).
 
 ## Components are code you review
 
