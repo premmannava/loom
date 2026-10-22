@@ -28,6 +28,7 @@ card
 
 - [Why SayShape](#why-sayshape)
 - [Quick start](#quick-start)
+- [In Claude, ChatGPT and other chat apps](#in-claude-chatgpt-and-other-chat-apps)
 - [The SayShape language](#the-sayshape-language)
 - [Components](#components)
 - [Using the engine](#using-the-engine)
@@ -95,6 +96,18 @@ npm run dev        # opens the playground
 | `npm run site:dev` / `site:build` / `site:check` | The website in `site/` (VitePress): develop, build, and check the build ([publishing it](https://premmannava.github.io/sayshape/docs/contributing/website.html)) |
 
 The playground streams sample specs as a model would. Once a sample finishes you can edit the spec, toggle the debugging overlays, and watch state and emitted actions in the panels. **Appearance**, at the top, previews the screen in other styles ([Theming](#theming)).
+
+---
+
+## In Claude, ChatGPT and other chat apps
+
+[`mcp/`](mcp/) is an [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) server. It lets the model in a chat app that supports MCP Apps (such as Claude, ChatGPT, VS Code or Goose) show SayShape interfaces inside the conversation. The model reads the generated guide once, then calls `show_interface` with a spec. The server checks the spec with the real parser, and the chat app shows a view in which SayShape's engine draws it. Pressing an `emit:` button sends a message back into the conversation.
+
+```bash
+cd mcp && npm ci && npm run build   # then point your chat app at mcp/dist/server.js
+```
+
+Configuration for each chat app is in [`mcp/README.md`](mcp/README.md).
 
 ---
 

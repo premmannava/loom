@@ -1,0 +1,40 @@
+/**
+ * A minimal MCP Apps host for the end-to-end check (scripts/e2e.mjs): it puts
+ * the built view in a sandboxed iframe, the way Claude or ChatGPT does, and
+ * exposes the bridge so the script can stream tool input and read messages.
+ */
+import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+
+declare global {
+  interface Window {
+    host: {
+      ready: Promise<void>;
+      bridge: AppBridge;
+      messages: string[];
+      sizes: number[];
+    };
+  }
+}
+
+export function mount(html: string, theme: "light" | "dark"): void {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("sandbox", "allow-scripts");
+  iframe.style.cssText = "width:600px;height:200px;border:1px solid #ccc;border-radius:12px";
+  document.body.append(iframe);
+  const bridge = new AppBridge(null, { name: "TestHost", version: "1.0.0" }, { openLinks: {}, logging: {}, message: { text: {} }, updateModelContext: { text: {} } }, {
+    hostContext: { theme, platform: "web", displayMode: "inline" },
+  });
+  const messages: string[] = [];
+  const sizes: number[] = [];
+  bridge.onmessage = async ({ content }) => {
+    for (const c of content) if (c.type === "text") messages.push(c.text);
+    return {};
+  };
+  bridge.addEventListener("sizechange", ({ height }) => {
+    if (typeof height === "number") { iframe.style.height = `${height}px`; sizes.push(height); }
+  });
+  const ready = new Promise<void>((done) => { bridge.oninitialized = () => done(); });
+  iframe.srcdoc = html;
+  void bridge.connect(new PostMessageTransport(iframe.contentWindow!, iframe.contentWindow!));
+  window.host = { ready, bridge, messages, sizes };
+}

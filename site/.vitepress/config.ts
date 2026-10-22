@@ -59,6 +59,7 @@ const docsSidebar: DefaultTheme.SidebarItem[] = [
       { text: "Themes", link: "/docs/integration/themes" },
       { text: "Images", link: "/docs/integration/images" },
       { text: "Connecting a model", link: "/docs/integration/model" },
+      { text: "In Claude, ChatGPT and other chat apps", link: "/docs/integration/mcp" },
       { text: "The model guide", link: "/docs/integration/model-guide" },
       { text: "Streaming, validation and repair", link: "/docs/integration/streaming" },
     ],
