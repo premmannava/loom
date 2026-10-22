@@ -1,0 +1,23 @@
+# The SayShape model proxy (a Cloudflare Worker). See README.md in this folder.
+name = "sayshape-model"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+ALLOWED_ORIGINS = "https://premmannava.github.io"
+GENERATION_ENABLED = "true"
+
+# Per-visitor limit, by IP: 4 requests a minute. (OpenRouter's free models also
+# allow 20 a minute and 50 a day per account, or 1,000 a day after buying credits.)
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 4
+  period = 60
+
+# Secrets, set with wrangler and never written here:
+#   npx wrangler secret put OPENROUTER_API_KEY
+#   npx wrangler secret put TURNSTILE_SECRET     (optional, recommended)

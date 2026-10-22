@@ -16,6 +16,7 @@ import { themeCode } from "../../../../playground/appearance/export";
 import { highlightSpec } from "../loom/highlight";
 import { useLoom } from "../loom/useLoom";
 import { fromBase64, isSiteDark, prefersReducedMotion, replayStream, toBase64Url } from "../loom/runtime";
+import { generate, generationAvailable, humanCheck, MAX_REQUEST_CHARS, MODEL_LABEL, needsHumanCheck, type GenerateEvent } from "../loom/generate";
 import { onHostEvents, type HostEvent } from "../loom/events";
 
 // ------------------------------------------------------------ what can be loaded
@@ -60,7 +61,8 @@ let signal = { cancelled: false };
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const edited = computed(() => text.value !== original.value);
-const currentTitle = computed(() => sources.find((s) => s.key === sourceKey.value)?.title ?? "Spec from a link");
+const generatedFor = ref("");
+const currentTitle = computed(() => sources.find((s) => s.key === sourceKey.value)?.title ?? (generatedFor.value ? `Generated: ${generatedFor.value}` : "Spec from a link"));
 const lineCount = computed(() => Math.max(1, text.value.split("\n").length));
 const highlighted = computed(() => highlightSpec(text.value));
 const byLine = computed(() => {
@@ -141,6 +143,7 @@ function renderState() {
 
 function load(key: string, spec = sourceOf(key)) {
   cancelStream();
+  generatedFor.value = "";
   sourceKey.value = key;
   text.value = spec;
   original.value = spec;
@@ -327,6 +330,89 @@ onBeforeUnmount(() => {
   clearTimeout(noticeTimer);
 });
 
+// ------------------------------------------------------------ generation through the hosted proxy (when configured)
+
+const askText = ref("");
+const asking = ref(false);
+const askStatus = ref("");
+const askError = ref(false);
+const checkEl = ref<HTMLElement | null>(null);
+let check: ReturnType<typeof humanCheck> | null = null;
+let askController: AbortController | null = null;
+const phaseText: Record<string, string> = {
+  waiting: "Waiting for the model…",
+  thinking: "The model is thinking before it writes…",
+  writing: "Writing the interface…",
+  repairing: "Fixing lines the parser skipped…",
+};
+
+function startCheck() {
+  if (!needsHumanCheck || !checkEl.value) return;
+  check ??= humanCheck(checkEl.value);
+  check.start().catch((e) => { askStatus.value = e instanceof Error ? e.message : String(e); askError.value = true; });
+}
+
+async function ask() {
+  const request = askText.value.trim();
+  const l = loom.value;
+  if (!request || !l || asking.value) return;
+  if (edited.value && !confirm("Replace the current spec with a generated one? Your edits will be lost.")) return;
+  askError.value = false;
+  asking.value = true;
+  askStatus.value = phaseText.waiting!;
+  cancelStream();
+  const previous = text.value;
+  askController = new AbortController();
+  let shown = "";
+  let finished = false;
+  const begin = () => { shown = ""; l.beginStream(); text.value = ""; };
+  try {
+    const token = check ? await check.take() : undefined;
+    begin();
+    streaming.value = true;
+    await generate(request, {
+      token,
+      signal: askController.signal,
+      onEvent: (e: GenerateEvent) => {
+        if (e.t === "phase" && phaseText[e.v]) askStatus.value = phaseText[e.v]!;
+        else if (e.t === "text") { l.push(e.v); shown += e.v; text.value = shown; }
+        else if (e.t === "reset") begin();
+        else if (e.t === "done") {
+          finished = true;
+          l.endStream();
+          if (l.spec !== e.spec) l.setSpec(e.spec);
+          text.value = e.spec;
+          original.value = e.spec;
+          sourceKey.value = "";
+          const url = new URL(location.href);
+          url.search = "";
+          url.hash = "";
+          history.replaceState(history.state, "", url);
+          generatedFor.value = request.length > 48 ? request.slice(0, 47) + "…" : request;
+          const secs = (e.ms / 1000).toFixed(1);
+          askStatus.value = `Done in ${secs} s. ${e.problems ? `${e.problems} problem${e.problems === 1 ? "" : "s"} left, listed under Problems.` : "No problems."}${e.repaired ? " One repair was needed." : ""}`;
+        } else if (e.t === "error") { askStatus.value = e.message; askError.value = true; }
+      },
+    });
+  } catch (e) {
+    if (askController.signal.aborted) askStatus.value = "Stopped.";
+    else { askStatus.value = "Couldn't reach the model service. Check your connection and try again."; askError.value = true; }
+  } finally {
+    streaming.value = false;
+    if (!finished) {
+      // Nothing usable came back: keep what was there before.
+      l.endStream();
+      if (!shown.trim()) { text.value = previous; l.setSpec(previous); }
+    }
+    asking.value = false;
+    askController = null;
+  }
+}
+
+function stopAsking() { askController?.abort(); }
+
+onBeforeUnmount(() => { askController?.abort(); check?.destroy(); });
+
 const docsModel = withBase("/docs/integration/model.html");
 const docsGuide = withBase("/docs/integration/model-guide.html");
 </script>
@@ -336,7 +422,11 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
     <header class="pg-head">
       <div>
         <h1>Playground</h1>
-        <p class="pg-note">
+        <p v-if="generationAvailable" class="pg-note">
+          This playground runs saved or edited SayShape specs in your browser. You can also describe an interface and have
+          {{ MODEL_LABEL }} write the spec: the model only writes text, and SayShape renders and runs it here.
+        </p>
+        <p v-else class="pg-note">
           This playground runs saved or edited SayShape specs in your browser. AI generation requires a model connection, which this
           static site doesn't have: <a :href="docsModel">run generation locally</a>, or copy the
           <a :href="docsGuide">model guide</a> below into a chat assistant and paste its answer here.
@@ -350,11 +440,34 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
       </dl>
     </header>
 
+    <form v-if="generationAvailable" class="pg-ask" @submit.prevent="ask">
+      <label class="pg-ask-field">
+        <span>Describe an interface</span>
+        <input
+          v-model="askText"
+          type="text"
+          :maxlength="MAX_REQUEST_CHARS"
+          autocomplete="off"
+          placeholder="e.g. A packing list for a weekend hike with a progress bar"
+          :disabled="asking"
+          @focus="startCheck"
+        />
+      </label>
+      <button v-if="!asking" class="loom-btn primary" type="submit" :disabled="!askText.trim() || !loom">Generate</button>
+      <button v-else class="loom-btn quiet" type="button" @click="stopAsking">Stop</button>
+      <div ref="checkEl" class="pg-check"></div>
+      <p class="pg-ask-status" :class="{ bad: askError }" role="status" aria-live="polite">{{ askStatus }}</p>
+      <p class="pg-ask-note">
+        Your request is sent to {{ MODEL_LABEL }} through OpenRouter, so don't include anything private. It's a free model with a small
+        daily limit shared by every visitor, and results vary. Generated specs are checked by SayShape's parser before they're used.
+      </p>
+    </form>
+
     <div class="pg-toolbar" role="toolbar" aria-label="Playground controls">
       <label class="pg-field wide">
         <span>Spec</span>
         <select :value="sourceKey" @change="onPick">
-          <option v-if="!sourceKey" value="">From a link</option>
+          <option v-if="!sourceKey" value="">{{ generatedFor ? "Generated spec" : "From a link" }}</option>
           <optgroup label="Examples">
             <option v-for="s in sources.filter((x) => x.group === 'Examples')" :key="s.key" :value="s.key">{{ s.title }}</option>
           </optgroup>
@@ -521,6 +634,15 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
 .pg-metrics dt { font-size: 11.5px; color: var(--vp-c-text-2); font-weight: 600 }
 .pg-metrics dd { margin: 0; font: 500 13px var(--vp-font-family-mono); font-variant-numeric: tabular-nums; white-space: nowrap }
 
+.pg-ask { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; align-items: end; padding: 14px 16px 12px; margin-bottom: 14px; border: 1px solid var(--vp-c-divider); border-radius: 12px; background: var(--loom-panel) }
+.pg-ask-field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--vp-c-text-1) }
+.pg-ask-field input { height: 40px; padding: 0 12px; border: 1px solid var(--vp-c-border); border-radius: 8px; background: var(--vp-c-bg); color: var(--vp-c-text-1); font: 15px var(--vp-font-family-base) }
+.pg-ask-field input:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 1px }
+.pg-check:empty { display: none }
+.pg-check, .pg-ask-status, .pg-ask-note { grid-column: 1 / -1; margin: 0 }
+.pg-ask-status { font-size: 13.5px; font-weight: 600; color: var(--vp-c-brand-1); min-height: 1.2em }
+.pg-ask-status.bad { color: var(--loom-bad) }
+.pg-ask-note { font-size: 12.5px; color: var(--vp-c-text-2); line-height: 1.5 }
 .pg-toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; padding: 12px 0; border-top: 1px solid var(--vp-c-divider) }
 .pg-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: end }
 .pg-right { margin-left: auto }

@@ -14,3 +14,4 @@ site/.vitepress/dist/
 site/.vitepress/cache/
 site/.generated/
 site/docs/components/*.md
+.dev.vars
