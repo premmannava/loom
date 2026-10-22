@@ -1,0 +1,76 @@
+{
+  "name": "loom",
+  "displayName": "Loom",
+  "scopeName": "source.loom",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#declaration" },
+    { "include": "#element" },
+    { "include": "#line-rest" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "^\\s*#.*$",
+      "name": "comment.line.number-sign.loom"
+    },
+    "declaration": {
+      "match": "^(state|derive)\\b",
+      "name": "keyword.control.declaration.loom"
+    },
+    "element": {
+      "match": "^(\\s*)(each|if)(?=[\\s=]|$)|^(\\s*)([a-z][a-z0-9-]*)\\b",
+      "captures": {
+        "2": { "name": "keyword.control.flow.loom" },
+        "4": { "name": "entity.name.tag.loom" }
+      }
+    },
+    "line-rest": {
+      "patterns": [
+        { "include": "#prop" },
+        { "include": "#string" },
+        { "include": "#expression" },
+        { "include": "#constant" }
+      ]
+    },
+    "prop": {
+      "match": "\\b([A-Za-z_][\\w-]*)(=)",
+      "captures": {
+        "1": { "name": "entity.other.attribute-name.loom" },
+        "2": { "name": "punctuation.separator.key-value.loom" }
+      }
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.loom",
+      "patterns": [
+        { "match": "\\\\.", "name": "constant.character.escape.loom" },
+        { "include": "#expression" }
+      ]
+    },
+    "expression": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.loom" } },
+      "endCaptures": { "0": { "name": "punctuation.section.embedded.end.loom" } },
+      "name": "meta.embedded.expression.loom",
+      "patterns": [
+        { "match": "'(?:[^'\\\\]|\\\\.)*'", "name": "string.quoted.single.loom" },
+        { "match": "\"(?:[^\"\\\\]|\\\\.)*\"", "name": "string.quoted.double.loom" },
+        { "match": "\\b([a-z][A-Za-z0-9_]*)(?=\\()", "name": "support.function.loom" },
+        { "match": "\\b(true|false|null)\\b", "name": "constant.language.loom" },
+        { "match": "\\b\\d+(?:\\.\\d+)?\\b", "name": "constant.numeric.loom" },
+        { "match": "==|!=|<=|>=|&&|\\|\\||[-+*/%<>!?:]", "name": "keyword.operator.loom" },
+        { "include": "#expression" },
+        { "match": "\\[|\\]", "name": "punctuation.section.brackets.loom" }
+      ]
+    },
+    "constant": {
+      "patterns": [
+        { "match": "\\b(true|false|null)\\b", "name": "constant.language.loom" },
+        { "match": "(?<![\\w.-])-?\\d+(?:\\.\\d+)?\\b", "name": "constant.numeric.loom" },
+        { "match": "'(?:[^'\\\\]|\\\\.)*'", "name": "string.quoted.single.loom" }
+      ]
+    }
+  }
+}

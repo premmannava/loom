@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Loom</title>
+  <rect x="9" y="3" width="4" height="26" rx="2" fill="#E6EAF0"/>
+  <rect x="19" y="3" width="4" height="26" rx="2" fill="#E6EAF0"/>
+  <rect x="3" y="9" width="26" height="4" rx="2" fill="#3CC2B8"/>
+  <rect x="3" y="19" width="26" height="4" rx="2" fill="#3CC2B8"/>
+  <path d="M8.25 9v4M13.75 9v4M18.25 19v4M23.75 19v4" stroke="#1B2026" stroke-width="1.5"/>
+  <rect x="9" y="9" width="4" height="4" fill="#E6EAF0"/>
+  <rect x="19" y="19" width="4" height="4" fill="#E6EAF0"/>
+  <path d="M19 8.25h4M19 13.75h4M9 18.25h4M9 23.75h4" stroke="#1B2026" stroke-width="1.5"/>
+</svg>
