@@ -265,6 +265,22 @@ card
     button "Drop oldest" variant=secondary on=remove:months:0 disabled={len(months) < 2}
 `,
   },
+  salesCharts: {
+    label: "Sales charts",
+    prompt: "This year's revenue against last year's and the target by month, and how this quarter's sales split by region.",
+    spec: `state sales=[{month: "Jul", revenue: 42000, last_year: 38000, target: 40000}, {month: "Aug", revenue: 45500, last_year: 41000, target: 43000}, {month: "Sep", revenue: 39800, last_year: 43500, target: 44000}, {month: "Oct", revenue: 51200, last_year: 44800, target: 46000}, {month: "Nov", revenue: 56900, last_year: 49200, target: 50000}, {month: "Dec", revenue: 63400, last_year: 57100, target: 58000}] regions=[{name: "West", total: 98200}, {name: "Northeast", total: 71500}, {name: "South", total: 64300}, {name: "Midwest", total: 38900}, {name: "Online", total: 26400}]
+card
+  text "Revenue" style=title
+  chart "This year, last year and target" kind=line items=sales x=month y=revenue,last_year,target labels="This year,Last year,Target" format=money
+  chart "By month" kind=bar items=sales x=month y=revenue,last_year labels="This year,Last year" format=money
+card
+  text "Sales by region" style=title
+  chart "This quarter" kind=donut items=regions x=name y=total format=money
+  row
+    button "Add Canada" on="add:regions:{name: 'Canada', total: 18700}" disabled={len(regions) > 6}
+    button "Drop the last" variant=secondary on=remove:regions:{len(regions) - 1} disabled={len(regions) < 2}
+`,
+  },
   inventory: {
     label: "Inventory",
     prompt: "An equipment inventory table I can sort by any column, where picking a row shows that item's details.",

@@ -402,7 +402,7 @@ ${comps.map((c) => componentBlock(c, examples && ctx.valid(componentExampleSpec(
 // ---------------------------------------------------------------- compact mode
 
 const COMPACT_TYPES: Record<PropDef["type"], string> = {
-  number: "number", string: "text", boolean: "true|false", enum: "", condition: "cond", expression: "expr", action: "action", state: "path", name: "name",
+  number: "number", string: "text", boolean: "true|false", enum: "", condition: "cond", expression: "expr", action: "action", state: "path", name: "name", names: "name,name",
 };
 
 /** One line for an element: its signature, where it may go, and what it's for. */

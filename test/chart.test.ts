@@ -27,7 +27,7 @@ describe("chart props", () => {
 
   it("explains bad or missing props", () => {
     const msgs = (spec: string) => parse(`${sales}\n${spec}\n`, registry).diagnostics.map((d) => d.message);
-    expect(msgs(`chart kind=pie items=sales x=month y=revenue`)).toEqual([`kind should be one of bar, line; got "pie"`]);
+    expect(msgs(`chart kind=area items=sales x=month y=revenue`)).toEqual([`kind should be one of bar, line, pie, donut; got "area"`]);
     expect(msgs(`chart items=sales x=month y=revenue format=euro`)).toEqual([`format should be one of number, money; got "euro"`]);
     expect(msgs(`chart items=sales x="the month" y=revenue`)[0]).toMatch(/x should be a plain name/);
     expect(msgs(`chart items=sales x=month`)).toEqual([`"chart" needs y=`]);
@@ -39,9 +39,10 @@ describe("chart props", () => {
   it("is documented in the model guide, generated from its definition", async () => {
     const { languageGuide } = await import("../src/prompt");
     const g = languageGuide(registry);
-    expect(g).toContain(`kind=<bar|line>`);
+    expect(g).toContain(`kind=<bar|line|pie|donut>`);
+    expect(g).toContain(`y=revenue,last_year`);
     expect(g).toMatch(/shown as gaps, not zero/);
-    expect(languageGuide(registry, { mode: "compact" })).toMatch(/^- chart \["text"\] kind=bar\|line items=expr! x=name! y=name! format=number\|money/m);
+    expect(languageGuide(registry, { mode: "compact" })).toMatch(/^- chart \["text"\] kind=bar\|line\|pie\|donut items=expr! x=name! y=name,name! labels=text format=number\|money/m);
   });
 });
 

@@ -28,6 +28,18 @@ chart "Signups per day" kind=bar items=days x=d y=n
 chart "Nothing yet" kind=line items=none x=d y=n
 `,
   },
+  // Multi-series and round chart cases the example and samples don't reach:
+  // grouped bars with a gap and negatives, a wrapping legend, a pie folding
+  // 9 items into Other, and the messages for too many series and a negative slice.
+  {
+    name: "chart-series-edges",
+    spec: `state q=[{q: "Q1", a: 4200, b: 3100, c: -600}, {q: "Q2", a: -1800, b: 2500, c: 1200}, {q: "Q3", a: 900, c: 2000}, {q: "Q4", a: 3300, b: 2900, c: 2600}] spend=[{k: "Rent", v: 1800}, {k: "Groceries", v: 640}, {k: "Transport", v: 310}, {k: "Utilities", v: 220}, {k: "Dining out", v: 180}, {k: "Streaming", v: 45}, {k: "Gym", v: 40}, {k: "Books", v: 25}, {k: "Gifts", v: 60}] mixed=[{k: "A", v: 3}, {k: "B", v: -1}] wide=[{k: "A", a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7}]
+chart "Profit by region and quarter" kind=bar items=q x=q y=a,b,c labels="North America,Europe and Middle East,Asia Pacific" format=money
+chart "Monthly spending" kind=pie items=spend x=k y=v format=money
+chart "Mixed signs" kind=donut items=mixed x=k y=v
+chart "Seven series" kind=line items=wide x=k y=a,b,c,d,e,f,g
+`,
+  },
   // Table cases the example and sample don't reach: missing and unusable
   // values, 0, false and negatives, long text, a read-only table, the empty
   // message, and a table too wide for a phone (it fits at desktop width).
