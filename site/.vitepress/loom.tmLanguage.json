@@ -1,6 +1,6 @@
 {
   "name": "loom",
-  "displayName": "Loom",
+  "displayName": "SayShape",
   "scopeName": "source.loom",
   "patterns": [
     { "include": "#comment" },

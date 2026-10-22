@@ -1,11 +1,11 @@
 ---
 title: Limits and status
-description: What Loom can and can't do today, its built-in limits, and what's planned.
+description: What SayShape can and can't do today, its built-in limits, and what's planned.
 ---
 
 # Limits and status
 
-Loom is an **early prototype, version 0.1**. This page separates what's built from what's planned. If something isn't listed as built, assume it isn't.
+SayShape is an **early prototype, version 0.1**. This page separates what's built from what's planned. If something isn't listed as built, assume it isn't.
 
 ## Built
 
@@ -44,7 +44,7 @@ Numbers, money and dates are formatted in US English. Weeks start on Sunday.
 
 ## Claims this site doesn't make
 
-Loom hasn't been benchmarked against other UI approaches, so nothing here says it's faster or uses fewer tokens. The engine's own timings are shown in the playground for the spec you're looking at. Model quality varies by model; measure yours with `npm run eval`.
+SayShape hasn't been benchmarked against other UI approaches, so nothing here says it's faster or uses fewer tokens. The engine's own timings are shown in the playground for the spec you're looking at. Model quality varies by model; measure yours with `npm run eval`.
 
 ## Roadmap
 

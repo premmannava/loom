@@ -1,6 +1,6 @@
 ---
 title: Lists and iteration
-description: Repeating elements with each in Loom, writing to list items, and adding and removing items.
+description: Repeating elements with each in SayShape, writing to list items, and adding and removing items.
 ---
 
 # Lists and iteration

@@ -1,6 +1,6 @@
 ---
 title: Derived values
-description: derive lines in Loom. Read-only values computed from state, cached until their inputs change.
+description: derive lines in SayShape. Read-only values computed from state, cached until their inputs change.
 ---
 
 # Derived values

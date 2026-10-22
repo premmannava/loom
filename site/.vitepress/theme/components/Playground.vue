@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The public playground: edit a Loom spec and see the real engine render it,
+ * The public playground: edit a SayShape spec and see the real engine render it,
  * entirely in the browser. It reuses the development playground's samples,
  * appearance presets, theme export and model guide (playground/), and keeps
  * its debugging tools. It has no model connection: GitHub Pages can only
@@ -8,7 +8,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { withBase } from "vitepress";
-import type { Diagnostic, LoomNode } from "@loom/index";
+import type { Diagnostic, SayShapeNode } from "@loom/index";
 import { examples, exampleById } from "../../../examples/catalog";
 import { samples } from "../../../../playground/samples";
 import { PRESETS, resolveTheme, type PresetId } from "../../../../playground/appearance/presets";
@@ -124,7 +124,7 @@ onMounted(() => {
   siteObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 });
 
-const passwordKeys = () => new Set((loom.value?.find("input") ?? []).filter((n: LoomNode) => n.props.kind === "password" && n.props.bind).map((n: LoomNode) => n.props.bind!.split(".")[0]!));
+const passwordKeys = () => new Set((loom.value?.find("input") ?? []).filter((n: SayShapeNode) => n.props.kind === "password" && n.props.bind).map((n: SayShapeNode) => n.props.bind!.split(".")[0]!));
 function renderState() {
   const l = loom.value;
   if (!l) return;
@@ -337,7 +337,7 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
       <div>
         <h1>Playground</h1>
         <p class="pg-note">
-          This playground runs saved or edited Loom specs in your browser. AI generation requires a model connection, which this
+          This playground runs saved or edited SayShape specs in your browser. AI generation requires a model connection, which this
           static site doesn't have: <a :href="docsModel">run generation locally</a>, or copy the
           <a :href="docsGuide">model guide</a> below into a chat assistant and paste its answer here.
         </p>
@@ -430,7 +430,7 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
               autocomplete="off"
               wrap="off"
               :readonly="streaming"
-              aria-label="Loom spec. Tab inserts two spaces; press Escape, then Tab, to leave the editor."
+              aria-label="SayShape spec. Tab inserts two spaces; press Escape, then Tab, to leave the editor."
               aria-describedby="pg-problems-title"
               @input="onInput"
               @scroll="onScroll"
@@ -452,7 +452,7 @@ const docsGuide = withBase("/docs/integration/model-guide.html");
           </div>
         </div>
         <div class="loom-stage pg-stage" :data-scheme="forcedScheme ?? undefined">
-          <div class="loom-canvas-wrap"><canvas ref="canvas" aria-label="Preview of the spec, drawn by Loom on a canvas. The editor holds the readable source."></canvas></div>
+          <div class="loom-canvas-wrap"><canvas ref="canvas" aria-label="Preview of the spec, drawn by SayShape on a canvas. The editor holds the readable source."></canvas></div>
         </div>
       </section>
 

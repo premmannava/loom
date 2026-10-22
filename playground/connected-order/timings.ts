@@ -41,8 +41,8 @@ export function timingLines(run: RunTiming): string[] {
   return [
     `Run ${run.id}: ${run.outcome} · ${seconds(run.elapsedMs)} total`,
     `Request: ${run.request}`,
-    `Model lookup: ${seconds(run.discoveryMs)} · Generation + validation: ${seconds(run.generationMs)} · Loom render: ${run.renderMs === undefined ? "unavailable" : run.renderMs.toFixed(1) + "ms"}`,
-    `First usable Loom line: ${seconds(run.firstLineMs)} after generation started`,
+    `Model lookup: ${seconds(run.discoveryMs)} · Generation + validation: ${seconds(run.generationMs)} · SayShape render: ${run.renderMs === undefined ? "unavailable" : run.renderMs.toFixed(1) + "ms"}`,
+    `First usable SayShape line: ${seconds(run.firstLineMs)} after generation started`,
     ...run.attempts.flatMap((a) => [
       `${a.name}: ${seconds(a.totalMs)} · First token/chunk: ${seconds(a.firstTokenMs)} · ${a.diagnostics} diagnostics`,
       `Input: ${a.inputTokens === undefined ? "~" + a.estimatedInputTokens + " tokens (estimated)" : a.inputTokens + " tokens"} · Output: ${a.outputTokens === undefined ? "unavailable" : a.outputTokens + " tokens"} · Observed output speed: ${a.observedTokensPerSecond === undefined ? "unavailable" : a.observedTokensPerSecond.toFixed(1) + " tokens/s"}`,

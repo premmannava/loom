@@ -17,7 +17,7 @@ export interface ModelConfig {
   model: string;
   /** Sent as a bearer token. Leave out for local servers that don't need one. */
   apiKey?: string;
-  /** Default 0.2: Loom is structured output, so little randomness helps. */
+  /** Default 0.2: SayShape is structured output, so little randomness helps. */
   temperature?: number;
   /** Default 4000. Reasoning models count their thinking here too. */
   maxTokens?: number;

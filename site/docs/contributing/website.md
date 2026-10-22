@@ -1,6 +1,6 @@
 ---
 title: Publishing this site
-description: How the Loom website is built with VitePress and deployed to GitHub Pages, and how to run it locally.
+description: How the SayShape website is built with VitePress and deployed to GitHub Pages, and how to run it locally.
 ---
 
 # Publishing this site
@@ -43,7 +43,7 @@ After the next push to `main` (or running the workflow by hand from the **Action
 | `site/index.md`, `site/playground.md`, `site/examples/` | The landing page, playground and gallery, as Vue components in the theme |
 | `site/examples/catalog.ts` | The gallery's specs: plain data, tested in `test/site.test.ts` |
 | `site/docs/` | The documentation; `docs/components/` is generated |
-| `site/.vitepress/theme/loom/` | Creating Loom instances in the browser, highlighting, events |
+| `site/.vitepress/theme/loom/` | Creating SayShape instances in the browser, highlighting, events |
 | `site/.vitepress/markdown.ts` | ` ```loom live ` blocks: highlighted source plus a live render |
 | `scripts/gen-site-docs.ts` | Generates the component reference and guide pages |
 | `scripts/check-site.mjs` | Checks the built site's links, assets and contents |

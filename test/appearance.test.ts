@@ -73,7 +73,7 @@ describe("effective accent", () => {
 });
 
 describe("presets", () => {
-  it("leave Loom's default theme as it is for Teal", () => {
+  it("leave SayShape's default theme as it is for Teal", () => {
     expect(resolveTheme("teal", "light", null).theme).toEqual(lightTheme);
     expect(resolveTheme("teal", "dark", null).theme).toEqual(darkTheme);
     expect(resolveTheme("teal", "light", null).changes).toEqual({});
@@ -106,7 +106,7 @@ describe("presets", () => {
     for (const r of [light, dark]) expect(auditTheme(r.theme).filter((c) => !c.pass)).toEqual([]);
   });
 
-  it("only change colors, so sizes and fonts stay Loom's", () => {
+  it("only change colors, so sizes and fonts stay SayShape's", () => {
     const t = resolveTheme("blue", "dark", "#123456").theme;
     expect({ ...t, colors: undefined }).toEqual({ ...darkTheme, colors: undefined });
   });
@@ -177,7 +177,7 @@ describe("theme code", () => {
       const out = ts.transpileModule(code, { reportDiagnostics: true, compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
       expect(out.diagnostics ?? [], code).toEqual([]);
       const imports = /import \{ ([^}]+) \} from "loom-ui";/.exec(code)![1]!.split(",").map((s) => s.trim().replace(/^type /, ""));
-      for (const name of imports) expect(["extendTheme", "lightTheme", "darkTheme", "Loom"], name).toContain(name);
+      for (const name of imports) expect(["extendTheme", "lightTheme", "darkTheme", "SayShape"], name).toContain(name);
       expect(code).not.toMatch(/playground|appearance\//);
     }
   });
@@ -193,7 +193,7 @@ describe("theme code", () => {
     expect(fixed).toContain("loom.setTheme(theme)");
   });
 
-  it("is just Loom's own theme for the defaults", () => {
+  it("is just SayShape's own theme for the defaults", () => {
     expect(themeCode({ preset: "teal", mode: "light", accent: null })).toContain("export const theme = lightTheme;");
     expect(themeCode({ preset: "teal", mode: "light", accent: null })).not.toContain("extendTheme");
   });

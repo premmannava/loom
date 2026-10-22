@@ -8,7 +8,7 @@ import { resolveProfile } from "../src/profiles";
 import { parse } from "../src/parser";
 import type { Registry } from "../src/registry";
 import { render } from "../src/testing";
-import type { LoomNode } from "../src/types";
+import type { SayShapeNode } from "../src/types";
 import type { EvalCase } from "./cases";
 
 /** Props a model invents when it tries to style things itself. */
@@ -104,9 +104,9 @@ export interface EvalOptions {
   onCase?: (r: CaseResult, index: number, total: number) => void;
 }
 
-function types(root: LoomNode): Set<string> {
+function types(root: SayShapeNode): Set<string> {
   const out = new Set<string>();
-  const walk = (n: LoomNode) => { if (n.id !== "root") out.add(n.type); n.children.forEach(walk); };
+  const walk = (n: SayShapeNode) => { if (n.id !== "root") out.add(n.type); n.children.forEach(walk); };
   walk(root);
   return out;
 }
@@ -335,7 +335,7 @@ function summaryRows(s: Summary): Array<[string, string]> {
     ["Input tokens per screen, reported (median)", s.medianInputTokens === undefined ? "unknown" : `${s.medianInputTokens}`],
     ["Input tokens per screen, estimated chars/4 (median)", `${s.medianInputTokensEstimated ?? "—"}`],
     ["Output tokens per screen (median)", `${s.medianTokens ?? "—"}${s.tokensEstimated ? " (estimated from length)" : ""}`],
-    ["Time to first Loom line (median)", secs(s.medianFirstLineMs)],
+    ["Time to first SayShape line (median)", secs(s.medianFirstLineMs)],
     ["Total time per screen (median)", secs(s.medianTotalMs)],
     ["Requests not supported by the profile (not sent)", `${s.unsupported}`],
   ];
@@ -365,7 +365,7 @@ export function compareVariants(results: CaseResult[]): string {
     `|---|${names.map(() => "---").join("|")}|`,
     ...rows,
     "",
-    "The time to the first Loom line is when the first line could be shown, not when the screen is usable.",
+    "The time to the first SayShape line is when the first line could be shown, not when the screen is usable.",
     "",
   ].join("\n");
 }
@@ -373,8 +373,8 @@ export function compareVariants(results: CaseResult[]): string {
 export function report(results: CaseResult[], meta: { model: string; url: string; date: string; guideTokens: number; repair: boolean }): string {
   const variants = [...new Set(results.map((r) => r.variant))];
   if (variants.length > 1) {
-    const parts = variants.map((v) => report(results.filter((r) => r.variant === v), meta).replace(/^# Loom evaluation: .*\n/, `## Variant: ${v}\n`));
-    return [`# Loom evaluation: ${meta.model}`, "", `${meta.date} · ${meta.url} · repair ${meta.repair ? "on" : "off"} · same model and settings for every variant`, "", compareVariants(results), ...parts].join("\n");
+    const parts = variants.map((v) => report(results.filter((r) => r.variant === v), meta).replace(/^# SayShape evaluation: .*\n/, `## Variant: ${v}\n`));
+    return [`# SayShape evaluation: ${meta.model}`, "", `${meta.date} · ${meta.url} · repair ${meta.repair ? "on" : "off"} · same model and settings for every variant`, "", compareVariants(results), ...parts].join("\n");
   }
   const s = summarize(results);
   const ran = s.cases - s.failed;
@@ -382,7 +382,7 @@ export function report(results: CaseResult[], meta: { model: string; url: string
   // Only named when it isn't the default, so existing reports read as before.
   const guideNote = first && (first.guideMode !== "full" || first.profile !== "all") ? ` · ${first.guideMode} guide, profile ${first.profile}` : "";
   const lines = [
-    `# Loom evaluation: ${meta.model}`,
+    `# SayShape evaluation: ${meta.model}`,
     "",
     `${meta.date} · ${meta.url} · guide about ${meta.guideTokens} tokens${guideNote} · repair ${meta.repair ? "on" : "off"}`,
     "",

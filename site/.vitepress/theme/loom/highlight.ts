@@ -1,5 +1,5 @@
 /**
- * A small syntax highlighter for Loom source, for places that redraw the
+ * A small syntax highlighter for SayShape source, for places that redraw the
  * source as it changes (the hero's streamed spec, the playground editor).
  * Static code blocks in the docs use the TextMate grammar in
  * .vitepress/loom.tmLanguage.json instead. It only colors text: it never

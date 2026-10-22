@@ -1,12 +1,12 @@
 ---
 title: Accessibility
-description: The current accessibility status of Loom's canvas renderer, what works today, and what is planned.
+description: The current accessibility status of SayShape's canvas renderer, what works today, and what is planned.
 ---
 
 # Accessibility
 
 ::: danger Canvas content isn't available to screen readers yet
-Loom draws interfaces on a `<canvas>`, which assistive technology can't read. A hidden accessibility layer that mirrors the canvas is planned but not built. **Don't use Loom where accessibility is required until it lands.**
+SayShape draws interfaces on a `<canvas>`, which assistive technology can't read. A hidden accessibility layer that mirrors the canvas is planned but not built. **Don't use SayShape where accessibility is required until it lands.**
 :::
 
 ## What works today

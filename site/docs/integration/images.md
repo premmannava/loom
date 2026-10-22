@@ -1,14 +1,14 @@
 ---
 title: Images
-description: Loom's image source restrictions. Same origin by default, allowed hosts, CORS, and what a blocked image shows.
+description: SayShape's image source restrictions. Same origin by default, allowed hosts, CORS, and what a blocked image shows.
 ---
 
 # Images
 
-A spec can name any image URL, and a model writes specs, so Loom is strict about where images come from. It loads images only from **your own site** (the page's origin) and from **hosts you list**. Everything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and `onWarning` says which host to allow.
+A spec can name any image URL, and a model writes specs, so SayShape is strict about where images come from. It loads images only from **your own site** (the page's origin) and from **hosts you list**. Everything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and `onWarning` says which host to allow.
 
 ```ts
-const loom = new Loom(canvas, {
+const loom = new SayShape(canvas, {
   components: coreComponents,
   imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
 });
@@ -23,7 +23,7 @@ card
   image "This one is blocked: its host isn't allowed" src="https://example.com/photo.jpg" ratio=3:2
 ```
 
-The first image is served by this site (it's the screenshot from the repository's README, `docs/images/playground.png`). The second names a host this site doesn't allow, so Loom never requests it and shows its description instead.
+The first image is served by this site (it's the screenshot from the repository's README, `docs/images/playground.png`). The second names a host this site doesn't allow, so SayShape never requests it and shows its description instead.
 
 Tell the model which hosts work with the guide's `imageHosts` option ([The model guide](./model-guide)). With none, the guide tells it to use images only with URLs it was given, because a model will otherwise invent plausible-looking URLs that don't exist.
 

@@ -1,11 +1,11 @@
 ---
 title: Loading, success and failure
-description: Patterns for showing loading, empty, success and error states in a Loom interface while your app does the work.
+description: Patterns for showing loading, empty, success and error states in a SayShape interface while your app does the work.
 ---
 
 # Loading, success and failure
 
-Loom doesn't fetch data or submit forms itself. Your app does, and tells the interface how it went by setting state. A `status` value and a few `if=` lines cover most cases.
+SayShape doesn't fetch data or submit forms itself. Your app does, and tells the interface how it went by setting state. A `status` value and a few `if=` lines cover most cases.
 
 ```loom live
 state status="loading" orders=[]

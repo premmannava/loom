@@ -145,7 +145,7 @@ describe("data in expressions and text", () => {
     expect(ev("n < 3 && 'a' < 'b'")).toEqual({ ok: true, value: true });
   });
 
-  it("still refuses objects a scope didn't get from Loom's data", () => {
+  it("still refuses objects a scope didn't get from SayShape's data", () => {
     const sneaky = (k: string) => (k === "x" ? ({ a: 1 } as unknown as Value) : undefined);
     expect(evaluate("x", sneaky).ok).toBe(false);
   });

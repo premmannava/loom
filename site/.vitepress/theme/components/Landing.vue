@@ -67,8 +67,8 @@ const href = (p: string) => withBase(p);
       <h1 class="hero-title">A UI language for&nbsp;AI. An engine that brings it to&nbsp;life.</h1>
       <div class="hero-side">
         <p class="hero-lede">
-          Turn compact, declarative specs into interactive interfaces, with components, state, calculations and actions powered by Loom.
-          A model writes a few lines of text; Loom parses them, lays them out, paints them on a canvas and runs them.
+          Turn compact, declarative specs into interactive interfaces, with components, state, calculations and actions powered by SayShape.
+          A model writes a few lines of text; SayShape parses them, lays them out, paints them on a canvas and runs them.
         </p>
         <div class="hero-cta">
           <a class="loom-btn primary" :href="href('/playground.html')">Try the playground</a>
@@ -82,27 +82,27 @@ const href = (p: string) => withBase(p);
 
     <section class="block split" aria-labelledby="two-halves">
       <div class="split-head">
-        <h2 id="two-halves">The model writes the spec. Loom runs it.</h2>
+        <h2 id="two-halves">The model writes the spec. SayShape runs it.</h2>
         <p>
-          These are separate jobs. A model only produces text in Loom's language. It never writes code, styles or components.
-          Loom's engine, running in the browser, turns that text into a working interface and keeps it working: totals recalculate,
+          These are separate jobs. A model only produces text in SayShape's language. It never writes code, styles or components.
+          SayShape's engine, running in the browser, turns that text into a working interface and keeps it working: totals recalculate,
           lists change, screens switch, all without going back to the model.
         </p>
       </div>
       <ol class="pipeline" aria-label="From request to interface">
         <li class="stage generated"><span class="stage-name">Request</span><span class="stage-text">Someone asks for an interface</span></li>
-        <li class="stage generated"><span class="stage-name">Model</span><span class="stage-text">Your model, guided by a reference generated from Loom's components</span></li>
-        <li class="stage handoff"><span class="stage-name">Loom spec</span><span class="stage-text">Plain text: elements, state, expressions, actions. No code</span></li>
+        <li class="stage generated"><span class="stage-name">Model</span><span class="stage-text">Your model, guided by a reference generated from SayShape's components</span></li>
+        <li class="stage handoff"><span class="stage-name">SayShape spec</span><span class="stage-text">Plain text: elements, state, expressions, actions. No code</span></li>
         <li class="stage engine"><span class="stage-name">Engine</span><span class="stage-text">Parses, validates, lays out and paints on a canvas</span></li>
         <li class="stage engine"><span class="stage-name">Interactive interface</span><span class="stage-text">State and actions run locally; emit: events reach your app</span></li>
       </ol>
       <div class="pipeline-legend" aria-hidden="true">
         <span class="lg generated">Written by a model</span>
-        <span class="lg engine">Rendered and run by Loom</span>
+        <span class="lg engine">Rendered and run by SayShape</span>
       </div>
       <p class="split-foot">
         Because each line stands alone, a half-finished response is still a valid, smaller screen, so the interface can appear while the model is
-        still writing. Specs can't run JavaScript: expressions go through Loom's own evaluator, which can only read state, do arithmetic and call
+        still writing. Specs can't run JavaScript: expressions go through SayShape's own evaluator, which can only read state, do arithmetic and call
         a fixed list of functions. <a :href="href('/docs/getting-started/pipeline.html')">How the pipeline works</a>
       </p>
     </section>
@@ -137,7 +137,7 @@ const href = (p: string) => withBase(p);
     <section class="block status" aria-labelledby="status">
       <h2 id="status">Current status and limitations</h2>
       <p class="block-intro">
-        Loom is a prototype. It isn't published to npm, and it shouldn't be used where accessibility is required until the accessibility layer exists.
+        SayShape is a prototype. It isn't published to npm, and it shouldn't be used where accessibility is required until the accessibility layer exists.
       </p>
       <div class="status-cols">
         <div>

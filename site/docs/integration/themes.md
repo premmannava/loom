@@ -1,13 +1,13 @@
 ---
 title: Themes
-description: How Loom themes work. Design tokens, light and dark themes, CSS overrides and extendTheme.
+description: How SayShape themes work. Design tokens, light and dark themes, CSS overrides and extendTheme.
 ---
 
 # Themes
 
 Components never use literal colors or sizes. They read design tokens from the theme: `colors`, `space`, `radius`, `font`, `text` sizes and the `control` height. Specs choose **roles** (`tone=good`, `variant=secondary`, `style=title`) and the theme decides what each role looks like, so a generated screen always matches your app.
 
-Loom ships `lightTheme` and `darkTheme`. With `theme: "auto"` (the default) it follows the page: a `data-theme="light"` or `data-theme="dark"` attribute on `<html>` if there is one, otherwise the system's light or dark setting.
+SayShape ships `lightTheme` and `darkTheme`. With `theme: "auto"` (the default) it follows the page: a `data-theme="light"` or `data-theme="dark"` attribute on `<html>` if there is one, otherwise the system's light or dark setting.
 
 ## Overriding colors from CSS
 
@@ -55,4 +55,4 @@ The [playground](/playground) can preview a spec in four color styles and in lig
 
 ## Contrast
 
-Loom's default text and accent colors meet 4.5:1 against their surfaces. Its default field and divider lines are lighter than the 3:1 that WCAG asks of control boundaries; the playground's Neutral style meets it. Check contrast for any custom accent you choose, in both light and dark.
+SayShape's default text and accent colors meet 4.5:1 against their surfaces. Its default field and divider lines are lighter than the 3:1 that WCAG asks of control boundaries; the playground's Neutral style meets it. Check contrast for any custom accent you choose, in both light and dark.

@@ -7,8 +7,8 @@
  *  - frame capture (the exact list of canvas calls for one frame)
  */
 import { boxAt, walkBoxes } from "./layout";
-import type { Loom } from "./engine";
-import type { Box, HitRegion, LoomNode } from "./types";
+import type { SayShape } from "./engine";
+import type { Box, HitRegion, SayShapeNode } from "./types";
 
 export interface DrawCall {
   op: string;
@@ -26,7 +26,7 @@ export class Inspector {
   private capture: DrawCall[] | null = null;
   private captureDone: ((calls: DrawCall[]) => void) | null = null;
 
-  constructor(private loom: Loom) {}
+  constructor(private loom: SayShape) {}
 
   setBoxes(on: boolean): void { this.showBoxes = on; this.loom.invalidate("paint"); }
   setHits(on: boolean): void { this.showHits = on; this.loom.invalidate("paint"); }
@@ -75,7 +75,7 @@ export class Inspector {
   }
 
   /** A plain summary of a node, for panels and the console. */
-  describe(node: LoomNode): Record<string, unknown> {
+  describe(node: SayShapeNode): Record<string, unknown> {
     const box = this.findBox(node);
     return {
       type: node.type,
@@ -87,7 +87,7 @@ export class Inspector {
     };
   }
 
-  private findBox(node: LoomNode): Box | null {
+  private findBox(node: SayShapeNode): Box | null {
     let found: Box | null = null;
     if (this.loom.boxes) walkBoxes(this.loom.boxes, (b) => { if (!found && b.node.id === node.id) found = b; });
     return found;

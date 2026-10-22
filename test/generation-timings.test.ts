@@ -17,6 +17,6 @@ describe("generation timing display", () => {
     const lines = timingLines({ id: 1, at: "", request: "test", outcome: "failed", elapsedMs: 5000, attempts: [attemptTiming(attempt(), "Initial")] }).join("\n");
     expect(lines).toContain("~100 tokens (estimated)");
     expect(lines).toContain("Output: unavailable");
-    expect(lines).toContain("Loom render: unavailable");
+    expect(lines).toContain("SayShape render: unavailable");
   });
 });

@@ -4,7 +4,7 @@
  * through loom.setTheme only: the spec, state, selections and any open
  * popup stay as they are, and nothing is sent to a model.
  */
-import type { Loom } from "../../src";
+import type { SayShape } from "../../src";
 import { mix, normalizeHex } from "./color";
 import { themeCode } from "./export";
 import { PRESETS, resolveTheme, type Mode, type PresetId, type Scheme } from "./presets";
@@ -17,7 +17,7 @@ function storage(): PrefStore | null {
   try { return window.localStorage; } catch { return null; }
 }
 
-export function setupAppearance(loom: Loom): void {
+export function setupAppearance(loom: SayShape): void {
   const panel = $<HTMLDetailsElement>("appearance");
   const presetsBox = $("apPresets");
   const hex = $<HTMLInputElement>("apHex");
@@ -51,7 +51,7 @@ export function setupAppearance(loom: Loom): void {
     if (prefs.mode === "system") delete root.dataset.theme;
     else root.dataset.theme = prefs.mode;
     if (isDefault(prefs)) {
-      // Exactly Loom's default: the engine follows the system and any --loom-* CSS by itself.
+      // Exactly SayShape's default: the engine follows the system and any --loom-* CSS by itself.
       loom.setTheme("auto");
       root.style.removeProperty("--accent");
       root.style.removeProperty("--hl");
@@ -105,7 +105,7 @@ export function setupAppearance(loom: Loom): void {
     code.value = text;
     try {
       await navigator.clipboard.writeText(text);
-      copyStatus.textContent = "Copied. Paste it where you create your Loom instance.";
+      copyStatus.textContent = "Copied. Paste it where you create your SayShape instance.";
       code.hidden = true;
     } catch {
       // No clipboard (permissions, insecure page): show the code to copy by hand.

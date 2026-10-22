@@ -1,6 +1,6 @@
 ---
 title: How the engine works
-description: Loom's architecture. Parser, layout, painter, state, actions, popups and debugging tools, and the files that hold them.
+description: SayShape's architecture. Parser, layout, painter, state, actions, popups and debugging tools, and the files that hold them.
 ---
 
 # How the engine works
@@ -9,14 +9,14 @@ description: Loom's architecture. Parser, layout, painter, state, actions, popup
 
 | Stage | File | What it does |
 |---|---|---|
-| Parse | `src/parser.ts` | Text to a `LoomNode` tree plus line-numbered diagnostics, validated against the component definitions |
+| Parse | `src/parser.ts` | Text to a `SayShapeNode` tree plus line-numbered diagnostics, validated against the component definitions |
 | Expressions | `src/expr.ts` | Its own tokenizer, parser and evaluator for `{…}`, with a fixed list of functions |
 | Derived values | `src/state.ts` | `derive` values, worked out lazily and cached until something they read changes |
 | Actions | `src/actions.ts` | `on=` strings: `inc`, `dec`, `toggle`, `set`, `emit`, `go`, `back`, `notify`, `add`, `remove`, `clear` |
 | Data | `src/data.ts` | Lists and records: frozen, with no prototype; host data is copied in |
 | Lists | `src/each.ts` | `each` copies, each item's scope, and where it lives in state for writing |
 | Layout | `src/layout.ts` | Headless: needs only a text measurer, and produces a box per element |
-| Engine | `src/engine.ts` | The `Loom` class: the staged pipeline, canvas sizing, painting, hit testing, pointer and keyboard |
+| Engine | `src/engine.ts` | The `SayShape` class: the staged pipeline, canvas sizing, painting, hit testing, pointer and keyboard |
 | Components | `src/components/` | One `ComponentDef` per component; the map is a separate entry point |
 | Popups | `src/popup.ts` | One popup at a time (a select's list, a date picker's calendar), painted last and hit-tested first |
 | Theme | `src/theme.ts` | Design tokens, light and dark, `--loom-*` overrides |
@@ -42,7 +42,7 @@ A `select` shows its options, and a `date-picker` its calendar, in a popup the e
 
 ## Debugging
 
-Browser developer tools can't see inside a canvas, so Loom has its own. All of them are in the [playground](/playground), and available from code:
+Browser developer tools can't see inside a canvas, so SayShape has its own. All of them are in the [playground](/playground), and available from code:
 
 | Tool | How | What it shows |
 |---|---|---|

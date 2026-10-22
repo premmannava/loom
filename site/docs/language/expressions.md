@@ -1,6 +1,6 @@
 ---
 title: Expressions and functions
-description: Loom's expression language. Operators, field access, and the whitelisted list, math and formatting functions.
+description: SayShape's expression language. Operators, field access, and the whitelisted list, math and formatting functions.
 ---
 
 # Expressions and functions
@@ -14,7 +14,7 @@ card
   stat label="Each, split three ways" value={round(price / 3, 2)}
 ```
 
-Expressions are evaluated by Loom's own interpreter, not JavaScript. They can read state, do arithmetic and comparisons, and call the functions on this page. Nothing else: see [The expression boundary](../architecture/security).
+Expressions are evaluated by SayShape's own interpreter, not JavaScript. They can read state, do arithmetic and comparisons, and call the functions on this page. Nothing else: see [The expression boundary](../architecture/security).
 
 ## Operators
 

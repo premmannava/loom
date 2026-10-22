@@ -273,7 +273,7 @@ describe("streaming", () => {
 });
 
 describe("the sandbox", () => {
-  it("keeps derive expressions inside Loom data", () => {
+  it("keeps derive expressions inside SayShape data", () => {
     for (const expr of ["constructor", "__proto__", "rows.constructor", "rows['constructor']", "rows.__proto__", "toString", "Function", "globalThis", "this", "process", "rows[0].constructor.constructor", "len.constructor"]) {
       const ui = render(`state rows=[{a: 1}]\nderive x={${expr}}\ntext "{x}"\n`);
       const x = derived(ui).x;
