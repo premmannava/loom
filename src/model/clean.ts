@@ -151,3 +151,19 @@ export function loomLineTest(isElement: (name: string) => boolean): (line: strin
     return isElement(word) && (t.length === word.length || /\s/.test(t[word.length]!));
   };
 }
+
+/**
+ * Fixes slips that make a finished spec fail for no good reason, line by line,
+ * so tidying the complete lines of a stream gives a prefix of tidying the whole:
+ * - drops code-fence lines (```), which models add even when told not to;
+ * - on a line that uses typographic quotes (“ ”) and no straight ones, makes
+ *   them straight, since only " delimits text. A line that already has straight
+ *   quotes keeps its “ ” as part of the text.
+ */
+export function tidySpec(spec: string): string {
+  return spec
+    .split("\n")
+    .filter((line) => !FENCE.test(line))
+    .map((line) => (/[“”]/.test(line) && !line.includes('"') ? line.replace(/[“”]/g, '"') : line))
+    .join("\n");
+}

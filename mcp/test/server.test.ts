@@ -101,6 +101,39 @@ describe("SayShape MCP server", () => {
     expect(r.structuredContent).toMatchObject({ errors: 1 });
   });
 
+  it("says when there's nothing to fix, so the model doesn't call again over an ignored prop", async () => {
+    const client = await connect();
+    const r = await client.callTool({ name: "show_interface", arguments: { spec: `card\n  button "Go" colour=red on=inc:n\n` } });
+    const t = text(r);
+    expect(t).toMatch(/showing correctly/);
+    expect(t).toMatch(/no need to call show_interface again/);
+    expect(t).toMatch(/line 2 \(ignored\)/);
+    expect(t).not.toMatch(/Docs for/);
+    expect(r.structuredContent).toMatchObject({ toFix: 0 });
+  });
+
+  it("asks for a fix when a warning leaves the interface wrong: an unknown function or a bad choice", async () => {
+    const client = await connect();
+    const spec = `state rows=[{m: "Jan", v: 3}]\ncard\n  text "Best: {argmax(rows).m}"\n  chart "Sales" kind=pie items=rows x=m y=v\n`;
+    const r = await client.callTool({ name: "show_interface", arguments: { spec } });
+    const t = text(r);
+    expect(t).toMatch(/2 problems leave part of it wrong/);
+    expect(t).toMatch(/call show_interface again/);
+    expect(t).toMatch(/Use first\(sort\(list, 'field', 'desc'\)\)/);
+    expect(r.structuredContent).toMatchObject({ toFix: 2 });
+  });
+
+  it("tidies fences and typographic quotes instead of reporting them", async () => {
+    const client = await connect();
+    const r = await client.callTool({ name: "show_interface", arguments: { spec: "```sayshape\ncard\n  text “Hello”\n```" } });
+    expect(text(r)).toMatch(/no problems/);
+  });
+
+  it("lists every expression function in the quick start, with the best-row pattern", () => {
+    expect(quickStart()).toMatch(/Functions \(no others exist\): .*\bfirst\b.*\btake\b/);
+    expect(quickStart()).toMatch(/first\(sort\(rows, 'revenue', 'desc'\)\)\.month/);
+  });
+
   it("refuses an empty or oversized spec", async () => {
     const client = await connect();
     const empty = await client.callTool({ name: "show_interface", arguments: { spec: "" } });

@@ -1,7 +1,7 @@
 import { render } from "../src/testing";
 import { describe, expect, it } from "vitest";
 import { coreComponents } from "../src/components";
-import { generateSpec, loomLineTest, ModelError, SpecFilter, streamChat, type ChatMessage } from "../src/model";
+import { generateSpec, loomLineTest, ModelError, SpecFilter, streamChat, tidySpec, type ChatMessage } from "../src/model";
 import { Registry } from "../src/registry";
 import { fakeModel, type Reply } from "./fake-model";
 
@@ -223,5 +223,23 @@ describe("generateSpec", () => {
       ["assistant", "card"],
       ["user", "make it shorter"],
     ]);
+  });
+});
+
+describe("tidySpec", () => {
+  it("drops fence lines and straightens typographic quotes used as delimiters", () => {
+    expect(tidySpec("```sayshape\ncard\n  text “Hi”\n```\n")).toBe('card\n  text "Hi"\n');
+  });
+
+  it("keeps typographic quotes inside straight-quoted text", () => {
+    expect(tidySpec('text "He said “hi”"\n')).toBe('text "He said “hi”"\n');
+  });
+
+  it("works line by line, so the complete lines of a stream tidy to a prefix of the whole", () => {
+    const whole = "```\ncard\n  text “A”\n  text “B”\n```\n";
+    for (let cut = 0; cut <= whole.length; cut++) {
+      const done = whole.slice(0, whole.lastIndexOf("\n", cut - 1) + 1);
+      expect(tidySpec(whole).startsWith(tidySpec(done))).toBe(true);
+    }
   });
 });
