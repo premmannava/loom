@@ -1,6 +1,6 @@
 ---
 title: Host data and events
-description: Passing your app's data into a Loom interface, and reacting to what people do with it.
+description: Passing your app's data into a SayShape interface, and reacting to what people do with it.
 ---
 
 # Host data and events
@@ -25,7 +25,7 @@ card
       text "{money(p.price)}" align=right
 ```
 
-What your app passes is copied into plain, frozen Loom data. Functions, class instances and cycles are refused with a clear error, so a spec can only ever see data, never your objects. Values your app sets are never replaced by a `state` line in the spec.
+What your app passes is copied into plain, frozen SayShape data. Functions, class instances and cycles are refused with a clear error, so a spec can only ever see data, never your objects. Values your app sets are never replaced by a `state` line in the spec.
 
 When a model writes a spec that reads host data, tell the parser and the model client which names your app supplies (`knownNames` for `parse`, `stateNames` for `generateSpec`), so reading them isn't reported as an unknown name.
 
@@ -52,7 +52,7 @@ loom.on("action", ({ name, value }) => {
 });
 ```
 
-Loom never makes a network request because of a spec: images aside ([Images](./images)), anything that leaves the page goes through your handlers. Which actions exist is a contract between your app and the model; describe them in the model guide's `actions` option so the model uses the names you handle ([The model guide](./model-guide#describing-your-app)).
+SayShape never makes a network request because of a spec: images aside ([Images](./images)), anything that leaves the page goes through your handlers. Which actions exist is a contract between your app and the model; describe them in the model guide's `actions` option so the model uses the names you handle ([The model guide](./model-guide#describing-your-app)).
 
 ## Moving between screens
 
@@ -60,4 +60,4 @@ Loom never makes a network request because of a spec: images aside ([Images](./i
 
 ## Not built yet
 
-Loom doesn't yet have declared data sources (a spec saying "load orders from here") or host commands that return results to the spec. Today your app fetches data and calls `state.set`.
+SayShape doesn't yet have declared data sources (a spec saying "load orders from here") or host commands that return results to the spec. Today your app fetches data and calls `state.set`.

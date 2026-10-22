@@ -3,7 +3,7 @@
  * server passes through to LOOM_MODEL_URL (LM Studio by default), so the
  * browser needs no CORS from the model server and never sees an API key.
  */
-import type { Loom } from "../src";
+import type { SayShape } from "../src";
 import { generateSpec, ModelError, nextRefineContext, type GenerateResult, type Phase, type RefineContext } from "../src/model";
 import type { GuideOptions } from "../src/prompt";
 
@@ -12,7 +12,7 @@ declare const __LOOM_MODEL_URL__: string;
 declare const __LOOM_USER_SUFFIX__: string;
 
 export interface AskDeps {
-  loom: Loom;
+  loom: SayShape;
   guide: GuideOptions;
   /** Stop a sample that's still streaming. */
   stopSample(): void;
@@ -90,7 +90,7 @@ export function setupAsk(d: AskDeps): void {
     waiting: "Waiting for the model…",
     thinking: "The model is thinking before it writes…",
     writing: "Writing the screen…",
-    repairing: "Fixing problems Loom found…",
+    repairing: "Fixing problems SayShape found…",
     done: "Done",
   };
 

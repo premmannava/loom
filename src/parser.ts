@@ -1,5 +1,5 @@
 /**
- * Turns spec text into a tree of LoomNodes.
+ * Turns spec text into a tree of SayShapeNodes.
  *
  * The format is one element per line; indentation means "inside of":
  *
@@ -21,7 +21,7 @@ import { loopNames } from "./each";
 import { PATH } from "./paths";
 import { literal } from "./actions";
 import type { Registry } from "./registry";
-import type { Diagnostic, LoomNode, Value } from "./types";
+import type { Diagnostic, SayShapeNode, Value } from "./types";
 
 /**
  * How deeply elements may nest. Real screens use under ten levels; the limit
@@ -91,7 +91,7 @@ export interface DerivedDef {
 export const MAX_DERIVED = 200;
 
 export interface ParseResult {
-  root: LoomNode;
+  root: SayShapeNode;
   state: Array<{ key: string; value: Value; line: number }>;
   /** Derived values that can be worked out: no duplicates, collisions or cycles. */
   derived: DerivedDef[];
@@ -348,18 +348,18 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
     const cut = src.lastIndexOf("\n");
     src = cut < 0 ? "" : src.slice(0, cut + 1);
   }
-  const root: LoomNode = { id: "root", type: "column", props: { ...(opts.rootProps ?? {}) }, children: [], line: 0, indent: -1 };
+  const root: SayShapeNode = { id: "root", type: "column", props: { ...(opts.rootProps ?? {}) }, children: [], line: 0, indent: -1 };
   const diagnostics: Diagnostic[] = [];
   const state: ParseResult["state"] = [];
-  const stack: LoomNode[] = [root];
+  const stack: SayShapeNode[] = [root];
   let nodeCount = 0;
   let skipDeeperThan: number | null = null;
-  let last: LoomNode | null = null;
+  let last: SayShapeNode | null = null;
   // A state line whose list or record was left open: the lines after it are probably the rest of it.
   let openState: { line: number; reported: boolean } | null = null;
   // Names each line reads that it isn't inside the each for, checked once every each is known.
   const outsideUses: Array<{ line: number; names: string[] }> = [];
-  const eaches: LoomNode[] = [];
+  const eaches: SayShapeNode[] = [];
   // State that bind= and actions write, so reading it before the first write isn't a mistake.
   const written = new Set<string>(opts.knownNames ?? []);
   // Where bind= and actions write, to report writes to derived names.
@@ -519,7 +519,7 @@ export function parse(src: string, registry: Registry, opts: ParseOptions = {}):
       if (pdef?.type === "action") { const r = parseActions(raw); if ("actions" in r) actionTargets(r.actions).forEach(wrote); }
     }
 
-    const node: LoomNode = {
+    const node: SayShapeNode = {
       id: `${lineNo}:${tok.type}`,
       type: tok.type,
       ...(tok.text !== undefined ? { text: tok.text } : {}),
@@ -590,8 +590,8 @@ const ENGINE_STATE = ["screen"];
  * otherwise just show a dash: a loop variable outside its each, or a word
  * meant as text but left unquoted ({done ? Yes : No}).
  */
-function checkNames(uses: Array<{ line: number; names: string[] }>, eaches: LoomNode[], stateKeys: Set<string>, written: Set<string>, diags: Diagnostic[]): void {
-  const defined = new Map<string, { each: LoomNode; prop: string }>();
+function checkNames(uses: Array<{ line: number; names: string[] }>, eaches: SayShapeNode[], stateKeys: Set<string>, written: Set<string>, diags: Diagnostic[]): void {
+  const defined = new Map<string, { each: SayShapeNode; prop: string }>();
   for (const e of eaches) {
     const as = e.props.as ?? "item";
     if (!defined.has(as)) defined.set(as, { each: e, prop: e.props.as ? `as=${as}` : `as=item, the default` });

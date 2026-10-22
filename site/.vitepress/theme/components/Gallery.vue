@@ -9,7 +9,7 @@ import GalleryItem from "./GalleryItem.vue";
     <header class="gallery-head">
       <h1>Examples</h1>
       <p>
-        Each example is a saved Loom spec rendered by the real engine in your browser. They were written for this site, not generated
+        Each example is a saved SayShape spec rendered by the real engine in your browser. They were written for this site, not generated
         live, and every name, price and record in them is made up. Nothing here is connected to a backend: when a spec emits an event,
         this page shows it and stops there.
       </p>

@@ -1,7 +1,7 @@
 /**
  * The browser's editor host: one real <input>, placed exactly over the field
  * being typed in, with the field's font and colors and a transparent
- * background. Loom keeps painting the box, label and focus ring; the input
+ * background. SayShape keeps painting the box, label and focus ring; the input
  * paints only the text, caret and selection.
  *
  * It sits right after the canvas in the page, so Tab from the last element

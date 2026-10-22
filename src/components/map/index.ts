@@ -6,7 +6,7 @@
  * pre-projected with the Natural Earth I projection by scripts/build-world.mjs.
  */
 import type { ComponentDef } from "../../component";
-import type { Box, LoomNode } from "../../types";
+import type { Box, SayShapeNode } from "../../types";
 import world from "./world.json";
 
 interface WorldData { w: number; h: number; k: number; t: [number, number]; c: Array<[string, string]> }
@@ -85,7 +85,7 @@ map highlight="Japan,Kenya" bind=picked
   paintOver(box, ctx) {
     const { g, theme } = ctx;
     const c = theme.colors;
-    const { scale: s, pins } = box.data as { scale: number; pins: LoomNode[] };
+    const { scale: s, pins } = box.data as { scale: number; pins: SayShapeNode[] };
     for (const pin of pins) {
       const pp = ctx.props(pin);
       g.globalAlpha = ctx.appear(pin);

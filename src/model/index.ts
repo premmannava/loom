@@ -1,5 +1,5 @@
 /**
- * Connecting Loom to a model (`loom-ui/model`): stream a spec from any
+ * Connecting SayShape to a model (`loom-ui/model`): stream a spec from any
  * OpenAI-compatible endpoint, clean it, check it and repair it once.
  * Nothing here is used by the engine itself; it's for apps and tools.
  */

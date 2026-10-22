@@ -1,11 +1,11 @@
 ---
 title: The model guide
-description: The instructions a model gets for writing Loom, generated from the component definitions, in full and compact modes, with profiles.
+description: The instructions a model gets for writing SayShape, generated from the component definitions, in full and compact modes, with profiles.
 ---
 
 # The model guide
 
-A model learns Loom from a guide: a system prompt that explains the syntax and describes every element it may use. The guide is **generated** by `languageGuide(registry, options)` from the same component definitions the parser validates against, so it can't describe a prop that doesn't exist or miss one that does.
+A model learns SayShape from a guide: a system prompt that explains the syntax and describes every element it may use. The guide is **generated** by `languageGuide(registry, options)` from the same component definitions the parser validates against, so it can't describe a prop that doesn't exist or miss one that does.
 
 ```ts
 import { languageGuide } from "loom-ui";
@@ -52,7 +52,7 @@ The app's own context comes last, so the part that's the same for every app stay
 
 ## The compact guide
 
-This is `languageGuide(registry, { mode: "compact" })` with every component registered, as generated for this site. The [playground](/playground) has a **Copy model guide** button with the playground's version, for trying Loom in any chat assistant.
+This is `languageGuide(registry, { mode: "compact" })` with every component registered, as generated for this site. The [playground](/playground) has a **Copy model guide** button with the playground's version, for trying SayShape in any chat assistant.
 
 ::: details Show the compact guide
 <!--@include: ../../.generated/guide-compact.md-->

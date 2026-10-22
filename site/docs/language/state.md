@@ -1,6 +1,6 @@
 ---
 title: State
-description: Declaring state in a Loom spec. Numbers, text, true/false, null, lists and records, and what happens to state when a spec changes.
+description: Declaring state in a SayShape spec. Numbers, text, true/false, null, lists and records, and what happens to state when a spec changes.
 ---
 
 # State

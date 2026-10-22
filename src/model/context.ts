@@ -17,7 +17,7 @@
  *   doesn't undo them. Past maxChanges, the oldest are left out, with a note
  *   saying how many; the spec still has their effect, and `requirements`
  *   is never cut, so anything that must survive belongs there.
- * - State is sent only when the app passes it, and only what it passes. Loom
+ * - State is sent only when the app passes it, and only what it passes. SayShape
  *   never serializes the app's state on its own.
  * - Nothing is summarized: there's no second model call.
  */

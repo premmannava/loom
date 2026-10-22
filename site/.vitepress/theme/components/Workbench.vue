@@ -100,18 +100,18 @@ onBeforeUnmount(() => { signal.cancelled = true; });
     <div id="wb-panel" class="wb-body" role="tabpanel" :aria-labelledby="`wb-tab-${active}`" :data-view="view">
       <div class="wb-spec">
         <div class="wb-pane-head">
-          <span>Loom spec</span>
+          <span>SayShape spec</span>
           <span class="wb-meta" aria-live="polite">{{ status }}</span>
         </div>
-        <pre class="spec-view numbered wrap" :class="{ streaming }" tabindex="0" aria-label="The Loom spec for this interface"><code v-html="html"></code></pre>
+        <pre class="spec-view numbered wrap" :class="{ streaming }" tabindex="0" aria-label="The SayShape spec for this interface"><code v-html="html"></code></pre>
       </div>
       <div class="wb-preview">
         <div class="wb-pane-head">
-          <span>Rendered by the Loom engine</span>
+          <span>Rendered by the SayShape engine</span>
           <span class="wb-meta">Interactive</span>
         </div>
         <div class="loom-stage wb-stage">
-          <div class="loom-canvas-wrap"><canvas ref="canvas" :aria-label="`${current.title}, rendered by Loom on a canvas. The spec is the readable source.`"></canvas></div>
+          <div class="loom-canvas-wrap"><canvas ref="canvas" :aria-label="`${current.title}, rendered by SayShape on a canvas. The spec is the readable source.`"></canvas></div>
         </div>
       </div>
     </div>

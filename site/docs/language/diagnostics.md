@@ -1,11 +1,11 @@
 ---
 title: Validation and diagnostics
-description: How Loom reports problems in a spec. Errors skip a line, warnings ignore the bad part, and the parser never stops.
+description: How SayShape reports problems in a spec. Errors skip a line, warnings ignore the bad part, and the parser never stops.
 ---
 
 # Validation and diagnostics
 
-Loom never stops on a mistake. Every problem becomes a **diagnostic** with a line number, and the rest of the spec still renders. This matters most for model output: one invented prop shouldn't blank the whole screen.
+SayShape never stops on a mistake. Every problem becomes a **diagnostic** with a line number, and the rest of the spec still renders. This matters most for model output: one invented prop shouldn't blank the whole screen.
 
 | Severity | Caused by | What happens |
 |---|---|---|
@@ -42,4 +42,4 @@ Some problems only appear once a spec runs: a blocked image, a chart given somet
 
 ## Validating examples
 
-Every Loom example on this website is parsed in the repository's tests, and must produce no diagnostics unless it's one of the examples marked as invalid on purpose, like the ones on this page.
+Every SayShape example on this website is parsed in the repository's tests, and must produce no diagnostics unless it's one of the examples marked as invalid on purpose, like the ones on this page.

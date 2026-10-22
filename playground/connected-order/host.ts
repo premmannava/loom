@@ -1,8 +1,8 @@
-import type { Loom } from "../../src/index";
+import type { SayShape } from "../../src/index";
 import { createDemoService } from "./service";
 
-/** Host adapter: Loom emits intent; this code calls the service and returns state. */
-export function connectOrderDemo(loom: Loom, service = createDemoService()) {
+/** Host adapter: SayShape emits intent; this code calls the service and returns state. */
+export function connectOrderDemo(loom: SayShape, service = createDemoService()) {
   let busy = false;
   let disposed = false;
   const events: string[] = [];

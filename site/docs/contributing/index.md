@@ -1,6 +1,6 @@
 ---
 title: Development
-description: Working on Loom itself. Commands, tests, the rules every change must keep, and what to check before a change is done.
+description: Working on SayShape itself. Commands, tests, the rules every change must keep, and what to check before a change is done.
 ---
 
 # Development
@@ -23,7 +23,7 @@ npm run build
 | Contract | `test/contract.test.ts` | Every registered component against the project rules: documentation, layout bounds at three widths, theme-only colors and fonts, hit regions and keyboard reach |
 | Streaming | `test/streaming.test.ts` | Every prefix of every sample renders a valid, smaller screen, however it's chunked |
 | Fuzz | `test/fuzz.test.ts` | Random and damaged specs, expressions and actions never throw (`FUZZ_RUNS=5000 npm test` for a longer run) |
-| Website | `test/site.test.ts` | Every gallery example renders cleanly and behaves as described; every Loom block in these docs parses |
+| Website | `test/site.test.ts` | Every gallery example renders cleanly and behaves as described; every SayShape block in these docs parses |
 | Visual | `visual/` | Component examples and samples in light and dark at two widths, against baselines (Playwright) |
 | Benchmarks | `bench/` | Parse, layout and paint timings; pull requests are compared with their base |
 

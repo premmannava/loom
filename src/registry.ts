@@ -1,6 +1,6 @@
 import type { ComponentDef } from "./component";
 
-/** The set of components a Loom instance understands. */
+/** The set of components a SayShape instance understands. */
 export class Registry {
   private defs = new Map<string, ComponentDef>();
 

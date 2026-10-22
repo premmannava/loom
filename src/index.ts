@@ -1,4 +1,4 @@
-export { Loom, roundRectPath, type LoomOptions, type LoomEvents, type Metrics } from "./engine";
+export { SayShape, roundRectPath, type SayShapeOptions, type SayShapeEvents, type Metrics } from "./engine";
 export { parse, tokenizeLine, MAX_DEPTH, type ParseOptions, type ParseResult } from "./parser";
 export { evaluate, interpolate, formatValue, checkSyntax, identifiers, type EvalResult, type Scope } from "./expr";
 export { parseActions, runActions, type Action } from "./actions";
@@ -13,4 +13,4 @@ export { CanvasMeasurer, MonoMeasurer, wrapText, type TextMeasurer } from "./tex
 export { PropReader, COMMON_PROPS, CATEGORIES, type ComponentDef, type PropDef, type LayoutContext, type PaintContext, type PressContext, type DragContext, type Category } from "./component";
 export { coreComponents } from "./components";
 export * as components from "./components";
-export type { LoomNode, Box, Diagnostic, Value, HitTarget, Rect } from "./types";
+export type { SayShapeNode, Box, Diagnostic, Value, HitTarget, Rect } from "./types";

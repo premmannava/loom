@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import "@fontsource/instrument-sans/400.css";
 import "@fontsource/instrument-sans/600.css";
-import { coreComponents, Loom } from "../../src/index";
+import { coreComponents, SayShape } from "../../src/index";
 import { mapComponents } from "../../src/components/map";
 import { generateSpec } from "../../src/model";
 import { playgroundGuide } from "../model-guide";
@@ -11,11 +11,11 @@ import monthlyBudgetSpec from "./monthly-budget.loom?raw";
 declare const __LOOM_MODEL__: string;
 const configuredModel = typeof __LOOM_MODEL__ === "string" ? __LOOM_MODEL__.trim() : "";
 
-const loom = new Loom(document.querySelector<HTMLCanvasElement>("#app")!, {
+const loom = new SayShape(document.querySelector<HTMLCanvasElement>("#app")!, {
   components: [...coreComponents, ...mapComponents], theme: "auto",
 });
 loom.setSpec('text "Your generated interface will appear here." tone=muted');
-const controls = new Loom(document.querySelector<HTMLCanvasElement>("#generator")!, { components: coreComponents, theme: "auto" });
+const controls = new SayShape(document.querySelector<HTMLCanvasElement>("#generator")!, { components: coreComponents, theme: "auto" });
 controls.setSpec(`state request="" generating=false status="" elapsed=""
 column
   text "What would you like to build?" style=title
@@ -26,7 +26,7 @@ column
   text "{status}" if={status != ''}
   text "{elapsed}" if={generating}
 `);
-const timings = new Loom(document.querySelector<HTMLCanvasElement>("#timings")!, { components: coreComponents, theme: "auto" });
+const timings = new SayShape(document.querySelector<HTMLCanvasElement>("#timings")!, { components: coreComponents, theme: "auto" });
 timings.setSpec(`state open=true lines=[] history=[]
 accordion "Generation diagnostics" bind=open
   text "Times are measured in your browser. First token includes queueing, prompt processing and transport; it cannot separate them. Output speed includes reasoning when reported and is approximate, not GPU decode speed."
@@ -95,7 +95,7 @@ async function generate() {
       if (runs.length > 20) runs.pop();
       timings.state.set("lines", timingLines(run));
       timings.state.set("history", runs.map((r) => ({ id: r.id, outcome: r.outcome, seconds: Math.round(r.elapsedMs / 10) / 100, repair: r.attempts.length ? (r.attempts.length > 1 ? "Yes" : "No") : "Unknown" })));
-      console.info("Loom generation timing", run);
+      console.info("SayShape generation timing", run);
     }
     controller = undefined;
     if (!disposed) controls.state.set("generating", false);

@@ -22,7 +22,7 @@ const clickDetail = (ui: Rendered, detail: string) => {
   ui.click(h!.box.x + h!.box.w / 2, h!.box.y + h!.box.h / 2);
 };
 const list = (rows: unknown[]) => toData(rows);
-/** A one-column table over rows written in Loom, with extra table props. */
+/** A one-column table over rows written in SayShape, with extra table props. */
 const simple = (rows: string, props = "", cols = `  table-column "V" field=v`, width = 600) =>
   render(`state rows=${rows} pick="" by="" dir="asc"\ntable items=rows ${props}\n${cols}\n`, { width });
 

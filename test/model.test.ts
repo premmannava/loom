@@ -21,7 +21,7 @@ describe("SpecFilter", () => {
     return { text: text + o.text, resets, thinking: f.thinkingChars };
   };
 
-  it("passes plain Loom through, line by line", () => {
+  it("passes plain SayShape through, line by line", () => {
     expect(run([good]).text).toBe(good);
     expect(run(good.split("")).text).toBe(good);
   });
@@ -203,7 +203,7 @@ describe("generateSpec", () => {
     expect(m.requests).toHaveLength(1);
   });
 
-  it("measures time to the first token and the first Loom line", async () => {
+  it("measures time to the first token and the first SayShape line", async () => {
     let t = 0;
     const m = fakeModel([{ reasoning: ["hmm"], content: ["card\n"] }]);
     const r = await generateSpec({ config, registry, request: "x", fetch: m.fetch, now: () => (t += 10) });

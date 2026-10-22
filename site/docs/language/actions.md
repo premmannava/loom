@@ -1,6 +1,6 @@
 ---
 title: Actions and navigation
-description: Loom's on= actions. Changing state, talking to the host app with emit, moving between screens, and showing messages.
+description: SayShape's on= actions. Changing state, talking to the host app with emit, moving between screens, and showing messages.
 ---
 
 # Actions and navigation
@@ -49,7 +49,7 @@ card
 
 ```ts
 loom.on("action", ({ name, value }) => {
-  if (name === "order") submitOrder(value); // your code; Loom never calls a server itself
+  if (name === "order") submitOrder(value); // your code; SayShape never calls a server itself
 });
 ```
 

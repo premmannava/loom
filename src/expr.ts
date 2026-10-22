@@ -325,7 +325,7 @@ function run(n: Node, scope: Scope): Value {
     case "lit": return n.v;
     case "id": {
       const v = scope(n.name);
-      // Only Loom data counts: a scope backed by an object could otherwise
+      // Only SayShape data counts: a scope backed by an object could otherwise
       // hand back things like Object.prototype for `__proto__`.
       if (!isData(v)) throw new ExprError(`Unknown state "${n.name}"`);
       return v;

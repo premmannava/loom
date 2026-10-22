@@ -1,6 +1,6 @@
 /**
  * The playground's style presets and how a preset, a mode and an optional
- * custom accent become a Loom Theme. Themes are built with Loom's own
+ * custom accent become a SayShape Theme. Themes are built with SayShape's own
  * extendTheme from lightTheme and darkTheme, changing color tokens only.
  */
 import { darkTheme, extendTheme, lightTheme, type Theme } from "../../src/theme";
@@ -14,7 +14,7 @@ type Colors = Partial<Theme["colors"]>;
 export interface Preset {
   id: PresetId;
   label: string;
-  /** Changes to Loom's light and dark colors. Teal changes nothing: it is Loom's default. */
+  /** Changes to SayShape's light and dark colors. Teal changes nothing: it is SayShape's default. */
   light: Colors;
   dark: Colors;
 }
@@ -44,12 +44,12 @@ export const PRESETS: readonly Preset[] = [
 
 export const presetById = (id: string): Preset | undefined => PRESETS.find((p) => p.id === id);
 
-/** Loom's own light or dark theme: the base every preset changes. */
+/** SayShape's own light or dark theme: the base every preset changes. */
 export const baseTheme = (scheme: Scheme): Theme => (scheme === "dark" ? darkTheme : lightTheme);
 
 export interface Resolved {
   theme: Theme;
-  /** Only the color tokens that differ from Loom's base theme for this scheme. */
+  /** Only the color tokens that differ from SayShape's base theme for this scheme. */
   changes: Colors;
   /** The accent asked for, and whether it had to be adjusted to be readable in this scheme. */
   requestedAccent: string | null;
@@ -89,9 +89,9 @@ export interface ContrastCheck {
 }
 
 /**
- * The color pairs Loom actually draws, with the contrast each needs: text
+ * The color pairs SayShape actually draws, with the contrast each needs: text
  * on the surface, a filled button's label, accent text and strokes, focus
- * rings, the selected-row and highlight tints Loom paints (accent at 12 to
+ * rings, the selected-row and highlight tints SayShape paints (accent at 12 to
  * 16% over the surface) with text on them, and status colors used as text.
  */
 export function auditTheme(theme: Theme): ContrastCheck[] {

@@ -1,5 +1,5 @@
 /*
- * Loom site theme. One accent, Loom's own teal (the engine's default
+ * SayShape site theme. One accent, SayShape's own teal (the engine's default
  * theme.colors.accent), on cool neutral surfaces. Display type is
  * Bricolage Grotesque; body text is Instrument Sans, the face the engine
  * draws with, so the page and the canvas read as one product.
@@ -228,7 +228,7 @@
 .vp-doc .loom-events li { margin: 2px 0 }
 .loom-events code { font-size: 12px; color: var(--vp-c-brand-1); background: none !important; padding: 0 !important }
 
-/* ------------------------------------------------------------ spec view (highlighted Loom source) */
+/* ------------------------------------------------------------ spec view (highlighted SayShape source) */
 
 .spec-view {
   margin: 0;

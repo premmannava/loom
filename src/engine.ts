@@ -1,5 +1,5 @@
 /**
- * The Loom engine: owns a canvas and runs the pipeline
+ * The SayShape engine: owns a canvas and runs the pipeline
  *
  *   spec text → parse → tree → layout → boxes → paint → pixels
  *                                  ↑                    │
@@ -26,7 +26,7 @@ import { CanvasMeasurer, font as fontString, wrapText } from "./text";
 import { darkTheme, lightTheme, themeFromCSS, type Theme } from "./theme";
 import { Inspector } from "./inspector";
 import { browserImageLoader, ImageCache, type ImageLoader, type ImagePolicy } from "./images";
-import type { Box, Diagnostic, HitRegion, HitTarget, LoomNode, Rect, Value } from "./types";
+import type { Box, Diagnostic, HitRegion, HitTarget, SayShapeNode, Rect, Value } from "./types";
 
 export interface Metrics {
   nodes: number;
@@ -39,9 +39,9 @@ export interface Metrics {
   pixelHeight: number;
 }
 
-export interface LoomEvents {
+export interface SayShapeEvents {
   /** An `emit:` action ran. This is how the host app (or a model) hears about user intent. */
-  action: { name: string; value: Value | undefined; node: LoomNode };
+  action: { name: string; value: Value | undefined; node: SayShapeNode };
   /** A state value changed. */
   change: { key: string; value: Value };
   /** A frame was painted. */
@@ -49,14 +49,14 @@ export interface LoomEvents {
   /** Parse diagnostics changed. */
   diagnostics: Diagnostic[];
   /** Inspect mode selected (or cleared) a node. */
-  inspect: { node: LoomNode; box: Box } | null;
+  inspect: { node: SayShapeNode; box: Box } | null;
   /** A notify: action (or the host) showed a message. */
   notify: { text: string };
   /** The visible screen changed, through go:, back or the host. */
   navigate: { screen: string; from: string | undefined };
 }
 
-export interface LoomOptions {
+export interface SayShapeOptions {
   components: ComponentDef[];
   /** A fixed theme, or "auto" to follow light/dark mode and --loom-* CSS variables. */
   theme?: Theme | "auto";
@@ -75,7 +75,7 @@ export interface LoomOptions {
   imageHosts?: string[];
   /** Custom image loading (server rendering, tests, a CDN signer). Default: an <img> with CORS. */
   loadImage?: ImageLoader;
-  /** Problems found while running, like a blocked image. Default: console.warn with a "Loom:" prefix. */
+  /** Problems found while running, like a blocked image. Default: console.warn with a "SayShape:" prefix. */
   onWarning?: (message: string) => void;
   /**
    * Places a real text box over a field while someone types in it. Default:
@@ -98,16 +98,16 @@ export interface LoomOptions {
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
-export class Loom {
+export class SayShape {
   readonly canvas: HTMLCanvasElement;
   readonly registry: Registry;
   readonly state = new Store();
   readonly inspector: Inspector;
   private images: ImageCache;
-  private events = new Emitter<LoomEvents>();
+  private events = new Emitter<SayShapeEvents>();
   private g: CanvasRenderingContext2D;
   private measurer: CanvasMeasurer;
-  private opts: LoomOptions;
+  private opts: SayShapeOptions;
   theme: Theme;
 
   private source = "";
@@ -150,18 +150,18 @@ export class Loom {
 
   metrics: Metrics = { nodes: 0, parseMs: 0, layoutMs: 0, paintMs: 0, width: 0, height: 0, pixelWidth: 0, pixelHeight: 0 };
 
-  constructor(canvas: HTMLCanvasElement, opts: LoomOptions) {
+  constructor(canvas: HTMLCanvasElement, opts: SayShapeOptions) {
     this.canvas = canvas;
     this.opts = opts;
     this.registry = new Registry(opts.components);
     const g = canvas.getContext("2d");
-    if (!g) throw new Error("Loom needs a 2D canvas context");
+    if (!g) throw new Error("SayShape needs a 2D canvas context");
     this.g = g;
     this.measurer = new CanvasMeasurer(g);
     this.theme = this.resolveTheme();
     this.inspector = new Inspector(this);
     this.editorHost = opts.editor ?? (typeof document !== "undefined" ? domEditorHost(canvas) : noEditor);
-    const warn = (this.warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`Loom: ${m}`); }));
+    const warn = (this.warn = opts.onWarning ?? ((m: string) => { if (typeof console !== "undefined") console.warn(`SayShape: ${m}`); }));
     this.images = new ImageCache(() => this.imagePolicy(), opts.loadImage ?? browserImageLoader, () => this.invalidate("paint"), now, warn);
 
     canvas.tabIndex = 0;
@@ -220,7 +220,7 @@ export class Loom {
     return this.streaming;
   }
 
-  get tree(): LoomNode | null {
+  get tree(): SayShapeNode | null {
     return this.parsed?.root ?? null;
   }
 
@@ -237,12 +237,12 @@ export class Loom {
     return this.hits;
   }
 
-  on<K extends keyof LoomEvents>(name: K, fn: (p: LoomEvents[K]) => void): () => void {
+  on<K extends keyof SayShapeEvents>(name: K, fn: (p: SayShapeEvents[K]) => void): () => void {
     return this.events.on(name, fn);
   }
 
   /** @internal used by the inspector */
-  emitInspect(p: LoomEvents["inspect"]): void {
+  emitInspect(p: SayShapeEvents["inspect"]): void {
     this.events.emit("inspect", p);
   }
 
@@ -364,11 +364,11 @@ export class Loom {
 
   private paintContext(g: CanvasRenderingContext2D): PaintContext {
     const theme = this.theme;
-    const readers = new WeakMap<LoomNode, PropReader>();
+    const readers = new WeakMap<SayShapeNode, PropReader>();
     const scope = this.state.scope;
     const animate = this.opts.animate ?? !(typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
     const t = now();
-    const same = (a: HitTarget | null, n: LoomNode, detail?: unknown) =>
+    const same = (a: HitTarget | null, n: SayShapeNode, detail?: unknown) =>
       !!a && a.node.id === n.id && (detail === undefined || a.detail === detail);
     return {
       g,
@@ -536,7 +536,7 @@ export class Loom {
   }
 
   private pressContext(target: HitTarget): PressContext {
-    const readers = new WeakMap<LoomNode, PropReader>();
+    const readers = new WeakMap<SayShapeNode, PropReader>();
     return {
       target,
       scope: scopeOf(target.node, this.state.scope),
@@ -562,7 +562,7 @@ export class Loom {
   };
 
   /** The open popup, for tools and tests: its owner, where it is, its regions and transient state. */
-  get openPopupInfo(): { owner: LoomNode; area: Rect | null; regions: readonly HitRegion[]; state: Readonly<PopupState> } | null {
+  get openPopupInfo(): { owner: SayShapeNode; area: Rect | null; regions: readonly HitRegion[]; state: Readonly<PopupState> } | null {
     return this.popup && { owner: this.popup.owner.node, area: this.popup.area, regions: this.popupHits, state: this.popup.state };
   }
 
@@ -738,7 +738,7 @@ export class Loom {
     if (typeof v !== "string" || !names.includes(v)) this.state.set(SCREEN_KEY, names[0]!);
   }
 
-  private runActionString(src: string, node: LoomNode): void {
+  private runActionString(src: string, node: SayShapeNode): void {
     const parsed = parseActions(src);
     if ("error" in parsed) return;
     runActions(parsed.actions, {
@@ -758,7 +758,7 @@ export class Loom {
    * Write a value at a path as seen from a node: a state name, or inside each
    * a path through the item (t.done), which rebuilds the list it lives in.
    */
-  private writePath(node: LoomNode, path: string, value: Value): void {
+  private writePath(node: SayShapeNode, path: string, value: Value): void {
     const place = placeOf(path, locateOf(node));
     if (!place) {
       this.warn(`Can't change ${path}: it isn't in state. Inside each, items= must name a list in state (like items=todos) for its items to change`);
@@ -772,7 +772,7 @@ export class Loom {
   }
 
   /** Remove the list item a path points at, like remove:t inside each as=t. */
-  private removeAt(node: LoomNode, path: string): void {
+  private removeAt(node: SayShapeNode, path: string): void {
     const place = placeOf(path, locateOf(node));
     const at = place?.steps.at(-1);
     if (!place || typeof at !== "number") {
@@ -817,7 +817,7 @@ export class Loom {
   // ---------------------------------------------------------------- typing
 
   /** The laid-out box of a node, by id (copies inside each have their own). */
-  private boxOf(node: LoomNode): Box | null {
+  private boxOf(node: SayShapeNode): Box | null {
     let found: Box | null = null;
     const walk = (b: Box) => { if (found) return; if (b.node.id === node.id) found = b; else b.children.forEach(walk); };
     if (this.rootBox) walk(this.rootBox);
@@ -825,7 +825,7 @@ export class Loom {
   }
 
   /** How the text box for a field should look, or null if it can't be typed in right now. */
-  private editorSpec(node: LoomNode): EditorSpec | null {
+  private editorSpec(node: SayShapeNode): EditorSpec | null {
     const def = this.registry.get(node.type);
     const box = this.boxOf(node);
     if (!def?.editor || !box || !node.props.bind) return null;
@@ -865,7 +865,7 @@ export class Loom {
   }
 
   /** Write what was typed to the field's bind=. */
-  private typeInto(node: LoomNode, text: string): void {
+  private typeInto(node: SayShapeNode, text: string): void {
     const bind = node.props.bind;
     const spec = this.editorSpec(node);
     if (!bind || !spec) return;
@@ -882,7 +882,7 @@ export class Loom {
   }
 
   /** Enter runs on=, Tab moves to the next element, Escape stops typing. */
-  private editorKey(node: LoomNode, key: string, shift: boolean): boolean {
+  private editorKey(node: SayShapeNode, key: string, shift: boolean): boolean {
     if (key === "Enter") {
       if (node.props.on) this.runActionString(node.props.on, node);
       return true;
@@ -925,7 +925,7 @@ export class Loom {
     return true;
   }
 
-  private isShown(node: LoomNode): boolean {
+  private isShown(node: SayShapeNode): boolean {
     return isVisible(node, this.state.scope, this.registry);
   }
 
@@ -1146,9 +1146,9 @@ export class Loom {
   }
 
   /** Find nodes by type (handy in the console: loom.find("button")). */
-  find(type: string): LoomNode[] {
-    const out: LoomNode[] = [];
-    const walk = (n: LoomNode) => { if (n.type === type) out.push(n); n.children.forEach(walk); };
+  find(type: string): SayShapeNode[] {
+    const out: SayShapeNode[] = [];
+    const walk = (n: SayShapeNode) => { if (n.type === type) out.push(n); n.children.forEach(walk); };
     if (this.parsed) walk(this.parsed.root);
     return out;
   }

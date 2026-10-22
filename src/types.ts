@@ -1,4 +1,4 @@
-/** A value that can live in Loom state or result from an expression. */
+/** A value that can live in SayShape state or result from an expression. */
 export type Value = number | string | boolean | null | DataList | DataRecord;
 
 /** A list of values (frozen; see src/data.ts). */
@@ -10,7 +10,7 @@ export interface DataRecord {
 }
 
 /** One element in the spec tree, created from one line of the spec. */
-export interface LoomNode {
+export interface SayShapeNode {
   /** Stable identity across re-parses: `${line}:${type}`. */
   id: string;
   type: string;
@@ -18,7 +18,7 @@ export interface LoomNode {
   text?: string;
   /** Raw prop strings. Components interpret them through a PropReader. */
   props: Record<string, string>;
-  children: LoomNode[];
+  children: SayShapeNode[];
   /** 1-based line number in the spec. */
   line: number;
   indent: number;
@@ -41,7 +41,7 @@ export interface Rect {
 
 /** The result of layout for one node. */
 export interface Box extends Rect {
-  node: LoomNode;
+  node: SayShapeNode;
   children: Box[];
   /** Component-private layout results (wrapped lines, scale factors...). */
   data?: Record<string, unknown>;
@@ -57,7 +57,7 @@ export interface HitRegion {
 
 /** What the pointer or keyboard focus is currently on. */
 export interface HitTarget {
-  node: LoomNode;
+  node: SayShapeNode;
   box: Box;
   detail?: unknown;
   /** "popup" for a region of the open popup (see src/popup.ts); its node is the popup's owner. */

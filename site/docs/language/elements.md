@@ -1,11 +1,11 @@
 ---
 title: Elements and nesting
-description: Loom's line syntax. One element per line, quoted text, props, indentation for nesting, and comments.
+description: SayShape's line syntax. One element per line, quoted text, props, indentation for nesting, and comments.
 ---
 
 # Elements and nesting
 
-A Loom spec is a list of lines. Each line is one element: its type, then optional quoted text, then `name=value` props.
+A SayShape spec is a list of lines. Each line is one element: its type, then optional quoted text, then `name=value` props.
 
 ```loom live
 button "Save changes" variant=secondary on=emit:save

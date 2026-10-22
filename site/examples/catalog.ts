@@ -16,7 +16,7 @@ export interface Example {
   title: string;
   /** One or two sentences: what it is. */
   summary: string;
-  /** The Loom features it demonstrates, as short phrases. */
+  /** The SayShape features it demonstrates, as short phrases. */
   features: string[];
   /** Set when an action pretends to submit something. */
   simulated?: string;

@@ -116,7 +116,7 @@ describe("the sandbox", () => {
     "take(rooms, '__proto__')",
   ];
   for (const src of attempts) {
-    it(`gives only Loom data for ${src}`, () => {
+    it(`gives only SayShape data for ${src}`, () => {
       const r = evaluate(src, store.scope);
       if (r.ok) expect(isData(r.value) || typeof r.value === "number").toBe(true);
     });

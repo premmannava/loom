@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** The engine's stages and its input loop, drawn to match src/engine.ts. */
 const stages = [
-  { name: "Spec text", note: "lines of Loom" },
+  { name: "Spec text", note: "lines of SayShape" },
   { name: "Parse", note: "tree + diagnostics" },
   { name: "Layout", note: "a box per element" },
   { name: "Paint", note: "canvas calls" },
@@ -12,7 +12,7 @@ const stages = [
 <template>
   <figure class="ed-fig">
     <svg viewBox="0 0 760 210" role="img" aria-labelledby="engine-diagram-title engine-diagram-desc">
-      <title id="engine-diagram-title">Loom's rendering pipeline</title>
+      <title id="engine-diagram-title">SayShape's rendering pipeline</title>
       <desc id="engine-diagram-desc">Spec text is parsed into a tree, laid out into boxes and painted onto the canvas. Pointer and keyboard input on the canvas runs actions, which change state, which causes a new layout.</desc>
       <defs>
         <marker id="ed-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">

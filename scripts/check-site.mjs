@@ -14,7 +14,7 @@
  *   local model server or the development proxy.
  *
  * Browser checks: every page loads without console errors, makes no request
- * outside the site (in particular none to localhost), and its Loom canvases draw.
+ * outside the site (in particular none to localhost), and its SayShape canvases draw.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../..");
 const DIST = join(ROOT, "site/.vitepress/dist");
-const BASE = "/loom/";
+const BASE = process.env.SITE_BASE ?? "/loom/";
 const problems = [];
 const fail = (msg) => problems.push(msg);
 
@@ -155,7 +155,7 @@ async function browserCheck() {
           return c.width === 0 || c.height === 0;
         }).length,
       );
-      if (blank) errors.push(`${blank} visible Loom canvas(es) never drew`);
+      if (blank) errors.push(`${blank} visible SayShape canvas(es) never drew`);
       for (const e of errors) fail(`${path} (${scheme}): ${e}`);
       await page.close();
     }

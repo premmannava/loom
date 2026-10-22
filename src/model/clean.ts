@@ -1,10 +1,10 @@
 /**
- * Turns a model's raw streamed text into Loom lines, chunk by chunk:
+ * Turns a model's raw streamed text into SayShape lines, chunk by chunk:
  *
  * - drops thinking (`<think>…</think>`, as Qwen3 and DeepSeek R1 write it),
  * - drops code fences (```), which models add out of habit,
  * - drops chatter before the spec starts ("Here is your interface:"),
- * - joins a state value spread over several lines back into one line. Loom
+ * - joins a state value spread over several lines back into one line. SayShape
  *   needs each value on one line (so a stream can render line by line), but
  *   models often lay out long lists like JSON, one item per line.
  *
@@ -15,7 +15,7 @@
  */
 
 export interface FilterOutput {
-  /** Loom text to pass on (complete lines, each ending in a newline). */
+  /** SayShape text to pass on (complete lines, each ending in a newline). */
   text: string;
   /** True when earlier output turned out to be thinking and must be thrown away. */
   reset: boolean;

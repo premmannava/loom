@@ -6,7 +6,7 @@
  *
  * Expansion happens during layout, when a container asks for its children:
  * every `each` is replaced by copies of its children, one set per item. A copy
- * is an ordinary LoomNode whose id carries the item's key (`7:check#3`), so
+ * is an ordinary SayShapeNode whose id carries the item's key (`7:check#3`), so
  * focus, hover and fade-in follow the item, not its position. Each copy reads
  * values through its own scope: the loop variables first, then whatever the
  * `each` itself could see (state, or an outer loop's variables).
@@ -17,7 +17,7 @@
 import { bareExpression, evaluate, type Scope } from "./expr";
 import { isList, isScalar } from "./data";
 import { PATH, placeOf, stateLocate, type Locate } from "./paths";
-import type { LoomNode, Value } from "./types";
+import type { SayShapeNode, Value } from "./types";
 
 /** At most this many items are shown per `each`; the rest are left out with a warning. */
 export const MAX_EACH_ITEMS = 500;
@@ -37,11 +37,11 @@ export interface EachBudget {
 /** Default loop variable name when `as=` is left out. */
 export const DEFAULT_AS = "item";
 
-const scopes = new WeakMap<LoomNode, Scope>();
-const locators = new WeakMap<LoomNode, Locate>();
+const scopes = new WeakMap<SayShapeNode, Scope>();
+const locators = new WeakMap<SayShapeNode, Locate>();
 
 /** The scope a node reads values through: its item's scope inside an `each`, otherwise `base`. */
-export function scopeOf(node: LoomNode, base: Scope): Scope {
+export function scopeOf(node: SayShapeNode, base: Scope): Scope {
   return scopes.get(node) ?? base;
 }
 
@@ -49,7 +49,7 @@ export function scopeOf(node: LoomNode, base: Scope): Scope {
  * Where a node's names live in state, for writing: inside each, the loop
  * variable points at its item (`t` is item 2 of `todos`).
  */
-export function locateOf(node: LoomNode): Locate {
+export function locateOf(node: SayShapeNode): Locate {
   return locators.get(node) ?? stateLocate;
 }
 
@@ -59,20 +59,20 @@ export function bare(raw: string): string {
 }
 
 /** The loop variable names an `each` introduces. */
-export function loopNames(each: LoomNode): string[] {
+export function loopNames(each: SayShapeNode): string[] {
   const names = [each.props.as ?? DEFAULT_AS];
   if (each.props.index) names.push(each.props.index);
   return names;
 }
 
-function size(node: LoomNode): number {
+function size(node: SayShapeNode): number {
   let n = 1;
   for (const c of node.children) n += size(c);
   return n;
 }
 
-function copy(node: LoomNode, suffix: string, scope: Scope, locate: Locate): LoomNode {
-  const out: LoomNode = { ...node, id: node.id + suffix, children: node.children.map((c) => copy(c, suffix, scope, locate)) };
+function copy(node: SayShapeNode, suffix: string, scope: Scope, locate: Locate): SayShapeNode {
+  const out: SayShapeNode = { ...node, id: node.id + suffix, children: node.children.map((c) => copy(c, suffix, scope, locate)) };
   scopes.set(out, scope);
   locators.set(out, locate);
   return out;
@@ -83,7 +83,7 @@ function copy(node: LoomNode, suffix: string, scope: Scope, locate: Locate): Loo
  * itself reads through. `warn` hears about problems a model can fix: items
  * that aren't a list, too many items, repeated keys.
  */
-export function eachInstances(each: LoomNode, scope: Scope, warn?: (message: string) => void, budget: EachBudget = { left: MAX_EACH_ELEMENTS }): LoomNode[] {
+export function eachInstances(each: SayShapeNode, scope: Scope, warn?: (message: string) => void, budget: EachBudget = { left: MAX_EACH_ELEMENTS }): SayShapeNode[] {
   const raw = each.props.items;
   if (raw === undefined) return [];
   const r = evaluate(bare(raw), scope);
@@ -105,7 +105,7 @@ export function eachInstances(each: LoomNode, scope: Scope, warn?: (message: str
   const listPlace = PATH.test(itemsPath) ? placeOf(itemsPath, outer) : null;
   const keyExpr = each.props.key === undefined ? undefined : bare(each.props.key);
   const seen = new Set<string>();
-  const out: LoomNode[] = [];
+  const out: SayShapeNode[] = [];
   const n = Math.min(items.length, MAX_EACH_ITEMS);
   const perItem = each.children.reduce((sum, c) => sum + size(c), 0);
   for (let i = 0; i < n; i++) {

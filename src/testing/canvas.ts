@@ -1,5 +1,5 @@
 /**
- * A stand-in for <canvas> and its 2D context, so the real Loom engine can run
+ * A stand-in for <canvas> and its 2D context, so the real SayShape engine can run
  * in Node. The context draws nothing; it records every drawing call together
  * with the style that was active, which is what tests need to check colors,
  * fonts and text.

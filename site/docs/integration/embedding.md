@@ -1,18 +1,18 @@
 ---
-title: Embedding Loom
-description: The Loom class. Options, methods and events for rendering specs in your own page.
+title: Embedding SayShape
+description: The SayShape class. Options, methods and events for rendering specs in your own page.
 ---
 
-# Embedding Loom
+# Embedding SayShape
 
-> Loom isn't published to npm yet. Build it and install the repository folder as a local dependency ([Local setup](../getting-started/setup#using-it-from-another-project)). The package name is `loom-ui`.
+> SayShape isn't published to npm yet. Build it and install the repository folder as a local dependency ([Local setup](../getting-started/setup#using-it-from-another-project)). The package name is `loom-ui`.
 
 ```ts
-import { Loom, coreComponents } from "loom-ui";
+import { SayShape, coreComponents } from "loom-ui";
 import { mapComponents } from "loom-ui/map";
 
 const canvas = document.querySelector("canvas")!;
-const loom = new Loom(canvas, {
+const loom = new SayShape(canvas, {
   components: [...coreComponents, ...mapComponents],
 });
 
@@ -78,15 +78,15 @@ The canvas fills its parent's width, follows it when the parent resizes, and gro
 Create the instance once the canvas is in the document, and destroy it when the canvas goes away. In Vue, for example (this site does exactly this):
 
 ```ts
-let loom: Loom | null = null;
+let loom: SayShape | null = null;
 onMounted(() => {
-  loom = new Loom(canvasRef.value!, { components: coreComponents });
+  loom = new SayShape(canvasRef.value!, { components: coreComponents });
   loom.setSpec(spec);
 });
 onBeforeUnmount(() => loom?.destroy());
 ```
 
-With server-side rendering or static generation, import and construct Loom only in the browser: it needs a canvas, `window` and fonts.
+With server-side rendering or static generation, import and construct SayShape only in the browser: it needs a canvas, `window` and fonts.
 
 ## Fonts
 

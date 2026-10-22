@@ -61,7 +61,7 @@ describe("reading fields and items", () => {
 });
 
 describe("list and record literals", () => {
-  it("makes lists and records that are Loom data", () => {
+  it("makes lists and records that are SayShape data", () => {
     const r = val("{text: 'Snacks', done: false, tags: ['a', 'b']}") as Record<string, unknown>;
     expect(isData(r)).toBe(true);
     expect(Object.getPrototypeOf(r)).toBeNull();
@@ -168,7 +168,7 @@ describe("the sandbox around property access", () => {
     });
   }
 
-  it("never returns anything but Loom data", () => {
+  it("never returns anything but SayShape data", () => {
     for (const src of ["todos", "todos[0]", "order.lines", "{a: [1]}", "[todos[0], order]", "join(cart, 'name')"]) {
       expect(isData(val(src)), src).toBe(true);
     }

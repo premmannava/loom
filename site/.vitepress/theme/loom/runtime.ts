@@ -1,14 +1,14 @@
 /**
- * Creating Loom instances on the website.
+ * Creating SayShape instances on the website.
  *
  * The engine needs a real canvas, fonts and `window`, so it is only ever
  * imported in the browser (from onMounted), never while VitePress renders
  * pages to static HTML. Every demo on the site goes through here, so they
  * all run the same engine from ../../src with no second implementation.
  */
-import type { Loom, Theme } from "@loom/index";
+import type { SayShape, Theme } from "@loom/index";
 
-export type { Loom, Theme };
+export type { SayShape, Theme };
 
 /** The faces the engine draws with (theme.font). Canvas text doesn't trigger font loading by itself. */
 const FACES = ['400 15px "Instrument Sans"', '600 15px "Instrument Sans"', '700 15px "Instrument Sans"', '400 13px "IBM Plex Mono"'];
@@ -30,7 +30,7 @@ export interface CreateOptions {
 }
 
 export interface LoomModules {
-  Loom: typeof import("@loom/index").Loom;
+  SayShape: typeof import("@loom/index").SayShape;
   lightTheme: Theme;
   darkTheme: Theme;
   parse: typeof import("@loom/index").parse;
@@ -43,15 +43,15 @@ let mapMod: Promise<typeof import("@loom/components/map/index")> | null = null;
 export async function loomModules(): Promise<LoomModules> {
   core ??= import("@loom/index");
   const m = await core;
-  return { Loom: m.Loom, lightTheme: m.lightTheme, darkTheme: m.darkTheme, parse: m.parse, Registry: m.Registry };
+  return { SayShape: m.SayShape, lightTheme: m.lightTheme, darkTheme: m.darkTheme, parse: m.parse, Registry: m.Registry };
 }
 
-export async function createLoom(canvas: HTMLCanvasElement, opts: CreateOptions = {}): Promise<Loom> {
+export async function createLoom(canvas: HTMLCanvasElement, opts: CreateOptions = {}): Promise<SayShape> {
   core ??= import("@loom/index");
   if (opts.map) mapMod ??= import("@loom/components/map/index");
   const [m, map] = await Promise.all([core, opts.map ? mapMod : null, loadFonts()]);
   const components = [...m.coreComponents, ...(map ? map.mapComponents : [])];
-  return new m.Loom(canvas, {
+  return new m.SayShape(canvas, {
     components,
     // The site shell decides light or dark; see watchSiteTheme.
     theme: isSiteDark() ? m.darkTheme : m.lightTheme,
@@ -66,7 +66,7 @@ export async function createLoom(canvas: HTMLCanvasElement, opts: CreateOptions 
 export const isSiteDark = () => typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 
 /** Keep an instance in step with the site's light/dark switch. Returns a cleanup function. */
-export function watchSiteTheme(loom: Loom, themes: { light: Theme; dark: Theme }, enabled: () => boolean = () => true): () => void {
+export function watchSiteTheme(loom: SayShape, themes: { light: Theme; dark: Theme }, enabled: () => boolean = () => true): () => void {
   const apply = () => { if (enabled()) loom.setTheme(isSiteDark() ? themes.dark : themes.light); };
   const mo = new MutationObserver(apply);
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
@@ -93,7 +93,7 @@ export function toBase64Url(text: string): string {
  * beginStream, push chunks, endStream. Nothing is generated; the text is
  * already known. Resolves false if cancelled.
  */
-export function replayStream(loom: Loom, spec: string, opts: { signal: { cancelled: boolean }; onProgress?: (shown: string) => void; instant?: boolean }): Promise<boolean> {
+export function replayStream(loom: SayShape, spec: string, opts: { signal: { cancelled: boolean }; onProgress?: (shown: string) => void; instant?: boolean }): Promise<boolean> {
   loom.beginStream();
   if (opts.instant) {
     loom.push(spec);

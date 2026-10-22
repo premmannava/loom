@@ -61,7 +61,7 @@ async function copy() {
     </div>
     <div class="gi-preview">
       <div class="loom-stage gi-stage">
-        <div class="loom-canvas-wrap"><canvas ref="canvas" :aria-label="`${example.title}, rendered by Loom on a canvas`"></canvas></div>
+        <div class="loom-canvas-wrap"><canvas ref="canvas" :aria-label="`${example.title}, rendered by SayShape on a canvas`"></canvas></div>
       </div>
       <ol v-if="events.length" class="loom-events" aria-live="polite" aria-label="Events sent to this page">
         <li v-for="e in events" :key="e.id"><code>{{ e.text }}</code><span v-if="e.kind === 'emit'">, received by this page and not sent anywhere</span></li>
@@ -69,10 +69,10 @@ async function copy() {
     </div>
     <div v-show="open" :id="sourceId" class="gi-source">
       <div class="gi-source-head">
-        <span>{{ lines }} lines of Loom</span>
+        <span>{{ lines }} lines of SayShape</span>
         <button class="loom-btn-text" type="button" @click="copy">{{ copied || "Copy spec" }}</button>
       </div>
-      <pre class="spec-view numbered" tabindex="0" :aria-label="`Loom spec for ${example.title}`"><code v-html="html"></code></pre>
+      <pre class="spec-view numbered" tabindex="0" :aria-label="`SayShape spec for ${example.title}`"><code v-html="html"></code></pre>
     </div>
   </article>
 </template>

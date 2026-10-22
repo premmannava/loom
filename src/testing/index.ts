@@ -1,5 +1,5 @@
 /**
- * Test helpers for Loom (`loom-ui/testing`).
+ * Test helpers for SayShape (`loom-ui/testing`).
  *
  * `render()` runs the real engine (parse, layout, paint, hit testing,
  * pointer and keyboard handling) against a recording stand-in for the
@@ -13,13 +13,13 @@
  */
 import type { ComponentDef } from "../component";
 import { coreComponents } from "../components";
-import { Loom, type LoomEvents, type LoomOptions } from "../engine";
+import { SayShape, type SayShapeEvents, type SayShapeOptions } from "../engine";
 import { interpolate } from "../expr";
 import { eachInstances, scopeOf } from "../each";
 import type { EditorEvents, EditorHost, EditorSpec } from "../editor";
 import { isVisible, walkBoxes } from "../layout";
 import { lightTheme, type Theme } from "../theme";
-import type { Box, Diagnostic, HitRegion, LoomNode, Value } from "../types";
+import type { Box, Diagnostic, HitRegion, SayShapeNode, Value } from "../types";
 import { ensurePath2D, FakeCanvas, type DrawOp } from "./canvas";
 
 export { createRecordingContext, FakeCanvas, monoWidth, type DrawOp } from "./canvas";
@@ -35,7 +35,7 @@ export interface RenderOptions {
   padding?: number;
   /** Passed to the engine, to test images (Node has no image loading of its own). */
   imageHosts?: string[];
-  loadImage?: LoomOptions["loadImage"];
+  loadImage?: SayShapeOptions["loadImage"];
   /** The visible part of the canvas, for popup placement. Default: from the top, unbounded. */
   viewport?: { top: number; bottom: number };
   /** Today's date as YYYY-MM-DD, for date pickers. Default: the machine's local day. */
@@ -59,7 +59,7 @@ export type Query =
     };
 
 export interface Found {
-  node: LoomNode;
+  node: SayShapeNode;
   /** The element's box, or null when it's hidden by `if=` or not laid out. */
   box: Box | null;
   /** The text as currently shown, with {expressions} filled in. */
@@ -73,7 +73,7 @@ export interface Emitted {
 
 export interface Rendered {
   /** The engine instance, for anything the helpers don't cover. */
-  loom: Loom;
+  loom: SayShape;
   /** The stand-in canvas, for sending raw events. */
   canvas: FakeCanvas;
   /** Current state, as a plain object. */
@@ -88,9 +88,9 @@ export interface Rendered {
   /** Interactive regions from the most recent frame. */
   readonly hits: readonly HitRegion[];
   /** The element with keyboard focus, if any. */
-  readonly focused: LoomNode | null;
+  readonly focused: SayShapeNode | null;
   /** The open popup (a select's options): its owner, where it is, and its pressable regions. */
-  readonly popup: Loom["openPopupInfo"];
+  readonly popup: SayShape["openPopupInfo"];
 
   /** Elements matching a query, in spec order. Hidden elements are included with `box: null`. */
   findAll(query: Query): Found[];
@@ -142,7 +142,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
   const canvas = new FakeCanvas();
   let editingNode = (): string | null => null;
   const editor = new FakeEditorHost(() => editingNode());
-  const loom: Loom = new Loom(canvas as unknown as HTMLCanvasElement, {
+  const loom: SayShape = new SayShape(canvas as unknown as HTMLCanvasElement, {
     editor,
     components: opts.components ?? coreComponents,
     theme: opts.theme ?? lightTheme,
@@ -159,7 +159,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
   const emitted: Emitted[] = [];
   const warnings: string[] = [];
   let drawOps: DrawOp[] = [];
-  loom.on("action", (e: LoomEvents["action"]) => emitted.push({ name: e.name, value: e.value }));
+  loom.on("action", (e: SayShapeEvents["action"]) => emitted.push({ name: e.name, value: e.value }));
   loom.on("render", () => { drawOps = canvas.takeDrawOps(); });
   editingNode = () => loom.editing?.node.id ?? null;
 
@@ -180,7 +180,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     const boxes = boxesById();
     const out: Found[] = [];
     const scope = loom.state.scope;
-    const walk = (n: LoomNode) => {
+    const walk = (n: SayShapeNode) => {
       if (n.id !== "root") {
         const shownText = n.text === undefined ? undefined : interpolate(n.text, scopeOf(n, scope));
         const textOk =

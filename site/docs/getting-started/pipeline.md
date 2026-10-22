@@ -1,13 +1,13 @@
 ---
 title: From spec to pixels
-description: How a Loom spec becomes an interface. The model's part ends at the text; the engine parses, lays out, paints and runs it.
+description: How a SayShape spec becomes an interface. The model's part ends at the text; the engine parses, lays out, paints and runs it.
 ---
 
 # From spec to pixels
 
-There are two halves to every Loom interface, and they never mix.
+There are two halves to every SayShape interface, and they never mix.
 
-**Generating** is a model's job (or a person's). The output is text in Loom's language and nothing else. The model is told what it may write by a [guide generated from the components](../integration/model-guide), and its text is checked by Loom's own parser before anything relies on it.
+**Generating** is a model's job (or a person's). The output is text in SayShape's language and nothing else. The model is told what it may write by a [guide generated from the components](../integration/model-guide), and its text is checked by SayShape's own parser before anything relies on it.
 
 **Rendering and running** is the engine's job, in the browser. From here on no model is involved: state changes, totals, filtering, screen changes and focus are all handled locally.
 
@@ -36,7 +36,7 @@ The repository's tests check this property for every sample: each prefix must pa
 
 - **Its own layout.** No HTML elements or CSS layout are used for the interface. The one exception is text entry: while someone types in a field, a real `<input>` is placed exactly over it so the browser handles typing, selection, input methods and autofill. It's removed when they leave the field.
 - **Its own state.** Declared in the spec, readable and writable from your app ([Host data and events](../integration/host-data)).
-- **Its own expressions.** `{…}` is evaluated by Loom's own small language, which can't reach JavaScript ([The expression boundary](../architecture/security)).
+- **Its own expressions.** `{…}` is evaluated by SayShape's own small language, which can't reach JavaScript ([The expression boundary](../architecture/security)).
 - **The look.** Specs choose roles such as `tone=` and `variant=`; the theme decides colors, fonts, spacing and radii.
 
 More detail is in [How the engine works](../architecture/).

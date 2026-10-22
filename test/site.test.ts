@@ -1,6 +1,6 @@
 /**
  * The website's examples and documentation run on the real engine, so they
- * must be valid Loom and must do what the site says they do.
+ * must be valid SayShape and must do what the site says they do.
  *
  * - Every gallery example parses with no diagnostics and renders without
  *   warnings at phone and desktop widths, and its interactions work.
@@ -242,7 +242,7 @@ describe("documentation examples", () => {
 
   for (const b of blocks) {
     const invalid = b.info.split(/\s+/).includes("invalid");
-    it(`${b.file}:${b.line} ${invalid ? "shows diagnostics" : "is valid Loom"}`, () => {
+    it(`${b.file}:${b.line} ${invalid ? "shows diagnostics" : "is valid SayShape"}`, () => {
       // `known=a,b` names state the host app supplies (loom.state.set), as in the integration docs.
       const known = /(?:^|\s)known=([\w,]+)/.exec(b.info)?.[1]?.split(",") ?? [];
       const diagnostics = parse(b.spec, registry, { knownNames: known }).diagnostics;

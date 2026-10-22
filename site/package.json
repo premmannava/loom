@@ -1,7 +1,7 @@
 {
   "name": "loom-site",
   "private": true,
-  "description": "The Loom website: landing page, playground, examples and documentation (VitePress). Not part of the loom-ui package.",
+  "description": "The SayShape website: landing page, playground, examples and documentation (VitePress). Not part of the loom-ui package.",
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",

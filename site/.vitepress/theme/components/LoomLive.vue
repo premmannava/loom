@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * A documentation example: the highlighted spec (slot) with the same spec
- * rendered live by the Loom engine underneath. Created by ```loom live fences.
+ * rendered live by the SayShape engine underneath. Created by ```loom live fences.
  */
 import { computed, ref, shallowRef } from "vue";
 import { withBase } from "vitepress";
@@ -45,7 +45,7 @@ function reset() {
     <div class="loom-live__code"><slot /></div>
     <div class="loom-live__result">
       <div class="loom-live__bar">
-        <span class="loom-live__label"><span class="dot" aria-hidden="true"></span>Rendered by the Loom engine</span>
+        <span class="loom-live__label"><span class="dot" aria-hidden="true"></span>Rendered by the SayShape engine</span>
         <span class="loom-live__actions">
           <button type="button" class="loom-btn-text" :disabled="!loom" @click="reset">Reset</button>
           <a class="loom-btn-text" :href="playgroundHref">Open in playground</a>

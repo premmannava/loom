@@ -1,11 +1,11 @@
 ---
 title: Local setup
-description: Clone the Loom repository, install it, run the tests and open the development playground.
+description: Clone the SayShape repository, install it, run the tests and open the development playground.
 ---
 
 # Local setup
 
-Loom isn't published to npm yet, so you work from the repository. You need **Node.js 18 or newer** and npm.
+SayShape isn't published to npm yet, so you work from the repository. You need **Node.js 18 or newer** and npm.
 
 ```bash
 git clone https://github.com/premmannava/loom.git
@@ -54,6 +54,6 @@ npm run build
 npm install ../loom
 ```
 
-Rebuild Loom after pulling changes. When Loom is published, this becomes an ordinary `npm install`.
+Rebuild SayShape after pulling changes. The package is still named `loom-ui`, SayShape's earlier working name; it will be renamed before it's published. When SayShape is published, this becomes an ordinary `npm install`.
 
 Next: [render your first interface](./first-interface).

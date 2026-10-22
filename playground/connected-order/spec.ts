@@ -11,7 +11,7 @@ derive total={round(subtotal * 1.08, 2)}
 
 column
   text "Equipment desk" style=title
-  text "A connected Loom demo. Orders are simulated and reset when this page reloads."
+  text "A connected SayShape demo. Orders are simulated and reset when this page reloads."
   link "Back to the playground" on=emit:playground
   select "Department" items=departments bind=department disabled={loading || submitting}
   text "Fetching the catalog…" if={loading}

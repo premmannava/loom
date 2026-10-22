@@ -34,7 +34,7 @@ import { fieldOf, isList, isRecord } from "../data";
 import type { TextMeasurer } from "../text";
 import { wrapText } from "../text";
 import type { Theme } from "../theme";
-import type { Box, LoomNode, Value } from "../types";
+import type { Box, SayShapeNode, Value } from "../types";
 import { chevron, fillTint, onProp, partBox, runOn, themeFont } from "./util";
 
 /** The most rows one table shows. Larger lists show a message: page them with take() or pagination. */
@@ -225,7 +225,7 @@ export function fitColumns(natural: readonly number[], minimum: readonly number[
 
 interface ColumnSpec { field: string; label: string; format: Format; align: Align }
 
-function readColumns(node: LoomNode, ctx: Pick<LayoutContext, "visibleChildren" | "props">): ColumnSpec[] {
+function readColumns(node: SayShapeNode, ctx: Pick<LayoutContext, "visibleChildren" | "props">): ColumnSpec[] {
   return ctx.visibleChildren(node).filter((c) => c.type === "table-column").map((c) => {
     const p = ctx.props(c);
     const field = p.str("field");
@@ -234,7 +234,7 @@ function readColumns(node: LoomNode, ctx: Pick<LayoutContext, "visibleChildren" 
   });
 }
 
-function tableLayout(box: { w: number; node: LoomNode }, p: PropReader, ctx: Pick<LayoutContext, "theme" | "measure" | "warn" | "visibleChildren" | "props">): TableGeometry {
+function tableLayout(box: { w: number; node: SayShapeNode }, p: PropReader, ctx: Pick<LayoutContext, "theme" | "measure" | "warn" | "visibleChildren" | "props">): TableGeometry {
   const t: Theme = ctx.theme, m = ctx.measure;
   const line = box.node.line;
   const warn = (msg: string) => ctx.warn?.(`table on line ${line}: ${msg}`);

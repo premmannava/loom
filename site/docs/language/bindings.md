@@ -1,6 +1,6 @@
 ---
 title: Bindings
-description: How Loom controls read and write state through bind=, including paths into list items and records.
+description: How SayShape controls read and write state through bind=, including paths into list items and records.
 ---
 
 # Bindings

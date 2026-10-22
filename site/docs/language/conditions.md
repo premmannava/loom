@@ -1,6 +1,6 @@
 ---
 title: Conditional visibility
-description: Showing and hiding Loom elements with if=, and if blocks for several lines at once.
+description: Showing and hiding SayShape elements with if=, and if blocks for several lines at once.
 ---
 
 # Conditional visibility
