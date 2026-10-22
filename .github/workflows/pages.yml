@@ -35,6 +35,8 @@ jobs:
         run: npm ci
       - name: Install the website's dependencies
         run: npm ci --prefix site
+      - name: Generate the component reference, so its examples are tested too
+        run: npm run site:docs
       - name: Website examples and documentation snippets
         run: npx vitest run test/site.test.ts
       - name: Type-check the website
