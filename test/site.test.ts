@@ -234,8 +234,10 @@ function loomBlocks(): Block[] {
 describe("documentation examples", () => {
   const blocks = loomBlocks();
 
+  // The component pages are generated (npm run site:docs) and ignored by git, so CI's
+  // plain `npm test` may not have them; count only the hand-written pages here.
   it("finds the documentation's examples", () => {
-    expect(blocks.length).toBeGreaterThan(40);
+    expect(blocks.filter((b) => !b.file.startsWith("docs/components")).length).toBeGreaterThanOrEqual(30);
   });
 
   for (const b of blocks) {
