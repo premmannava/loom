@@ -60,4 +60,6 @@ export interface HitTarget {
   node: LoomNode;
   box: Box;
   detail?: unknown;
+  /** "popup" for a region of the open popup (see src/popup.ts); its node is the popup's owner. */
+  layer?: "popup";
 }

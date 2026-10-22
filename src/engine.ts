@@ -9,7 +9,7 @@
  * changing state re-lays out, hovering only repaints.
  */
 import { parseActions, runActions } from "./actions";
-import { PropReader, type ComponentDef, type DragContext, type PaintContext, type PressContext } from "./component";
+import { PropReader, type ComponentDef, type DragContext, type LayoutContext, type PaintContext, type PopupContext, type PressContext } from "./component";
 import { Emitter } from "./emitter";
 import { locateOf, scopeOf } from "./each";
 import { domEditorHost } from "./dom-editor";
@@ -17,6 +17,7 @@ import { noEditor, type EditorHost, type EditorSpec } from "./editor";
 import { isList, makeList } from "./data";
 import { getIn, placeOf, setIn } from "./paths";
 import { createLayoutContext, isVisible } from "./layout";
+import { placePopup, POPUP_MARGIN, type PopupState, type Viewport } from "./popup";
 import { parse, type ParseResult } from "./parser";
 import { Registry } from "./registry";
 import { Store } from "./state";
@@ -24,7 +25,7 @@ import { CanvasMeasurer, font as fontString, wrapText } from "./text";
 import { darkTheme, lightTheme, themeFromCSS, type Theme } from "./theme";
 import { Inspector } from "./inspector";
 import { browserImageLoader, ImageCache, type ImageLoader, type ImagePolicy } from "./images";
-import type { Box, Diagnostic, HitRegion, HitTarget, LoomNode, Value } from "./types";
+import type { Box, Diagnostic, HitRegion, HitTarget, LoomNode, Rect, Value } from "./types";
 
 export interface Metrics {
   nodes: number;
@@ -81,6 +82,12 @@ export interface LoomOptions {
    * loom-ui/testing passes a fake one.
    */
   editor?: EditorHost;
+  /**
+   * The part of the canvas people can see, in canvas CSS pixels, for placing
+   * popups. Default: worked out from the canvas's place in the window (in
+   * Node, everything from the top down).
+   */
+  viewport?: () => Viewport;
 }
 
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
@@ -128,6 +135,12 @@ export class Loom {
   private typed: { text: string; value: Value } | null = null;
   /** Layout warnings already reported for this spec, so a list problem isn't repeated every frame. */
   private warned = new Set<string>();
+  /** The open popup, if any: its owner, its transient state, and where it was placed. */
+  private popup: { owner: HitTarget; state: PopupState; area: Rect | null } | null = null;
+  /** The open popup's hit regions from the latest frame, checked before the screen's. */
+  private popupHits: HitRegion[] = [];
+  /** Set when a press outside an open popup closed it, so its release does nothing either. */
+  private swallowRelease = false;
 
   metrics: Metrics = { nodes: 0, parseMs: 0, layoutMs: 0, paintMs: 0, width: 0, height: 0, pixelWidth: 0, pixelHeight: 0 };
 
@@ -165,6 +178,7 @@ export class Loom {
   /** Replace the whole spec. State is kept unless resetState is true. */
   setSpec(src: string, opts: { resetState?: boolean } = {}): void {
     if (opts.resetState) this.resetState();
+    this.closePopup(false);
     this.source = src;
     this.streaming = false;
     this.invalidate("parse");
@@ -177,6 +191,7 @@ export class Loom {
   /** Start a new streamed spec (e.g. a model response). Clears state by default. */
   beginStream(opts: { keepState?: boolean } = {}): void {
     if (!opts.keepState) this.resetState();
+    this.closePopup(false);
     this.source = "";
     this.streaming = true;
     this.invalidate("parse");
@@ -275,7 +290,10 @@ export class Loom {
     const warnOnce = (m: string) => { if (!this.warned.has(m)) { this.warned.add(m); this.warn(m); } };
     const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, warnOnce);
     this.rootBox = ctx.layout(this.parsed.root, 0, 0, width);
-    const height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
+    let height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
+    // A popup that needs more room than the screen has makes the canvas taller while it's open.
+    const area = this.placeOpenPopup(ctx, width);
+    if (area) height = Math.max(height, area.y + area.h + POPUP_MARGIN);
     const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
     const pw = Math.round(width * dpr), ph = Math.round(height * dpr);
     if (this.canvas.width !== pw) this.canvas.width = pw;
@@ -302,6 +320,7 @@ export class Loom {
     this.paintBox(this.rootBox, ctx, 1);
     this.resolveFocus();
     if (this.focus && this.keyboardMode && !this.inspector.inspecting) this.paintFocusRing(g, this.focus.box);
+    this.paintPopup(g, ctx);
     this.paintToast(g);
     this.inspector.paintOverlay(g, this.rootBox, this.hits);
     this.inspector.endCapture();
@@ -350,6 +369,7 @@ export class Loom {
       isFocused: (n, d) => this.keyboardMode && same(this.focus, n, d),
       isPressed: (n, d) => same(this.pressed, n, d),
       isEditing: (n) => !!this.editing && this.editing.node.id === n.id,
+      isPopupOpen: (n) => !!this.popup && this.popup.owner.node.id === n.id,
       motion: animate,
       appear: (n) => {
         if (!animate || n.id === "root") return 1;
@@ -466,6 +486,17 @@ export class Loom {
 
   /** Find the interactive target at a point (CSS pixels relative to the canvas). */
   targetAt(x: number, y: number): HitTarget | null {
+    // An open popup is on top: only its regions can be hit, and only inside it.
+    if (this.popup) {
+      const a = this.popup.area;
+      if (!a || x < a.x || x > a.x + a.w || y < a.y || y > a.y + a.h) return null;
+      for (let i = this.popupHits.length - 1; i >= 0; i--) {
+        const h = this.popupHits[i]!;
+        const b = h.box;
+        if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return { node: b.node, box: b, detail: h.detail, layer: "popup" };
+      }
+      return null;
+    }
     for (let i = this.hits.length - 1; i >= 0; i--) {
       const h = this.hits[i]!;
       const b = h.box;
@@ -493,12 +524,111 @@ export class Loom {
       },
       set: (path, v) => this.writePath(target.node, path, v),
       run: (actions) => this.runActionString(actions, target.node),
+      openPopup: (state) => this.openPopup(target, state),
+      popupOpen: !!this.popup && this.popup.owner.node.id === target.node.id,
     };
+  }
+
+  // ---------------------------------------------------------------- popups
+
+  /** The open popup, for tools and tests: its owner, where it is, its regions and transient state. */
+  get openPopupInfo(): { owner: LoomNode; area: Rect | null; regions: readonly HitRegion[]; state: Readonly<PopupState> } | null {
+    return this.popup && { owner: this.popup.owner.node, area: this.popup.area, regions: this.popupHits, state: this.popup.state };
+  }
+
+  private openPopup(owner: HitTarget, state: PopupState): void {
+    if (!this.registry.get(owner.node.type)?.popup) return;
+    this.endEdit();
+    this.popup = { owner: { node: owner.node, box: owner.box }, state: { ...state }, area: null };
+    this.popupHits = [];
+    this.focus = { node: owner.node, box: owner.box };
+    this.invalidate("layout");
+  }
+
+  /** Close the open popup, sending keyboard focus back to its owner when it's still shown. */
+  closePopup(restoreFocus = true): void {
+    const p = this.popup;
+    if (!p) return;
+    this.popup = null;
+    this.popupHits = [];
+    this.hover = null;
+    if (restoreFocus) {
+      const box = this.boxOf(p.owner.node);
+      if (box) { this.focus = { node: box.node, box }; this.canvas.focus(); }
+    }
+    this.invalidate("layout");
+  }
+
+  /** What a popup's handlers get: its owner as the target, its state, and close. */
+  private popupContext(target: HitTarget): PopupContext {
+    const p = this.popup!;
+    return { ...this.pressContext({ ...target, node: p.owner.node }), popup: p.state, area: p.area, close: (restore = true) => this.closePopup(restore) };
+  }
+
+  /** The visible part of the canvas, for placing popups. */
+  private viewport(): Viewport {
+    if (this.opts.viewport) return this.opts.viewport();
+    if (typeof window === "undefined" || !window.innerHeight) return { top: 0, bottom: Infinity };
+    const top = this.canvas.getBoundingClientRect().top;
+    return { top: Math.max(0, -top), bottom: window.innerHeight - top };
+  }
+
+  /** After layout: place the open popup by its owner, or close it if the owner is gone. */
+  private placeOpenPopup(ctx: LayoutContext, width: number): Rect | null {
+    const p = this.popup;
+    if (!p) return null;
+    const box = this.boxOf(p.owner.node);
+    const def = box && this.registry.get(box.node.type)?.popup;
+    const size = box && def && this.isShown(box.node) ? def.measure(box, ctx, p.state) : null;
+    if (!box || !size) {
+      this.popup = null;
+      this.popupHits = [];
+      return null;
+    }
+    p.owner = { node: box.node, box };
+    const placed = placePopup(box, size, this.viewport(), width);
+    p.area = { x: placed.x, y: placed.y, w: placed.w, h: placed.h };
+    return p.area;
+  }
+
+  /** Draw the open popup over everything, collecting its hit regions apart from the screen's. */
+  private paintPopup(g: CanvasRenderingContext2D, ctx: PaintContext): void {
+    const p = this.popup;
+    const a = p?.area;
+    const def = p && this.registry.get(p.owner.node.type)?.popup;
+    if (!p || !a || !def) { this.popupHits = []; return; }
+    const t = this.theme;
+    const screenHits = this.hits;
+    this.hits = [];
+    g.save();
+    // A soft edge under the panel, then the panel, then its content clipped to it.
+    roundRectPath(g, a.x, a.y + 2, a.w, a.h, t.radius.md);
+    g.globalAlpha = 0.12;
+    g.fillStyle = t.colors.ink;
+    g.fill();
+    g.globalAlpha = 1;
+    roundRectPath(g, a.x + 0.5, a.y + 0.5, a.w - 1, a.h - 1, t.radius.md);
+    g.fillStyle = t.colors.surface;
+    g.fill();
+    g.strokeStyle = t.colors.line;
+    g.lineWidth = 1;
+    g.stroke();
+    roundRectPath(g, a.x, a.y, a.w, a.h, t.radius.md);
+    g.clip();
+    def.paint(p.owner.box, a, ctx, p.state);
+    g.restore();
+    // Only regions inside the panel count.
+    this.popupHits = this.hits.filter((h) => h.box.y + h.box.h > a.y && h.box.y < a.y + a.h);
+    this.hits = screenHits;
   }
 
   /** Press a target as if clicked. */
   activate(target: HitTarget): void {
     const def = this.registry.get(target.node.type);
+    if (target.layer === "popup") {
+      if (this.popup && def?.popup) def.popup.press(this.popupContext(target));
+      return;
+    }
     if (def?.editor) { this.beginEdit(target); return; }
     if (def?.press) def.press(this.pressContext(target));
     // Draggable elements act through drag and key; Enter shouldn't fire their on=.
@@ -800,7 +930,19 @@ export class Loom {
       setTimeout(() => { pressing = false; }, 0);
       const p = local(e);
       if (this.inspector.inspecting) return;
+      if (this.popup) {
+        const a = this.popup.area;
+        if (!a || p.x < a.x || p.x > a.x + a.w || p.y < a.y || p.y > a.y + a.h) {
+          // A press outside closes it and stops there: nothing underneath is pressed.
+          this.swallowRelease = true;
+          this.pressed = null;
+          this.closePopup(true);
+          return;
+        }
+      }
       this.pressed = this.targetAt(p.x, p.y);
+      // Pressing inside a popup leaves keyboard focus on its owner.
+      if (this.pressed?.layer === "popup") { this.invalidate("paint"); return; }
       if (this.pressed) { this.focus = this.pressed; this.invalidate("paint"); }
       if (this.pressed && this.registry.get(this.pressed.node.type)?.drag) {
         // Keep receiving moves when the pointer leaves the canvas mid-drag.
@@ -811,6 +953,7 @@ export class Loom {
     };
     const onUp = (e: PointerEvent) => {
       const p = local(e);
+      if (this.swallowRelease) { this.swallowRelease = false; this.pressed = null; this.invalidate("paint"); return; }
       if (this.dragging) {
         this.pressed = null;
         this.dragTo("end", p.x, p.y);
@@ -826,6 +969,18 @@ export class Loom {
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && this.inspector.inspecting) { this.inspector.setInspecting(false); return; }
+      // An open popup takes every key. Escape closes it; Tab closes it and moves on as usual.
+      if (this.popup) {
+        this.keyboardMode = true;
+        if (e.key === "Tab") this.closePopup(true);
+        else {
+          e.preventDefault();
+          if (e.key === "Escape") this.closePopup(true);
+          else this.registry.get(this.popup.owner.node.type)?.popup?.key(this.popupContext(this.popup.owner), e.key);
+          this.invalidate("paint");
+          return;
+        }
+      }
       if (e.key === "Tab") {
         // Past the last element, let the browser move focus out of the canvas.
         if (this.tabFrom(e.shiftKey)) e.preventDefault();
@@ -854,13 +1009,28 @@ export class Loom {
       }
       this.invalidate("paint");
     };
-    const onBlur = () => { this.keyboardMode = false; this.invalidate("paint"); };
+    const onBlur = () => {
+      this.keyboardMode = false;
+      // Focus went elsewhere on the page (or another window): an open list goes with it.
+      this.closePopup(false);
+      this.invalidate("paint");
+    };
     // The browser took over the gesture (a scroll, say): finish the drag where it was.
     const onCancel = () => {
       this.pressed = null;
       if (this.dragging) this.dragTo("end", this.pointer?.x ?? 0, this.pointer?.y ?? 0);
     };
 
+    const onWheel = (e: WheelEvent) => {
+      const p = this.popup;
+      const a = p?.area;
+      const at = local(e);
+      if (!p || !a || at.x < a.x || at.x > a.x + a.w || at.y < a.y || at.y > a.y + a.h) return;
+      e.preventDefault();
+      this.registry.get(p.owner.node.type)?.popup?.wheel?.(this.popupContext(p.owner), e.deltaY);
+      this.invalidate("paint");
+    };
+    c.addEventListener("wheel", onWheel as EventListener, { passive: false });
     c.addEventListener("pointermove", onMove);
     c.addEventListener("pointerleave", onLeave);
     c.addEventListener("pointerdown", onDown);
@@ -870,6 +1040,7 @@ export class Loom {
     c.addEventListener("focus", onFocus);
     c.addEventListener("blur", onBlur);
     this.cleanup.push(() => {
+      c.removeEventListener("wheel", onWheel as EventListener);
       c.removeEventListener("pointermove", onMove);
       c.removeEventListener("pointerleave", onLeave);
       c.removeEventListener("pointerdown", onDown);
@@ -884,7 +1055,15 @@ export class Loom {
   private bindEnvironment(): void {
     if (typeof window === "undefined") return;
     // A message sits at the bottom of the visible area, which moves when the page scrolls.
-    const onScroll = () => { if (this.toast) this.invalidate("paint"); };
+    // A press anywhere on the page outside the canvas closes an open popup too.
+    const onPagePress = (e: Event) => { if (this.popup && e.target !== this.canvas) this.closePopup(false); };
+    document.addEventListener("pointerdown", onPagePress, true);
+    this.cleanup.push(() => document.removeEventListener("pointerdown", onPagePress, true));
+    const onScroll = () => {
+      if (this.toast) this.invalidate("paint");
+      // An open popup is placed in the visible part of the canvas, which scrolling moves.
+      if (this.popup) this.invalidate("layout");
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     this.cleanup.push(() => window.removeEventListener("scroll", onScroll));
     if (this.opts.width === undefined && this.canvas.parentElement && typeof ResizeObserver !== "undefined") {
@@ -927,6 +1106,7 @@ export class Loom {
 
   destroy(): void {
     this.endEdit();
+    this.popup = null;
     if (this.toastTimer !== null) clearTimeout(this.toastTimer);
     if (this.frame && typeof cancelAnimationFrame !== "undefined") cancelAnimationFrame(this.frame);
     this.cleanup.forEach((f) => f());

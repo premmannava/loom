@@ -55,7 +55,7 @@ describe("paths", () => {
 
 describe("bind= inside each, for every component that binds", () => {
   /** [component, line inside each, field, start value, how to act on the first copy] */
-  const cases: Array<[string, string, string, Value, "press" | "last" | "key" | "country" | "type"]> = [
+  const cases: Array<[string, string, string, Value, "press" | "last" | "key" | "country" | "type" | "pick"]> = [
     ["input", `input "Name" bind=r.v`, "v", "", "type"],
     ["check", `check "{r.name}" bind=r.v`, "v", false, "press"],
     ["switch", `switch "{r.name}" bind=r.v`, "v", false, "press"],
@@ -68,6 +68,7 @@ describe("bind= inside each, for every component that binds", () => {
     ["breadcrumb", `breadcrumb "Shop / Shoes / Socks" bind=r.v`, "v", "Socks", "press"],
     ["pagination", `pagination bind=r.v pages=3`, "v", 1, "last"],
     ["map", `map bind=r.v`, "v", "", "country"],
+    ["select", `select items=rows value=name bind=r.v`, "v", "", "pick"],
     ["table", `table items=rows key=name bind=r.v\n      table-column "Name" field=name`, "v", "", "press"],
   ];
 
@@ -83,6 +84,13 @@ describe("bind= inside each, for every component that binds", () => {
     const target = { node: region.box.node, box: region.box, detail: how === "country" ? "Japan" : region.detail };
     if (how === "type") {
       ui.type({ id }, "Hi");
+      return;
+    }
+    if (how === "pick") {
+      // Open the list, then choose the highlighted (first) option.
+      ui.loom.activate(target);
+      ui.loom.renderNow();
+      ui.key("Enter");
       return;
     }
     if (how === "key") {

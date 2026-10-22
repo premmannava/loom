@@ -287,4 +287,18 @@ card
       button "Request one" on="emit:request:{selected}" disabled={find(equipment, 'id', selected).stock == 0}
 `,
   },
+  directory: {
+    label: "Directory",
+    prompt: "A team directory with a department picker that filters the people shown.",
+    spec: `state department="" departments=[{id: "", name: "All departments"}, {id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}, {id: "design", name: "Design"}, {id: "support", name: "Support"}, {id: "legal", name: "Legal (moving teams)", moving: true}] people=[{name: "Ada Park", dept: "eng", role: "Staff engineer"}, {name: "Ben Ortiz", dept: "sales", role: "Account lead"}, {name: "Chloe Wu", dept: "design", role: "Product designer"}, {name: "Dev Rao", dept: "eng", role: "Engineer"}, {name: "Ella Kim", dept: "support", role: "Support lead"}, {name: "Finn Hale", dept: "sales", role: "Sales rep"}]
+card
+  text "Team directory" style=title
+  select "Department" items=departments value=id label=name unavailable=moving bind=department on="emit:filter:{department}"
+  text "{plural(department == '' ? len(people) : len(filter(people, 'dept', department)), 'person', 'people')}" tone=muted
+  table items={department == '' ? people : filter(people, 'dept', department)} key=name
+    table-column "Name" field=name
+    table-column "Role" field=role
+  empty "Nobody in this department yet" if={department != '' && len(filter(people, 'dept', department)) == 0}
+`,
+  },
 };

@@ -493,13 +493,13 @@ slider "Up to \${maxPrice}" bind=maxPrice min=20 max=300 step=10`,
 };
 
 /** Field text size: at least 16 px, or phones zoom the page when the field is focused. */
-const FIELD_TEXT = 16;
-const FIELD_PAD = 12;
-const LABEL_SIZE = 13;
+export const FIELD_TEXT = 16;
+export const FIELD_PAD = 12;
+export const LABEL_SIZE = 13;
 const LABEL_GAP = 6;
 
 /** The field's box, under its label if it has one. */
-function fieldBox(box: Box, p: PropReader, controlHeight: number): Box {
+export function fieldBox(box: Box, p: PropReader, controlHeight: number): Box {
   const top = p.text() ? LABEL_SIZE + 4 + LABEL_GAP : 0;
   return partBox(box, box.x, box.y + top, box.w, controlHeight);
 }
@@ -511,7 +511,7 @@ function fieldValue(p: PropReader): string {
 }
 
 /** Cut text to fit a width, ending with an ellipsis. */
-function fitText(g: CanvasRenderingContext2D, text: string, width: number): string {
+export function fitText(g: CanvasRenderingContext2D, text: string, width: number): string {
   if (g.measureText(text).width <= width) return text;
   let lo = 0, hi = text.length;
   while (lo < hi) {

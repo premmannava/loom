@@ -36,6 +36,8 @@ export interface RenderOptions {
   /** Passed to the engine, to test images (Node has no image loading of its own). */
   imageHosts?: string[];
   loadImage?: LoomOptions["loadImage"];
+  /** The visible part of the canvas, for popup placement. Default: from the top, unbounded. */
+  viewport?: { top: number; bottom: number };
 }
 
 /** Which element to find. A string is shorthand for `{ type }`. */
@@ -85,6 +87,8 @@ export interface Rendered {
   readonly hits: readonly HitRegion[];
   /** The element with keyboard focus, if any. */
   readonly focused: LoomNode | null;
+  /** The open popup (a select's options): its owner, where it is, and its pressable regions. */
+  readonly popup: Loom["openPopupInfo"];
 
   /** Elements matching a query, in spec order. Hidden elements are included with `box: null`. */
   findAll(query: Query): Found[];
@@ -105,6 +109,8 @@ export interface Rendered {
    * top-left corner; y defaults to where the drag started.
    */
   drag(query: Query, toX: number, toY?: number): void;
+  /** Turn the mouse wheel at a point, in CSS pixels from the canvas's top-left corner. */
+  wheel(x: number, y: number, deltaY: number): void;
   /** Send a key press to the canvas, e.g. key("Tab"), key("Enter"), key("Tab", { shift: true }). */
   key(key: string, opts?: { shift?: boolean }): void;
   /** Move keyboard focus with Tab (or Shift+Tab when `back` is true). */
@@ -144,6 +150,7 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     imageHosts: opts.imageHosts,
     loadImage: opts.loadImage,
     onWarning: (m) => warnings.push(m),
+    viewport: opts.viewport ? () => opts.viewport! : undefined,
   });
 
   const emitted: Emitted[] = [];
@@ -231,11 +238,17 @@ export function render(spec: string, opts: RenderOptions = {}): Rendered {
     get drawOps() { return drawOps; },
     get hits() { return loom.hitRegions; },
     get focused() { return loom.focus?.node ?? null; },
+    get popup() { return loom.openPopupInfo; },
 
     findAll,
     find,
     isShown: (query) => find(query).box !== null,
     text: () => drawOps.filter((d) => d.op === "fillText").map((d) => String(d.args[0])),
+
+    wheel(x, y, deltaY) {
+      canvas.dispatch("wheel", { clientX: x, clientY: y, deltaY });
+      flush();
+    },
 
     press(query) {
       const at = pressPoint(query);

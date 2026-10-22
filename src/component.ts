@@ -10,7 +10,8 @@ import type { EditorSpec } from "./editor";
 import type { ImageState } from "./images";
 import type { Theme } from "./theme";
 import type { TextMeasurer } from "./text";
-import type { Box, HitTarget, LoomNode, Value } from "./types";
+import type { PopupSize, PopupState } from "./popup";
+import type { Box, HitTarget, LoomNode, Rect, Value } from "./types";
 
 /**
  * `name` is a plain identifier (letters, digits, _), like a screen name that go: refers to.
@@ -76,6 +77,8 @@ export interface PaintContext {
   isPressed(node: LoomNode, detail?: unknown): boolean;
   /** Whether a real text box is over this element right now; it then draws the text, so don't. */
   isEditing(node: LoomNode): boolean;
+  /** Whether this element's popup is open (to draw it as open). */
+  isPopupOpen(node: LoomNode): boolean;
   /** False when animation is off (option or reduced motion): draw a still frame. */
   motion: boolean;
   /** Fade-in opacity for a node that just appeared (0..1). */
@@ -100,6 +103,34 @@ export interface PressContext {
   set(path: string, value: Value): void;
   /** Run an action string such as "inc:count;emit:saved". */
   run(actions: string): void;
+  /** Open this element's popup (its ComponentDef.popup), with its starting transient state. */
+  openPopup(state: PopupState): void;
+  /** Whether this element's popup is open. */
+  popupOpen: boolean;
+}
+
+/** Pressing or typing in an open popup. ctx.target.node is the popup's owner. */
+export interface PopupContext extends PressContext {
+  /** The popup's transient state (highlight, scroll): change it freely. Never app state. */
+  popup: PopupState;
+  /** Where the popup is drawn now, or null before it's first placed. */
+  area: Rect | null;
+  /** Close the popup; keyboard focus goes back to its owner unless restoreFocus is false. */
+  close(restoreFocus?: boolean): void;
+}
+
+/** A panel an element opens above the rest of the screen; see src/popup.ts. */
+export interface PopupDef {
+  /** The size it wants, from the owner's box. null closes it (nothing to show any more). */
+  measure(owner: Box, ctx: LayoutContext, state: PopupState): PopupSize | null;
+  /** Draw inside area (already clipped, on a surface panel), registering hit regions with ctx.addHit. */
+  paint(owner: Box, area: Rect, ctx: PaintContext, state: PopupState): void;
+  /** One of its hit regions was pressed (ctx.target.detail says which). */
+  press(ctx: PopupContext): void;
+  /** A key while it's open, other than Escape and Tab (which close it). Return true if handled. */
+  key(ctx: PopupContext, key: string): boolean;
+  /** The wheel turned over it, by dy pixels. */
+  wheel?(ctx: PopupContext, dy: number): void;
 }
 
 export interface DragContext extends PressContext {
@@ -159,6 +190,8 @@ export interface ComponentDef {
    * (see src/editor.ts), and each change is written to its bind=.
    */
   editor?(box: Box, props: PropReader, theme: Theme): EditorSpec;
+  /** A panel this element opens over the screen, like a select's options. Open it with ctx.openPopup in press or key. */
+  popup?: PopupDef;
 }
 
 /** Props every component accepts. */

@@ -95,7 +95,7 @@ ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
 - content: text, image, code, badge, avatar
 - data: stat, rating, chart, table, table-column, map, pin
-- input: button, link, check, switch, radio, stepper, slider, input
+- input: button, link, check, switch, radio, select, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
 - feedback: progress, skeleton, empty
 
@@ -327,6 +327,20 @@ ELEMENTS
       radio "Small" bind=size value=s
       radio "Medium" bind=size value=m
       radio "Large" bind=size value=l
+
+  select "<text>"  — A field that opens a list to pick one option from, for choices like a department, status or filter; compact where radio buttons would take too much room. bind= holds the chosen option's value.
+    "<text>"  The label above the field.
+    items=<expression, required>  The options: a list of records, or of text or numbers. At most 200.
+    value=<name>  For records, the field holding each option's value (text or a number), e.g. value=id. Options without one, or repeating one, are left out.
+    label=<name>  For records, the field shown for each option, e.g. label=name. Default: the value.
+    bind=<state, required>  State that holds the chosen value, like department or t.status.
+    placeholder=<string>  Shown while nothing (or a value no option has) is chosen.
+    unavailable=<name>  A field that, when true, greys an option out so it can't be chosen, e.g. unavailable=full.
+    disabled=<condition>  Expression; when true the field is greyed out and doesn't open.
+    on=<action>  Actions to run after an option is chosen, with bind= already set, e.g. emit:changed. Separate several with ;
+    example:
+      state teams=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}] team=""
+      select "Team" items=teams value=id label=name bind=team placeholder="Choose a team"
 
   stepper "<text>"  — A number with minus and plus buttons, for small counts like a quantity.
     "<text>"  An optional label on the left.

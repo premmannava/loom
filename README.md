@@ -16,7 +16,7 @@ card
   button "Add day" on=inc:days
 ```
 
-> **Status: 0.1, early foundation.** The engine, 38 components including text input, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, 39 components including text input, selects, lists and data, bar and line charts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -267,6 +267,24 @@ chart "Revenue trend" kind=line items=sales x=month y=revenue format=money
 - An empty list, a value that isn't a list, or no numbers at all shows "No data to chart" or "No numbers to chart". More than 200 items, or too little width for them, shows a message saying so instead of a partial chart.
 - Problems a model can fix (items that aren't a list, gaps, too little room) are reported once through the engine's `onWarning`, not on every frame.
 
+#### Selects
+
+`select` picks one option from a list, in a field that opens the list in a [popup](#popups):
+
+```
+state departments=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}, {id: "legal", name: "Legal", full: true}] department=""
+select "Department" items=departments value=id label=name unavailable=full bind=department placeholder="Choose a department"
+```
+
+`items=` is a list of records, with `value=` naming the field to store and `label=` the field to show, or a plain list of text or numbers, each its own value and label. `bind=` holds the chosen value, and `on=` runs after it's stored. The props are in the [reference](#select). How it treats options:
+
+- A value is text or a number, 0 included; `0` and `"0"` are different options. Items with no usable value, or repeating an earlier option's value, aren't offered.
+- `unavailable=` names a field that, when `true`, greys an option out; it can't be chosen by pointer or keyboard.
+- A `bind=` value no option has shows the placeholder, and the state keeps its value. To offer "all", add an option for it, like `{id: "", name: "All departments"}`.
+- With no options, items that aren't a list, or more than 200 options, the field says so ("No options", "Too many options") and doesn't open. Narrow a long list with `filter()` or `search()`.
+- Long labels are cut with an ellipsis, in the field and in the list.
+- Problems a model can fix (no value field, repeated values, a chosen value no option has, too many options) are reported once through `onWarning`.
+
 #### Tables
 
 `table` shows a list of records as rows, with one `table-column` line per field, in the order written:
@@ -349,7 +367,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
@@ -764,6 +782,27 @@ radio "Medium" bind=size value=m
 radio "Large" bind=size value=l
 ```
 
+### `select`
+
+A field that opens a list to pick one option from, for choices like a department, status or filter; compact where radio buttons would take too much room. bind= holds the chosen option's value.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The label above the field. |
+| `items` | expression, required | The options: a list of records, or of text or numbers. At most 200. |
+| `value` | name | For records, the field holding each option's value (text or a number), e.g. value=id. Options without one, or repeating one, are left out. |
+| `label` | name | For records, the field shown for each option, e.g. label=name. Default: the value. |
+| `bind` | state, required | State that holds the chosen value, like department or t.status. |
+| `placeholder` | string | Shown while nothing (or a value no option has) is chosen. |
+| `unavailable` | name | A field that, when true, greys an option out so it can't be chosen, e.g. unavailable=full. |
+| `disabled` | condition | Expression; when true the field is greyed out and doesn't open. |
+| `on` | action | Actions to run after an option is chosen, with bind= already set, e.g. emit:changed. Separate several with ; |
+
+```
+state teams=[{id: "eng", name: "Engineering"}, {id: "sales", name: "Sales"}] team=""
+select "Team" items=teams value=id label=name bind=team placeholder="Choose a team"
+```
+
 ### `stepper`
 
 A number with minus and plus buttons, for small counts like a quantity.
@@ -1031,6 +1070,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `loadImage` | an `<img>` with CORS | Custom image loading, for tests, server rendering or signed URLs |
 | `onWarning` | `console.warn` | Receives problems found while running, like a blocked image |
 | `editor` | an `<input>` over the field | How text fields are typed into ([Typing](#typing)); `loom-ui/testing` passes a fake one |
+| `viewport` | from the window | The part of the canvas people can see, `() => ({ top, bottom })` in canvas pixels, for placing a select's list ([Popups](#popups)) |
 
 ### Methods
 
@@ -1084,9 +1124,20 @@ Images load with CORS (`crossOrigin="anonymous"`), so their server must send `Ac
 
 ### Keyboard
 
-The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End.
+The canvas is focusable. Tab and Shift+Tab move between interactive elements, Enter or Space presses the focused one, and a focus ring is drawn on the canvas. A focused `slider` also moves with the arrow keys, Page Up and Page Down, Home and End. A focused `select` opens with Enter, Space or the up and down arrows; its list then takes the keys (see [Popups](#popups)).
 
 On touch screens, vertical swipes still scroll the page and pinches still zoom, while horizontal drags go to the canvas, so sliders can be dragged.
+
+### Popups
+
+A `select` shows its options in a popup: a panel the engine draws on the canvas above everything else, owned by the element that opened it. One can be open at a time.
+
+- **On top.** It's drawn last, and only its own options can be hovered or pressed while it's open. A press anywhere outside it (on the canvas or elsewhere on the page) closes it and does nothing else, so a button underneath isn't pressed by the same click.
+- **Keys.** While it's open, keys go to it: up and down move the highlight (skipping unavailable options), Home and End jump to the ends, Page Up and Page Down move a page, Enter or Space chooses, Escape closes, and Tab closes it and moves on. Focus goes back to the select when it closes.
+- **Placement.** It opens below the field, or above it when only that fits in the visible part of the window, lining up with the field and staying inside the canvas. A canvas can't draw outside itself, so when the list needs more room than the screen has, the canvas grows while the list is open and shrinks back after.
+- **Long lists** show 8 options at a time. They scroll with the wheel, the keyboard (the highlight stays in view), or the arrows at the top and bottom of the list, so every option can be reached by pointer as well as keyboard.
+- **Closing.** It also closes when an option is chosen, when the select is hidden, disabled or left with no options, when the canvas loses focus, and when the spec is replaced.
+- What's highlighted and how far the list is scrolled belong to the popup, not to state: they're forgotten when it closes. Only choosing changes `bind=`.
 
 ### Typing
 
@@ -1477,7 +1528,8 @@ Loom draws everything itself, so it gives up what the browser normally provides 
 - **Multi-line text, and form validation** (required fields, email format). A model can show a hint with `if=` for now.
 - **Screen reader support.** A canvas is invisible to assistive technology. A hidden accessibility layer that mirrors the canvas is planned.
 - **Text selection, copy and browser find.**
-- **Scrolling regions, overlays, dialogs or menus.**
+- **Scrolling regions, dialogs, menus or tooltips.** The one popup so far is a select's list of options (one open at a time); there's no general overlay element yet.
+- **Selects beyond the basics.** One choice from at most 200 options, with no multi-select, typing to search, option groups, or options showing anything but text.
 - **Tables beyond the basics.** `table` shows at most 200 rows and 8 columns, without scrolling, sticky headers, editable cells, multi-row selection, nested elements in cells, or resizing and reordering columns. A table too wide for its space shows a message instead of scrolling.
 - **Charts beyond the basics.** `chart` draws one series as bars or a line, at most 200 items, with labels evenly spaced in list order. No pie or stacked charts, several series, legends, tooltips, zoom, time or numeric x-axes, or pressing a bar.
 - **Right-to-left or complex-script text shaping** beyond what the canvas does on its own.
@@ -1491,7 +1543,7 @@ Don't use Loom where accessibility is required until the accessibility layer lan
 The full phase-by-phase plan, including the component pipeline, testing strategy and how a model generates UI on the fly, is in [`docs/PLAN.md`](docs/PLAN.md). [`docs/examples/ecommerce.md`](docs/examples/ecommerce.md) shows the complete store the plan builds toward.
 
 1. **Foundation** (0.1, done): engine, parser, expressions, actions, keyboard focus, inspector, first components, tests, playground.
-2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, and tables with sorting and selection. Next: scrolling, select and dialog, plus the accessibility layer.
+2. **Components and data**: done so far: grid, list, accordion, badge, avatar, code, rating, link, switch, radio, stepper, tabs, breadcrumb, pagination, skeleton, empty, pressable cards and struck-through text, plus images, a slider (with dragging), screens with `go:` and `back`, `notify:` messages, lists and records with `each`, `if` blocks, list functions and formatting, text input (a real input placed over the field while typing), bar and line charts, tables with sorting and selection, and a select whose options open in a popup layer on the canvas. Next: scrolling and dialog, plus the accessibility layer.
 3. **Docs site**, built with Loom so every example is live.
 4. **Model connection**: started. The playground's Ask a model box, `loom-ui/model` (streaming, cleanup and one repair) and `npm run eval` work with any OpenAI-compatible server. Still to do: a production server package, and comparing the results with other generative UI formats.
 5. **An app** built on top.
