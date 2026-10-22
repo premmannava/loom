@@ -38,20 +38,20 @@ The repository also has a general-purpose demo at `/playground/connected-order/i
 ```ts
 import { generateSpec } from "loom-ui/model";
 
-loom.beginStream();
+ui.beginStream();
 const result = await generateSpec({
   config: { url: "/api/model", model: "qwen3-14b" }, // a route on your server that adds the key
-  registry: loom.registry,
+  registry: ui.registry,
   request: "A booking form for a cabin, 2 to 6 guests",
   guide: {
     mode: "compact",
     actions: [{ name: "book", value: "the number of guests", description: "when the person books" }],
     notes: "A cabin rental site. Prices are per night.",
   },
-  onText: (text) => loom.push(text),
-  onReset: () => loom.beginStream(), // a fix is coming: start the screen over
+  onText: (text) => ui.push(text),
+  onReset: () => ui.beginStream(), // a fix is coming: start the screen over
 });
-loom.endStream();
+ui.endStream();
 // result.spec, result.diagnostics, result.first, result.repair, result.timings, result.usage, result.messages
 ```
 

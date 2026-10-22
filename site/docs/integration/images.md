@@ -8,7 +8,7 @@ description: SayShape's image source restrictions. Same origin by default, allow
 A spec can name any image URL, and a model writes specs, so SayShape is strict about where images come from. It loads images only from **your own site** (the page's origin) and from **hosts you list**. Everything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and `onWarning` says which host to allow.
 
 ```ts
-const loom = new SayShape(canvas, {
+const ui = new SayShape(canvas, {
   components: coreComponents,
   imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
 });

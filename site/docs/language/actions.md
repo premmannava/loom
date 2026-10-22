@@ -48,7 +48,7 @@ card
 ```
 
 ```ts
-loom.on("action", ({ name, value }) => {
+ui.on("action", ({ name, value }) => {
   if (name === "order") submitOrder(value); // your code; SayShape never calls a server itself
 });
 ```
@@ -71,7 +71,7 @@ screen name=cart title="Your cart"
   button "Keep shopping" variant=secondary on=back
 ```
 
-State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. The visible screen's name is in `{screen}`. Your app can move between screens with `loom.go("cart")` and `loom.back()`, and hears every move through the `navigate` event.
+State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. The visible screen's name is in `{screen}`. Your app can move between screens with `ui.go("cart")` and `ui.back()`, and hears every move through the `navigate` event.
 
 ## Messages
 

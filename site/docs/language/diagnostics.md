@@ -32,7 +32,7 @@ L6  "pricee" isn't state or a loop variable, so it shows as nothing. To show it 
 
 ## Where diagnostics go
 
-- `loom.diagnostics` holds the current list, and the `diagnostics` event fires when it changes.
+- `ui.diagnostics` holds the current list, and the `diagnostics` event fires when it changes.
 - `parse(text, registry)` returns `{ root, diagnostics, … }` without rendering, which is how a server can check a spec ([Streaming, validation and repair](../integration/streaming)).
 - The [playground](/playground) lists them under **Problems**, marks their lines, and jumps to a line when you click one.
 

@@ -10,9 +10,9 @@ description: How SayShape renders a model's response as it streams, cleans it, c
 The engine renders a spec while it arrives:
 
 ```ts
-loom.beginStream();           // clears state unless { keepState: true }
-loom.push(chunk);             // as often as text arrives; only complete lines render
-loom.endStream();             // renders the last line
+ui.beginStream();           // clears state unless { keepState: true }
+ui.push(chunk);             // as often as text arrives; only complete lines render
+ui.endStream();             // renders the last line
 ```
 
 Any prefix of a valid spec, cut at a line boundary, is a valid and smaller spec, so the screen grows line by line instead of waiting for the whole response. The repository tests this for every sample and every way of chunking it.
@@ -59,7 +59,7 @@ To change the current screen ("make the total bigger"), pass a `refine` context 
 import { generateSpec, nextRefineContext, type RefineContext } from "loom-ui/model";
 
 let context: RefineContext = { task: "A packing list for a 3-day hike", requirements: ["Prices in euros"], spec: first.spec };
-const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: loom.spec } });
+const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: ui.spec } });
 context = nextRefineContext(context, "Add a progress bar", r.spec);
 ```
 

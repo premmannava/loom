@@ -10,7 +10,7 @@ A model learns SayShape from a guide: a system prompt that explains the syntax a
 ```ts
 import { languageGuide } from "loom-ui";
 
-const guide = languageGuide(loom.registry, { mode: "compact", profile: "forms" });
+const guide = languageGuide(ui.registry, { mode: "compact", profile: "forms" });
 ```
 
 `generateSpec` builds it for you from the `guide` option ([Connecting a model](./model#in-your-own-app)).

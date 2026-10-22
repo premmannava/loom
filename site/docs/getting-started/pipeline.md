@@ -25,9 +25,9 @@ There are two halves to every SayShape interface, and they never mix.
 Because a spec is one element per line and nothing needs a closing line, any prefix of a valid spec, cut at a line boundary, is itself a valid and smaller spec. That's what lets an interface appear while a model is still writing:
 
 ```ts
-loom.beginStream();
-for await (const chunk of modelResponse) loom.push(chunk); // only complete lines render
-loom.endStream();
+ui.beginStream();
+for await (const chunk of modelResponse) ui.push(chunk); // only complete lines render
+ui.endStream();
 ```
 
 The repository's tests check this property for every sample: each prefix must parse into a valid tree. The [landing page demo](/) and the playground's **Replay as stream** use the same three calls with a saved spec, so you can see the effect without a model.
