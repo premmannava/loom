@@ -8,3 +8,9 @@ playwright-report/
 eval/results/
 .env.local
 .env.*.local
+# Website (site/): build output, cache and generated pages
+site/node_modules/
+site/.vitepress/dist/
+site/.vitepress/cache/
+site/.generated/
+site/docs/components/*.md

@@ -44,7 +44,12 @@
     "docs:check": "vite-node scripts/gen-component-docs.ts --check",
     "new:component": "vite-node scripts/new-component.ts --",
     "eval": "vite-node scripts/eval.ts --",
-    "guide:size": "vite-node scripts/guide-size.ts"
+    "guide:size": "vite-node scripts/guide-size.ts",
+    "site:docs": "vite-node scripts/gen-site-docs.ts",
+    "site:dev": "npm run site:docs && npm --prefix site run dev",
+    "site:build": "npm run site:docs && npm --prefix site run build",
+    "site:preview": "npm --prefix site run preview",
+    "site:check": "node scripts/check-site.mjs"
   },
   "devDependencies": {
     "@fontsource/instrument-sans": "5.3.0",

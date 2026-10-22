@@ -9,30 +9,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { coreComponents } from "../src/components";
 import { mapComponents } from "../src/components/map";
-import { CATEGORIES, type ComponentDef } from "../src/component";
+import { CATEGORIES } from "../src/component";
+import { componentSection } from "./component-docs";
 
 const README = resolve(__dirname, "../README.md");
 const START = "<!-- COMPONENTS:START (generated from src/components) -->";
 const END = "<!-- COMPONENTS:END -->";
 const CAT_START = "<!-- CATEGORIES:START (generated from src/components) -->";
 const CAT_END = "<!-- CATEGORIES:END -->";
-
-const esc = (s: string) => s.replace(/\|/g, "\\|");
-
-function section(c: ComponentDef): string {
-  let out = `### \`${c.type}\`\n\n${c.description}\n\n`;
-  const rows: string[] = [];
-  if (c.text) rows.push(`| \`"text"\` | text${c.text.required ? ", required" : ""} | ${esc(c.text.description)} |`);
-  for (const [name, d] of Object.entries(c.props)) {
-    const type = d.type === "enum" && d.values ? d.values.map((v) => `\`${v}\``).join(" / ") : d.type;
-    rows.push(`| \`${name}\` | ${type}${d.required ? ", required" : ""} | ${esc(d.description)} |`);
-  }
-  if (rows.length) out += `| Prop | Type | Description |\n|---|---|---|\n${rows.join("\n")}\n\n`;
-  if (c.children) out += `Children: ${c.children === "any" ? "any elements" : c.children.map((x) => `\`${x}\``).join(", ")}.\n\n`;
-  if (c.parents) out += `Only inside: ${c.parents.map((x) => `\`${x}\``).join(", ")}.\n\n`;
-  if (c.example) out += "```\n" + c.example + "\n```\n\n";
-  return out;
-}
 
 const all = [...coreComponents, ...mapComponents];
 const anchor = (type: string) => `[\`${type}\`](#${type})`;
@@ -52,7 +36,7 @@ function between(text: string, start: string, end: string, content: string): str
 }
 
 const readme = readFileSync(README, "utf8");
-const next = between(between(readme, CAT_START, CAT_END, categories), START, END, all.map(section).join("").trim());
+const next = between(between(readme, CAT_START, CAT_END, categories), START, END, all.map((c) => componentSection(c)).join("").trim());
 
 if (process.argv.includes("--check")) {
   if (next !== readme) {

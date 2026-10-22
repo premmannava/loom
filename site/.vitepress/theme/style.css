@@ -1,0 +1,263 @@
+/*
+ * Loom site theme. One accent, Loom's own teal (the engine's default
+ * theme.colors.accent), on cool neutral surfaces. Display type is
+ * Bricolage Grotesque; body text is Instrument Sans, the face the engine
+ * draws with, so the page and the canvas read as one product.
+ */
+
+:root {
+  --vp-font-family-base: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --vp-font-family-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --loom-display: "Bricolage Grotesque", "Instrument Sans", system-ui, sans-serif;
+
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f3f6f5;
+  --vp-c-bg-soft: #f3f6f5;
+  --vp-c-bg-elv: #ffffff;
+  --vp-c-text-1: #15202b;
+  --vp-c-text-2: #4d5965;
+  --vp-c-text-3: #66717d;
+  --vp-c-divider: #dfe5e3;
+  --vp-c-border: #cdd5d2;
+  --vp-c-gutter: #e7ecea;
+
+  --vp-c-brand-1: #0e7c76;
+  --vp-c-brand-2: #0a6560;
+  --vp-c-brand-3: #0e7c76;
+  --vp-c-brand-soft: rgba(14, 124, 118, 0.12);
+  /* Code blocks sit on white with a border: the highlighting theme's colors need it for 4.5:1. */
+  --vp-code-block-bg: #ffffff;
+  /* Inline code sits on a tinted background, so it needs a darker teal than links. */
+  --vp-code-color: #09564f;
+
+  --vp-button-brand-bg: #0e7c76;
+  --vp-button-brand-hover-bg: #0a6560;
+  --vp-button-brand-active-bg: #08524e;
+
+  --vp-home-hero-name-color: var(--vp-c-text-1);
+  --vp-nav-logo-height: 26px;
+  --vp-layout-max-width: 1320px;
+
+  --loom-stage: #edf1ef;
+  --loom-stage-dot: #cbd4d0;
+  --loom-panel: #f7f9f8;
+  --loom-code-bg: #fbfcfb;
+  --loom-ok: #2e7d32;
+  --loom-warn: #9a4a07;
+  --loom-bad: #b42318;
+  --loom-hl: rgba(14, 124, 118, 0.1);
+  --loom-shadow: 0 1px 0 rgba(21, 32, 43, 0.04), 0 12px 32px -18px rgba(21, 32, 43, 0.25);
+
+  /* Spec highlighting (spec view and playground editor) */
+  --tk-tag: #0e7c76;
+  --tk-kw: #15202b;
+  --tk-prop: #5b6577;
+  --tk-str: #7a4a00;
+  --tk-expr: #1d4ed8;
+  --tk-com: #6b7480;
+}
+
+.dark {
+  --vp-c-bg: #10151b;
+  --vp-c-bg-alt: #0b0f14;
+  --vp-c-bg-soft: #161c23;
+  --vp-c-bg-elv: #161c23;
+  --vp-c-text-1: #e6eaf0;
+  --vp-c-text-2: #a7b1be;
+  --vp-c-text-3: #8893a1;
+  --vp-c-divider: #25303a;
+  --vp-c-border: #34404c;
+  --vp-c-gutter: #0b0f14;
+
+  --vp-c-brand-1: #3cc2b8;
+  --vp-c-brand-2: #6fd5cd;
+  --vp-c-brand-3: #0e7c76;
+  --vp-c-brand-soft: rgba(60, 194, 184, 0.14);
+  --vp-code-color: #6fd5cd;
+  --vp-code-block-bg: #0d1217;
+
+  --loom-stage: #0b0f14;
+  --loom-stage-dot: #222b35;
+  --loom-panel: #131920;
+  --loom-code-bg: #0d1217;
+  --loom-ok: #6ccb74;
+  --loom-warn: #f5b454;
+  --loom-bad: #f87171;
+  --loom-hl: rgba(60, 194, 184, 0.12);
+  --loom-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 40px -20px rgba(0, 0, 0, 0.7);
+
+  --tk-tag: #3cc2b8;
+  --tk-kw: #e6eaf0;
+  --tk-prop: #a7b1be;
+  --tk-str: #e3b567;
+  --tk-expr: #8ab4f8;
+  --tk-com: #7d8896;
+}
+
+/* ------------------------------------------------------------ type */
+
+.vp-doc h1,
+.vp-doc h2 {
+  font-family: var(--loom-display);
+  letter-spacing: -0.015em;
+}
+.vp-doc h1 { font-weight: 800; font-size: 36px; line-height: 1.12 }
+.vp-doc h2 { font-weight: 700; border-top: 0; padding-top: 8px; margin-top: 48px }
+.vp-doc h3 { font-weight: 600 }
+.vp-doc p, .vp-doc li { line-height: 1.7 }
+.VPNavBarTitle .title { font-family: var(--loom-display); font-weight: 800; font-size: 20px; letter-spacing: -0.02em }
+.vp-doc .generated-note {
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+  border-left: 3px solid var(--vp-c-brand-1);
+  padding: 2px 0 2px 14px;
+}
+.vp-doc table { font-size: 14px }
+.vp-doc :not(pre) > code { font-size: 0.86em }
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ shared controls */
+
+.loom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--vp-c-brand-3);
+  font: 600 15px/1 var(--vp-font-family-base);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.loom-btn.primary { background: var(--vp-button-brand-bg); color: #fff }
+.loom-btn.primary:hover { background: var(--vp-button-brand-hover-bg) }
+.loom-btn.quiet { background: transparent; color: var(--vp-c-text-1); border-color: var(--vp-c-border) }
+.loom-btn.quiet:hover { border-color: var(--vp-c-brand-1); color: var(--vp-c-brand-1) }
+.loom-btn.small { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 7px }
+.loom-btn[disabled] { opacity: 0.5; cursor: not-allowed }
+
+.loom-btn-text {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  font: 600 13px var(--vp-font-family-base);
+  color: var(--vp-c-brand-1);
+  cursor: pointer;
+  text-decoration: none;
+}
+.loom-btn-text:hover { text-decoration: underline; text-underline-offset: 3px }
+.loom-btn-text[disabled] { color: var(--vp-c-text-3); cursor: default; text-decoration: none }
+
+/* ------------------------------------------------------------ the stage a canvas sits on */
+
+.loom-stage {
+  position: relative;
+  background-color: var(--loom-stage);
+  background-image: radial-gradient(var(--loom-stage-dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+  padding: 18px;
+}
+/* The engine sizes the canvas to its parent's width, so the parent must have no padding. */
+.loom-canvas-wrap { width: 100%; min-width: 0 }
+.loom-stage canvas {
+  display: block;
+  border-radius: 10px;
+  box-shadow: var(--loom-shadow);
+}
+.loom-stage canvas:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 3px }
+@media (max-width: 640px) { .loom-stage { padding: 10px } }
+
+/* ------------------------------------------------------------ live examples in docs */
+
+.loom-live {
+  margin: 20px 0 28px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--vp-c-bg);
+}
+.loom-live__code div[class*="language-"] { margin: 0 !important; border-radius: 0 !important }
+.vp-doc .loom-live__code div[class*="language-"] { background: var(--vp-code-block-bg); border: 0 }
+.vp-doc div[class*="language-"] { border: 1px solid var(--vp-c-divider) }
+.loom-live__bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid var(--vp-c-divider);
+  border-bottom: 1px solid var(--vp-c-divider);
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+.loom-live__label { display: inline-flex; align-items: center; gap: 8px }
+.loom-live__label .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--vp-c-brand-1) }
+.loom-live__actions { display: inline-flex; gap: 16px }
+.loom-live .loom-stage { min-height: 96px }
+.loom-live__failed { margin: 0; color: var(--loom-bad); font-size: 14px }
+
+.loom-diags {
+  list-style: none;
+  margin: 0 !important;
+  padding: 8px 14px !important;
+  border-top: 1px solid var(--vp-c-divider);
+  font-size: 13px;
+}
+.vp-doc .loom-diags li { margin: 4px 0; line-height: 1.5; display: flex; gap: 10px; align-items: baseline }
+.loom-diags .ln { font: 500 12px var(--vp-font-family-mono); color: var(--vp-c-text-2); flex: none; min-width: 52px }
+.loom-diags .sev { font-size: 12px; font-weight: 600; flex: none; min-width: 56px }
+.loom-diags .error .sev, .loom-diags .error .msg { color: var(--loom-bad) }
+.loom-diags .warning .sev { color: var(--loom-warn) }
+
+.loom-events {
+  list-style: none;
+  margin: 0 !important;
+  padding: 8px 14px !important;
+  border-top: 1px solid var(--vp-c-divider);
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+.vp-doc .loom-events li { margin: 2px 0 }
+.loom-events code { font-size: 12px; color: var(--vp-c-brand-1); background: none !important; padding: 0 !important }
+
+/* ------------------------------------------------------------ spec view (highlighted Loom source) */
+
+.spec-view {
+  margin: 0;
+  font: 13px/1.7 var(--vp-font-family-mono);
+  color: var(--vp-c-text-1);
+  counter-reset: line;
+  tab-size: 2;
+}
+.spec-view .line { display: block; white-space: pre; padding-right: 16px; min-height: 1.7em }
+.spec-view.numbered .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2.6em;
+  margin-right: 1.1em;
+  text-align: right;
+  color: var(--vp-c-text-3);
+  user-select: none;
+}
+.tk-tag { color: var(--tk-tag); font-weight: 500 }
+.tk-kw { color: var(--tk-kw); font-weight: 600 }
+.tk-flow { color: var(--tk-tag); font-weight: 600; font-style: italic }
+.tk-prop { color: var(--tk-prop) }
+.tk-str { color: var(--tk-str) }
+.tk-expr { color: var(--tk-expr) }
+.tk-com { color: var(--tk-com); font-style: italic }
+
+/* Skip-to-content and other shell links keep VitePress defaults. */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important }
+}
