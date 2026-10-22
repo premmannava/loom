@@ -7,8 +7,8 @@ description: Generating SayShape specs with a model. The development playground'
 
 SayShape doesn't include a model. It works with any server that speaks the OpenAI chat completions format: LM Studio, Ollama, vLLM or llama.cpp on your own machine, or hosted APIs such as DeepSeek, OpenAI and OpenRouter.
 
-::: warning This website has no model connection
-GitHub Pages serves static files only. It can't keep an API key secret or forward requests to a model, so the public playground runs saved and edited specs without generating new ones. To generate, run the development playground locally, or give your app a server route that adds the key.
+::: info Generating on this website
+GitHub Pages serves static files only, so it can't keep an API key secret. When the playground offers a **Generate** box, requests go through a small proxy (`worker/` in the repository, a Cloudflare Worker) that holds the key and calls one fixed free model. The browser never sees the key. Without the proxy, the playground runs saved and edited specs only.
 :::
 
 ## Try it locally
@@ -67,7 +67,7 @@ A public site that generates specs needs a server-side endpoint that:
 - streams the response through, so specs still render line by line;
 - limits who can call it and how often, since every request costs money.
 
-SayShape doesn't ship that server yet (a production model server package is on the roadmap). Because the browser side only needs a URL, a static front end like this site's playground can use one later by passing its address as `config.url`.
+The repository's `worker/` is a small example of exactly this, used by this website: a Cloudflare Worker with an origin check, an optional Turnstile check, per-IP rate limits and size caps, which builds every message itself so the key only ever serves its one job. A general production server package is still on the roadmap.
 
 ## Measure it
 

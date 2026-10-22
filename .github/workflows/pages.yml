@@ -43,6 +43,12 @@ jobs:
         run: npm --prefix site run typecheck
       - name: Build the website
         run: npm run site:build
+        env:
+          # Public settings for the playground's Generate box (Settings → Secrets and variables → Actions → Variables).
+          # Leave them unset and the site runs saved specs only. The API key is never here: it lives in the worker.
+          VITE_SAYSHAPE_MODEL_ENDPOINT: ${{ vars.SAYSHAPE_MODEL_ENDPOINT }}
+          VITE_SAYSHAPE_MODEL_LABEL: ${{ vars.SAYSHAPE_MODEL_LABEL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
       - name: Install Chromium for the page checks
         run: npx playwright install --with-deps chromium
       - name: Check links, assets, secrets and every page in a browser

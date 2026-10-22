@@ -50,4 +50,8 @@ After the next push to `main` (or running the workflow by hand from the **Action
 
 The engine needs a canvas, fonts and `window`, so every demo creates its instance after the page mounts in the browser and destroys it, with all its listeners, when the page unmounts. Pages are emitted as `.html` files, so every route works when visited directly or refreshed on GitHub Pages, which has no server-side routing.
 
-The site has no model connection and no secrets: nothing from `.env.local` is read by the site build.
+## The Generate box
+
+The playground can generate specs through the model proxy in `worker/` (a Cloudflare Worker that holds the API key). The site build only needs the proxy's public URL, set as the repository variable `SAYSHAPE_MODEL_ENDPOINT`; without it, the Generate box doesn't appear. Setup steps are in [`worker/README.md`](https://github.com/premmannava/sayshape/blob/main/worker/README.md).
+
+The site itself holds no secrets: nothing from `.env.local` is read by the site build, and `site:check` fails if a key-shaped string or a value from `.env.local` ends up in the output.
