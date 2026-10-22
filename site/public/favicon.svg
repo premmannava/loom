@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <title>SayShape</title>
-  <rect x="9" y="3" width="4" height="26" rx="2" fill="#15202B"/>
-  <rect x="19" y="3" width="4" height="26" rx="2" fill="#15202B"/>
-  <rect x="3" y="9" width="26" height="4" rx="2" fill="#0E7C76"/>
-  <rect x="3" y="19" width="26" height="4" rx="2" fill="#0E7C76"/>
-  <path d="M8.25 9v4M13.75 9v4M18.25 19v4M23.75 19v4" stroke="#FFFFFF" stroke-width="1.5"/>
-  <rect x="9" y="9" width="4" height="4" fill="#15202B"/>
-  <rect x="19" y="19" width="4" height="4" fill="#15202B"/>
-  <path d="M19 8.25h4M19 13.75h4M9 18.25h4M9 23.75h4" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M10 3a7 7 0 0 1 7 7v1a7 7 0 0 1-7 7H4.5l2.6-2.9A7 7 0 0 1 3 10a7 7 0 0 1 7-7z" fill="#0E7C76"/>
+  <rect x="13" y="13" width="16" height="16" rx="4" fill="#15202B"/>
+  <rect x="17" y="17" width="8" height="2.5" rx="1.25" fill="#FFFFFF"/>
+  <rect x="17" y="22.5" width="5" height="2.5" rx="1.25" fill="#FFFFFF"/>
 </svg>

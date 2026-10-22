@@ -26,9 +26,9 @@ card
 
 ## Contents
 
-- [Why SayShape](#why-loom)
+- [Why SayShape](#why-sayshape)
 - [Quick start](#quick-start)
-- [The SayShape language](#the-loom-language)
+- [The SayShape language](#the-sayshape-language)
 - [Components](#components)
 - [Using the engine](#using-the-engine)
 - [Connecting a model](#connecting-a-model)
@@ -133,7 +133,7 @@ state todos=[{text: "Pack water", done: false}, {text: "Snacks", done: true}]
 
 A value must fit on one line, however long, so a streamed spec can render line by line. Lists and records hold data only: they're parsed, never run, and are limited to 20 levels deep and 10,000 values.
 
-State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere). When a new spec declares a different starting value, such as a refined screen with new data, the new value replaces the old one. Values your app set itself are never replaced by a declaration. Your app can supply data too, with `loom.state.set("products", rows)` ([Lists](#lists)).
+State declared in a spec only sets the starting value. A value the user has already changed is kept when the spec is re-parsed with the same declaration (while streaming, or after an edit elsewhere). When a new spec declares a different starting value, such as a refined screen with new data, the new value replaces the old one. Values your app set itself are never replaced by a declaration. Your app can supply data too, with `ui.state.set("products", rows)` ([Lists](#lists)).
 
 ### Derived values
 
@@ -148,11 +148,11 @@ stat label="Total" value={total}
 ```
 
 - **Grammar.** `derive name={expression}`, unindented, at the top level of the spec; several pairs may share a line, as with `state`. The expression is the same safe kind as everywhere else in SayShape, with the same functions; there are no functions of your own, callbacks or side effects.
-- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. Its expression can read state, data your app sets with `loom.state.set`, and other derived values.
+- **Reading.** A derived name reads like state, in text, props, `if=`, `items=` and other `derive` lines. Its expression can read state, data your app sets with `ui.state.set`, and other derived values.
 - **Order.** Declarations can come in any order: a value is worked out from whatever it reads, wherever that's declared. While a spec streams in, a value whose inputs haven't arrived yet shows as nothing (—) until they do.
 - **Updates.** A value is worked out the first time it's read and kept until something it reads changes, directly or through other derived values; then it's worked out again the next time it's read. Changes to state it doesn't read leave it alone, and a render reads each value at most once per change.
 - **Failures.** If a value can't be worked out (it reads an item that's gone, say), it's nothing (—), never the last good result, and so is everything derived from it. The reason is reported once through `onWarning`, and the value comes back when what it reads is fixed.
-- **Read-only.** Derived values aren't state. `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change one, nor items of a derived list (`each items=open` with `bind=t.done`): the parser reports it, and the engine refuses with a warning. `loom.state.set` throws a `DerivedWriteError`. To let people change items, loop over the list in state and hide items with `if=`. `loom.state.snapshot()` holds state only; `loom.state.derivedSnapshot()` has the derived values.
+- **Read-only.** Derived values aren't state. `bind=` and actions (`set:`, `inc:`, `toggle:`, `add:`, `remove:`, `clear:`) can't change one, nor items of a derived list (`each items=open` with `bind=t.done`): the parser reports it, and the engine refuses with a warning. `ui.state.set` throws a `DerivedWriteError`. To let people change items, loop over the list in state and hide items with `if=`. `ui.state.snapshot()` holds state only; `ui.state.derivedSnapshot()` has the derived values.
 - **Problems the parser reports**, each skipping only that value: an expression not in braces or with a syntax error, a name used twice, a name that's already state, a name expressions can't read (`__proto__`, `constructor`, `prototype`) or the engine uses (`screen`), a name nothing defines, and cycles, direct (`derive x={x + 1}`) or through others (`p` → `q` → `p`), which are left out with the loop named. A spec can derive at most 200 values.
 - Lists that derived values hold are new, frozen lists: filtering or sorting never changes the list in state.
 
@@ -270,8 +270,8 @@ Numbers and money are formatted in US English for now.
 Your app can pass its own data, which is copied into plain, frozen SayShape data (functions, class instances and cycles are refused with a clear error):
 
 ```ts
-loom.state.set("products", await fetchProducts());
-loom.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
+ui.state.set("products", await fetchProducts());
+ui.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
 ```
 
 #### Charts
@@ -364,7 +364,7 @@ screen name=cart title="Your cart"
   button "Keep shopping" variant=secondary on=back
 ```
 
-State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. Your app can move between screens too, with `loom.go("cart")` and `loom.back()`, and hears every move through the `navigate` event.
+State is shared by every screen. Screens only go at the top level, and their names are plain words (letters, digits and `_`). `go:` to a screen that doesn't exist does nothing. Your app can move between screens too, with `ui.go("cart")` and `ui.back()`, and hears every move through the `navigate` event.
 
 ### Conditions
 
@@ -1106,11 +1106,11 @@ import { SayShape, coreComponents } from "loom-ui";
 import { mapComponents } from "loom-ui/map";
 
 const canvas = document.querySelector("canvas")!;
-const loom = new SayShape(canvas, {
+const ui = new SayShape(canvas, {
   components: [...coreComponents, ...mapComponents],
 });
 
-loom.setSpec(`
+ui.setSpec(`
 state count=0
 card
   text "Clicked {count} times"
@@ -1152,7 +1152,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `notify(text)` | Show a short message, as `notify:` does |
 | `imagesLoaded()` | A promise that resolves once every requested image has loaded or failed |
 | `setTheme(theme)` | Switch themes |
-| `find(type)` | All nodes of a type, e.g. `loom.find("button")` |
+| `find(type)` | All nodes of a type, e.g. `ui.find("button")` |
 | `expose(name?)` | Put the instance on `window` for the console (default `window.loom`) |
 | `destroy()` | Remove listeners and stop rendering |
 
@@ -1169,7 +1169,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `notify` | `{ text }` | A message was shown |
 
 ```ts
-loom.on("action", ({ name, value }) => {
+ui.on("action", ({ name, value }) => {
   if (name === "order") submitOrder(value);
 });
 ```
@@ -1179,7 +1179,7 @@ loom.on("action", ({ name, value }) => {
 A spec can name any image URL, and a model writes specs, so SayShape only loads images from your own site (the page's origin) and from hosts you list. Anything else, including `data:` and `javascript:` URLs, is blocked: the `image` shows its description instead, and the console says which host to allow.
 
 ```ts
-const loom = new SayShape(canvas, {
+const ui = new SayShape(canvas, {
   components: coreComponents,
   imageHosts: ["cdn.example.com", "*.images.example.com"], // * allows subdomains; https only
 });
@@ -1281,24 +1281,24 @@ The report starts with a side-by-side table on the requests every variant can bu
 ```ts
 import { generateSpec } from "loom-ui/model";
 
-loom.beginStream();
+ui.beginStream();
 const result = await generateSpec({
   config: { url: "/api/model", model: "qwen3-14b" }, // a route on your server that adds the key
-  registry: loom.registry,
+  registry: ui.registry,
   request: "A booking form for a cabin, 2 to 6 guests",
   guide: {
     imageHosts: ["cdn.example.com"],
     actions: [{ name: "book", value: "the number of guests", description: "when the user books" }],
     notes: "A cabin rental site. Prices are per night.",
   },
-  onText: (text) => loom.push(text),
-  onReset: () => loom.beginStream(), // a fix is coming: start the screen over
+  onText: (text) => ui.push(text),
+  onReset: () => ui.beginStream(), // a fix is coming: start the screen over
 });
-loom.endStream();
+ui.endStream();
 // result.spec, result.diagnostics, result.first, result.repair, result.timings, result.usage, result.messages
 ```
 
-If your app supplies data with `loom.state.set`, pass its names as `stateNames: ["products"]`, so a spec that reads them isn't flagged as using unknown names and sent back for a needless repair. When a model writes its whole spec inside a thinking block it never closes, `generateSpec` finds the spec there (`result.first.recovered`).
+If your app supplies data with `ui.state.set`, pass its names as `stateNames: ["products"]`, so a spec that reads them isn't flagged as using unknown names and sent back for a needless repair. When a model writes its whole spec inside a thinking block it never closes, `generateSpec` finds the spec there (`result.first.recovered`).
 
 The guide comes from `languageGuide(registry, options)`, generated from the registered components, so it always matches what the engine supports. Its options tell the model which image hosts work, which `emit:` actions your app listens for, and anything about your app it should know.
 
@@ -1348,7 +1348,7 @@ import { generateSpec, nextRefineContext, type RefineContext } from "loom-ui/mod
 
 let context: RefineContext = { task: "A packing list for a 3-day hike", requirements: ["Prices in euros"], spec: first.spec };
 
-const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: loom.spec } });
+const r = await generateSpec({ config, registry, request: "Add a progress bar", refine: { ...context, spec: ui.spec } });
 context = nextRefineContext(context, "Add a progress bar", r.spec);
 ```
 
@@ -1369,7 +1369,7 @@ Putting the guide first and the request last means requests with the same guide 
 Send the user's choices back to the model with `emit` actions, passing `result.messages` as `history` to continue the conversation:
 
 ```ts
-loom.on("action", ({ name, value }) => {
+ui.on("action", ({ name, value }) => {
   continueConversation(`The user chose ${name}: ${value}`);
 });
 ```
@@ -1401,16 +1401,16 @@ Browser DevTools can't see inside a canvas, so SayShape ships its own tools. All
 
 | Tool | How to use it | What it shows |
 |---|---|---|
-| Layout boxes | `loom.inspector.setBoxes(true)` | Every box, with its type and size |
-| Hit regions | `loom.inspector.setHits(true)` | Exactly what is clickable |
-| Inspect mode | `loom.inspector.setInspecting(true)` | Hover to highlight, click to select. The playground jumps to the spec line, and putting the cursor on a spec line selects its element |
-| Describe | `loom.inspector.describe(node)` | A node's type, line, props and box |
-| Frame capture | `await loom.inspector.captureFrame()` | Every canvas call made in one frame |
-| Console | `loom.expose()` | `loom.tree`, `loom.boxes`, `loom.state.snapshot()`, `loom.find("button")` |
+| Layout boxes | `ui.inspector.setBoxes(true)` | Every box, with its type and size |
+| Hit regions | `ui.inspector.setHits(true)` | Exactly what is clickable |
+| Inspect mode | `ui.inspector.setInspecting(true)` | Hover to highlight, click to select. The playground jumps to the spec line, and putting the cursor on a spec line selects its element |
+| Describe | `ui.inspector.describe(node)` | A node's type, line, props and box |
+| Frame capture | `await ui.inspector.captureFrame()` | Every canvas call made in one frame |
+| Console | `ui.expose()` | Puts the instance on `window.loom`: `loom.tree`, `loom.boxes`, `loom.state.snapshot()`, `loom.find("button")` |
 
 To find a bug, first decide which stage it's in:
 
-- **An element is missing or wrong:** check `loom.diagnostics` and `loom.tree` (parse).
+- **An element is missing or wrong:** check `ui.diagnostics` and `ui.tree` (parse).
 - **Wrong position or size:** turn on layout boxes (layout).
 - **The box is right but it looks wrong:** capture a frame (paint).
 - **A click does nothing:** turn on hit regions (input).
@@ -1502,7 +1502,7 @@ export const ribbon: ComponentDef = {
   },
 };
 
-const loom = new SayShape(canvas, { components: [...coreComponents, ribbon] });
+const ui = new SayShape(canvas, { components: [...coreComponents, ribbon] });
 ```
 
 What a `ComponentDef` can define:
@@ -1549,17 +1549,17 @@ const brand = extendTheme(lightTheme, {
   colors: { accent: "#6D28D9" },
   radius: { md: 6 },
 });
-loom.setTheme(brand);
+ui.setTheme(brand);
 ```
 
 ### Trying styles in the playground
 
-The playground's **Appearance** button opens a small panel for previewing the current screen in another style, and copying the setup into your app. It only changes the playground's theme, through `loom.setTheme`: the spec, state, selections and any open list or calendar stay as they are, and no model is asked again.
+The playground's **Appearance** button opens a small panel for previewing the current screen in another style, and copying the setup into your app. It only changes the playground's theme, through `ui.setTheme`: the spec, state, selections and any open list or calendar stay as they are, and no model is asked again.
 
 - **Style:** Teal (SayShape's default), Purple, Blue or Neutral, each with matching light and dark colors. Neutral is grey, with firmer field and divider lines so controls stand out.
 - **Mode:** Light, Dark, or System, which follows the operating system as it changes. The page around the canvas follows too.
 - **Accent color:** a color picker and a hex field (`#rgb` or `#rrggbb`; half-typed or invalid values aren't applied). SayShape uses the accent as text and strokes and as the fill behind button labels, so a color that's too close to the background is darkened (light mode) or lightened (dark mode) just enough to reach 4.5:1 contrast, and the panel says what it shows instead. The color you asked for is kept, so each mode adjusts it on its own. The label color on the accent is picked automatically. **Reset color** goes back to the style's accent; **Reset appearance** goes back to SayShape's default.
-- **Copy theme code** copies TypeScript that recreates what you see with `extendTheme`, `lightTheme`, `darkTheme` and `loom.setTheme`, using the colors actually shown (after any adjustment). For Light or Dark it sets one theme; for System it exports both and a `followSystemAppearance(loom)` function that returns a cleanup. If the clipboard isn't available, the code appears in a box to copy by hand.
+- **Copy theme code** copies TypeScript that recreates what you see with `extendTheme`, `lightTheme`, `darkTheme` and `ui.setTheme`, using the colors actually shown (after any adjustment). For Light or Dark it sets one theme; for System it exports both and a `followSystemAppearance(ui)` function that returns a cleanup. If the clipboard isn't available, the code appears in a box to copy by hand.
 - The choice is saved in your browser (`localStorage`, key `loom-playground-appearance:v1`): the style, the mode and the accent you asked for, nothing else.
 
 The styles change colors only, through the same theme tokens every component reads; they're a playground feature, not part of the SayShape language, so models still can't choose colors. Teal, Purple and Blue keep SayShape's default field and divider lines, which are lighter than the 3:1 that WCAG asks of control boundaries; Neutral meets it.

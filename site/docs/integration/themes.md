@@ -31,7 +31,7 @@ const brand = extendTheme(lightTheme, {
   colors: { accent: "#6d28d9" },
   radius: { md: 6 },
 });
-loom.setTheme(brand);
+ui.setTheme(brand);
 ```
 
 `setTheme` keeps the spec, state, selections and any open popup as they are. To follow light and dark yourself, set one theme or the other when your page's mode changes. This site does that: its own light/dark switch calls `setTheme` with `lightTheme` or `darkTheme`.

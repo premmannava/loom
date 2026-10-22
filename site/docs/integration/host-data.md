@@ -10,8 +10,8 @@ A spec declares its own starting state, but most real interfaces show data your 
 ## Providing data
 
 ```ts
-loom.state.set("products", await fetchProducts());
-loom.state.set("user", { name: "Ada", plan: "pro" });
+ui.state.set("products", await fetchProducts());
+ui.state.set("user", { name: "Ada", plan: "pro" });
 ```
 
 A spec reads host data like any other state:
@@ -32,7 +32,7 @@ When a model writes a spec that reads host data, tell the parser and the model c
 ## Reacting to changes
 
 ```ts
-loom.on("change", ({ key, value }) => {
+ui.on("change", ({ key, value }) => {
   if (key === "cart") saveCart(value);
 });
 ```
@@ -44,7 +44,7 @@ Writes to items replace the whole list, so a change to `cart[1].qty` arrives as 
 `emit:` is how a spec asks your app to do something it can't do itself:
 
 ```ts
-loom.on("action", ({ name, value }) => {
+ui.on("action", ({ name, value }) => {
   switch (name) {
     case "checkout": return startCheckout(value);
     case "open_order": return router.push(`/orders/${value}`);
@@ -56,7 +56,7 @@ SayShape never makes a network request because of a spec: images aside ([Images]
 
 ## Moving between screens
 
-`loom.go("cart")`, `loom.back()`, `loom.screens`, `loom.currentScreen` and the `navigate` event let your app follow and drive a spec's [screens](../language/actions#screens).
+`ui.go("cart")`, `ui.back()`, `ui.screens`, `ui.currentScreen` and the `navigate` event let your app follow and drive a spec's [screens](../language/actions#screens).
 
 ## Not built yet
 
