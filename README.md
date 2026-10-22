@@ -107,6 +107,8 @@ The playground streams sample specs as a model would. Once a sample finishes you
 cd mcp && npm ci && npm run build   # then point your chat app at mcp/dist/server.js
 ```
 
+It isn't on npm yet; once it is, `npx -y sayshape-mcp` will replace the build step.
+
 Configuration for each chat app is in [`mcp/README.md`](mcp/README.md).
 
 ---

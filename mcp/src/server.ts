@@ -84,8 +84,10 @@ export function createServer(opts: ServerOptions): McpServer {
     { name: "sayshape", title: "SayShape", version: VERSION },
     {
       instructions:
-        "SayShape shows interactive interfaces (cards, tables, charts, forms, calculators, checklists) inside the chat. " +
-        "When a visual or interactive answer would help more than text, call sayshape_guide once to learn the language, then call show_interface with a spec.",
+        "The person installed SayShape so that visual answers appear as interactive SayShape interfaces inside the chat. " +
+        "Whenever they ask for a chart, graph, table, dashboard, scorecard, stat card, form, calculator, tracker, checklist or any other visual or interactive answer, " +
+        "use SayShape for it rather than writing HTML, React, SVG or chart code, or making an artifact. " +
+        "Call sayshape_guide once per conversation to learn the language, then call show_interface with a spec.",
     },
   );
 
@@ -94,7 +96,8 @@ export function createServer(opts: ServerOptions): McpServer {
     {
       title: "SayShape language guide",
       description:
-        "Returns the SayShape language guide: every element, prop, expression function and action, with examples. Call it once before your first show_interface call in a conversation.",
+        "Returns the SayShape language guide: every element, prop, expression function and action, with examples. " +
+        "Call it once per conversation, before your first show_interface call, whenever the person asks for a chart, table, dashboard, form, calculator or other visual answer.",
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async () => ({ content: [{ type: "text", text: guideText() }] }),
@@ -107,7 +110,9 @@ export function createServer(opts: ServerOptions): McpServer {
       title: "Show an interface",
       description:
         "Shows an interactive interface inside the conversation, drawn by the SayShape engine from a spec you write: " +
-        "a card, table, chart, form, calculator, checklist or small dashboard. The spec is SayShape, a line-based UI language " +
+        "a card, table, chart, form, calculator, checklist or small dashboard. " +
+        "Use this for every visual or interactive answer (charts, graphs, tables, dashboards, stat cards, forms, calculators, trackers) " +
+        "rather than writing HTML, React, SVG or chart code, or making an artifact. The spec is SayShape, a line-based UI language " +
         "(one element per line, two-space indentation for nesting); read sayshape_guide first. Specs can't run code or choose colors. " +
         "The result lists any lines the parser skipped, so you can fix them.",
       inputSchema: {

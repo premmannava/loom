@@ -4,6 +4,7 @@
  * exposes the bridge so the script can stream tool input and read messages.
  */
 import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { McpUiStyles } from "@modelcontextprotocol/ext-apps";
 
 declare global {
   interface Window {
@@ -16,13 +17,13 @@ declare global {
   }
 }
 
-export function mount(html: string, theme: "light" | "dark"): void {
+export function mount(html: string, theme: "light" | "dark", styles?: Record<string, string>): void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", "allow-scripts");
   iframe.style.cssText = "width:600px;height:200px;border:1px solid #ccc;border-radius:12px";
   document.body.append(iframe);
   const bridge = new AppBridge(null, { name: "TestHost", version: "1.0.0" }, { openLinks: {}, logging: {}, message: { text: {} }, updateModelContext: { text: {} } }, {
-    hostContext: { theme, platform: "web", displayMode: "inline" },
+    hostContext: { theme, platform: "web", displayMode: "inline", ...(styles ? { styles: { variables: styles as unknown as McpUiStyles } } : {}) },
   });
   const messages: string[] = [];
   const sizes: number[] = [];
