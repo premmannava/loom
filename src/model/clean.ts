@@ -137,7 +137,7 @@ export class SpecFilter {
   }
 }
 
-/** A line that could start a spec: state, a comment, or a known element name. */
+/** A line that could start a spec: a declaration, a comment, or a known element name. */
 export function loomLineTest(isElement: (name: string) => boolean): (line: string) => boolean {
   return (line) => {
     const t = line.trim();
@@ -146,6 +146,7 @@ export function loomLineTest(isElement: (name: string) => boolean): (line: strin
     const word = /^[A-Za-z][\w-]*/.exec(t)?.[0];
     if (!word) return false;
     if (word === "state") return /^state(\s|$)/.test(t);
+    if (word === "derive") return /^derive(\s|$)/.test(t);
     // An element name alone, or followed by a space ("card", "text \"Hi\""), not prose ("Here's").
     return isElement(word) && (t.length === word.length || /\s/.test(t[word.length]!));
   };

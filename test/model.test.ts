@@ -50,6 +50,12 @@ describe("SpecFilter", () => {
     expect(run(["card\n  text \"Hi\""]).text).toBe(`card\n  text "Hi"\n`);
   });
 
+  it("preserves a leading derived declaration, including across chunks", () => {
+    const spec = 'derive total={2 * 3}\ntext "{total}"\n';
+    expect(run(spec.split("")).text).toBe(spec);
+    expect(render(run([spec]).text).text()).toEqual(["6"]);
+  });
+
   it("joins a state value spread over several lines, as models write long lists", () => {
     const raw = `state picked="" trails=[
     {name: "Four Peaks", miles: 12, note: "a ] in text"},
@@ -75,7 +81,7 @@ card
   });
 
   it("recognises how a spec can start", () => {
-    expect(["state n=0", "# comment", "card", 'text "Hi"', "screen name=a"].every(isLoom)).toBe(true);
+    expect(["state n=0", "derive total={2 * 3}", "# comment", "card", 'text "Hi"', "screen name=a"].every(isLoom)).toBe(true);
     expect(["Here is", "Card for you:", "stated plainly", "texts", ""].some(isLoom)).toBe(false);
   });
 });

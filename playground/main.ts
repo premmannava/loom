@@ -3,6 +3,7 @@ import { mapComponents } from "../src/components/map";
 import { setupAppearance } from "./appearance/panel";
 import { setupAsk } from "./ask";
 import { samples } from "./samples";
+import { playgroundGuide } from "./model-guide";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const ta = $<HTMLTextAreaElement>("spec");
@@ -15,7 +16,9 @@ const loom = new Loom(canvas, { components: [...coreComponents, ...mapComponents
 // Style presets, light/dark/system and a custom accent, through loom.setTheme.
 setupAppearance(loom);
 // The same guide a model gets from "Ask a model", so copying it into a chat app works the same way.
-const guideOptions = { imageHosts };
+// Leave room for the request, generated spec and a repair on local 8K models.
+// Keep the library default unchanged; this is the playground's configuration.
+const guideOptions = playgroundGuide(imageHosts);
 const guideText = languageGuide(loom.registry, guideOptions);
 $("guide").textContent = guideText;
 $("copyGuide").addEventListener("click", async (e) => {

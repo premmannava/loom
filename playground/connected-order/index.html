@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Loom · Build with Qwen</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { margin: 0; background: #eef1f5; }
+      main { max-width: 820px; margin: 24px auto; background: white; border-radius: 16px; overflow: hidden; }
+      canvas { display: block; width: 100%; }
+      @media (prefers-color-scheme: dark) { body { background: #111720; } main { background: #1c222d; } }
+      @media (max-width: 600px) { main { margin: 0; border-radius: 0; } }
+    </style>
+  </head>
+  <body>
+    <main><canvas id="generator" aria-label="Describe an interface for Qwen"></canvas></main>
+    <main><canvas id="app" aria-label="Generated interface"></canvas></main>
+    <main><canvas id="timings" aria-label="Generation timing diagnostics"></canvas></main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

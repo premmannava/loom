@@ -60,7 +60,7 @@ export interface GuideOptions {
    */
   profile?: string | ComponentProfile | readonly string[];
   /**
-   * The larger worked examples, by name: todo, form, cart, orders, booking.
+   * The larger worked examples, by name: todo, form, cart, orders, booking, equipment, calculator, shopping.
    * true or left out = the mode's default (full: todo, cart, orders and
    * booking, exactly as before, or if a profile rules all of them out, the
    * first of COMPACT_EXAMPLE_ORDER it can build; compact: the first of COMPACT_EXAMPLE_ORDER
@@ -72,7 +72,7 @@ export interface GuideOptions {
 }
 
 export type GuideMode = "full" | "compact";
-export type WorkedExampleName = "todo" | "form" | "cart" | "orders" | "booking";
+export type WorkedExampleName = "todo" | "form" | "cart" | "orders" | "booking" | "equipment" | "calculator" | "shopping";
 
 function propLine(name: string, d: PropDef): string {
   const type = d.type === "enum" && d.values ? d.values.join("|") : d.type;
@@ -121,6 +121,52 @@ function appActions(actions: readonly AppAction[]): string {
  * parse cleanly and behave as described.
  */
 export const WORKED_EXAMPLES = {
+  shopping: `state groceries=[{name: "Milk", purchased: false}, {name: "Eggs", purchased: false}, {name: "Bread", purchased: false}] newItem=""
+derive remaining={count(groceries, 'purchased', false)}
+card
+  text "Grocery list" style=title
+  text "{remaining} items left" tone=muted
+  each items=groceries as=item
+    row
+      check "{item.name}" bind=item.purchased
+      button "Remove" variant=secondary on=remove:item
+  input "Add an item" bind=newItem placeholder="e.g. Apples" on="add:groceries:{name: trim(newItem), purchased: false};set:newItem:''"
+  button "Add" on="add:groceries:{name: trim(newItem), purchased: false};set:newItem:''" disabled={trim(newItem) == ''}`,
+  calculator: `state bill=50 percent=15 people=1
+derive tip={bill * percent / 100}
+derive total={bill + tip}
+derive perPerson={total / people}
+card
+  text "Tip calculator" style=title
+  text "Bill amount"
+  stepper bind=bill min=0 max=1000 step=5
+  slider "Tip percentage: {percent}%" bind=percent min=0 max=30
+  text "People"
+  stepper bind=people min=1 max=20
+  stat label="Tip" value={money(tip)}
+  stat label="Total" value={money(total)}
+  stat label="Per person" value={money(perPerson)}`,
+  equipment: `state equipment=[{id: "laptop", name: "Laptop", team: "Engineering", price: 1200}, {id: "monitor", name: "Monitor", team: "Engineering", price: 350}, {id: "headset", name: "Headset", team: "Sales", price: 120}]
+state departments=["All", "Engineering", "Sales"] department="All" selected="laptop" quantity=1 delivery="" sortField="name" sortDirection="asc"
+derive visible={department == 'All' ? equipment : filter(equipment, 'team', department)}
+derive item={find(equipment, 'id', selected)}
+derive subtotal={item ? item.price * quantity : 0}
+derive tax={subtotal * 0.08}
+derive total={subtotal + tax}
+card
+  text "Equipment request" style=title
+  select "Department" items=departments bind=department
+  table items=visible key=id bind=selected sort=sortField direction=sortDirection
+    table-column "Equipment" field=name
+    table-column "Price" field=price format=money
+  text "Quantity"
+  stepper bind=quantity min=1 max=5
+  date-picker "Delivery date" bind=delivery
+  text "{item ? item.name : 'Choose equipment'} × {quantity}"
+  text "Delivery: {delivery == '' ? 'Choose a date' : delivery}"
+  stat label="Subtotal" value={money(subtotal)}
+  stat label="Tax" value={money(tax)}
+  stat label="Total" value={money(total)}`,
   todo: `state task="" todos=[{text: "Pack water", done: true}, {text: "Charge headlamp", done: false}, {text: "Snacks", done: false}]
 card
   text "Packing list" style=title
@@ -321,6 +367,8 @@ ${comps.map((c) => componentBlock(c, examples && ctx.valid(componentExampleSpec(
   add("rules", `RULES\n${rules.join("\n")}`);
   if (opts.notes?.trim()) add("notes", `ABOUT THIS APP\n${opts.notes.trim()}`);
   if (workedExamples(ctx).includes("form")) add("example-form", `A SIGN-UP FORM\n${WORKED_EXAMPLES.form}`);
+  if (workedExamples(ctx).includes("equipment")) add("example-equipment", `EXAMPLE (equipment)\n${WORKED_EXAMPLES.equipment}`);
+  if (workedExamples(ctx).includes("calculator")) add("example-calculator", `EXAMPLE (calculator)\n${WORKED_EXAMPLES.calculator}`);
   // Kept last: tests and tools read everything after "EXAMPLE\\n" as a spec.
   if (workedExamples(ctx).includes("booking")) add("example", `EXAMPLE\n${WORKED_EXAMPLES.booking}\n`);
   return out;

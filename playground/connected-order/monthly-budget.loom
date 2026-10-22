@@ -1,0 +1,32 @@
+state transactions=[{id:"oct-groceries",month:"October",date:"2026-10-02",category:"Food",description:"Groceries",amount:64.5},{id:"oct-internet",month:"October",date:"2026-10-04",category:"Home",description:"Internet",amount:80},{id:"oct-fuel",month:"October",date:"2026-10-08",category:"Transit",description:"Fuel",amount:42},{id:"oct-restaurant",month:"October",date:"2026-10-11",category:"Food",description:"Restaurant",amount:87.5},{id:"oct-electricity",month:"October",date:"2026-10-15",category:"Home",description:"Electricity",amount:132},{id:"oct-parking",month:"October",date:"2026-10-19",category:"Transit",description:"Parking",amount:35},{id:"nov-groceries",month:"November",date:"2026-11-03",category:"Food",description:"Groceries",amount:72},{id:"nov-concert",month:"November",date:"2026-11-08",category:"Fun",description:"Concert",amount:95}]
+state months=["October","November"] categories=["All","Food","Home","Transit","Fun"] month="October" category="All" budget=1500 selectedId="oct-groceries" sortField="date" sortDirection="asc"
+derive inMonth={filter(transactions,"month",month)}
+derive visible={category == "All" ? inMonth : filter(inMonth,"category",category)}
+derive spent={sum(visible,"amount")}
+derive remaining={budget-spent}
+derive usedPercent={round(spent/budget*100,0)}
+derive selected={find(transactions,"id",selectedId)}
+column
+  text "Monthly budget" style=title
+  row
+    select "Month" items=months bind=month
+    select "Category" items=categories bind=category
+  row
+    stat label="Visible expenses" value={len(visible)}
+    stat label="Spent" value={money(spent)}
+    stat label="Budget remaining" value={money(remaining)}
+    stat label="Budget used" value={usedPercent}
+  text "Over budget by {money(-remaining)}" tone=bad if={remaining < 0}
+  text "Within budget" tone=good if={remaining >= 0}
+  slider "Monthly budget: {money(budget)}" bind=budget min=500 max=3000 step=100
+  chart "Visible expenses" kind=bar items=visible x=description y=amount format=money
+  table "Expenses" items=visible key=id bind=selectedId sort=sortField direction=sortDirection
+    table-column "Date" field=date
+    table-column "Category" field=category
+    table-column "Description" field=description
+    table-column "Amount" field=amount format=money
+  card
+    text "Selected expense" style=title
+    text "{selected.description} · {selected.category} · {selected.date}" if={selected}
+    text "{money(selected.amount)}" if={selected}
+    text "Selected expense is outside the current filters." if={!selected}

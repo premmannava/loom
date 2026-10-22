@@ -1237,6 +1237,8 @@ Reasoning models such as Qwen3 and DeepSeek R1 think before writing. Their think
 
 **Copy guide**, under the model guide at the bottom of the playground, copies the same instructions the model gets, for trying Loom in any chat app.
 
+The playground uses the compact guide with equipment-order and numeric-calculator examples, plus short binding reminders. The calculator demonstrates numeric state, automatic control bindings, and derived totals without JavaScript event handlers. This leaves more room for a request and repair on local models loaded with an 8K context window. The library's default remains the full guide. A request can still exceed the model's context with a large spec or refinement; guide token estimates are not exact tokenizer counts.
+
 ### Measure it
 
 ```bash
@@ -1326,7 +1328,7 @@ Three sets of elements are involved, and they're separate:
 - **The model's**: the profile. The guide only describes these.
 - **What's checked**: by default, a spec is checked against the renderer's elements. With `enforceProfile: true`, it's checked against the profile, so an element outside it is sent back for repair.
 
-Examples are chosen explicitly: `examples` turns each element's own short example on or off (default on in full mode, off in compact), and `workedExamples` picks the larger ones by name (`["todo", "cart"]`, or `false` for none). With a profile, an example that uses an element outside it is never shown.
+Examples are chosen explicitly: `examples` turns each element's own short example on or off (default on in full mode, off in compact), and `workedExamples` picks the larger ones by name (`["todo", "cart"]`, `["equipment"]` for a filterable order calculator, or `false` for none). With a profile, an example that uses an element outside it is never shown.
 
 #### Repairs
 

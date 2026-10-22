@@ -38,6 +38,8 @@ export interface Attempt {
   estimatedThinkingTokens: number;
   /** How long this attempt took, from its request to its last byte. */
   ms: number;
+  /** From this attempt's start until its first content or reasoning chunk. */
+  firstTokenMs?: number;
 }
 
 export interface GenerateResult {
@@ -163,6 +165,7 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
     const filter = new SpecFilter(isLoomLine);
     const usage: Usage = {};
     let raw = "", spec = "", thinking = "", phase: Phase = "waiting";
+    let firstTokenMs: number | undefined;
     const setPhase = (p: Phase) => { if (p !== phase) { phase = p; o.onPhase?.(p); } };
     const emit = (out: { text: string; reset: boolean }) => {
       if (out.reset) { spec = ""; o.onReset?.("thinking"); }
@@ -174,6 +177,7 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
     };
     o.onPhase?.("waiting");
     for await (const part of streamChat(o.config, msgs, { signal: o.signal, fetch: o.fetch, usage })) {
+      if (firstTokenMs === undefined) firstTokenMs = now() - began;
       if (timings.firstTokenMs === undefined) timings.firstTokenMs = now() - start;
       if (part.kind === "reasoning") { thinking += part.text; setPhase("thinking"); continue; }
       raw += part.text;
@@ -196,7 +200,7 @@ export async function generateSpec(o: GenerateOptions): Promise<GenerateResult> 
     return {
       spec, diagnostics, raw, usage, thinkingChars, thinking, recovered,
       guide: g, inputChars, estimatedInputTokens: Math.round(inputChars / 4), estimatedThinkingTokens: Math.round(thinkingChars / 4),
-      ms: now() - began,
+      ms: now() - began, firstTokenMs,
     };
   };
 
