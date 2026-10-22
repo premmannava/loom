@@ -61,6 +61,7 @@ Anything that can't be read (a missing field, an item past the end of a list) sh
 | `search(list, 'name', query)` | Items whose field contains the text, ignoring case; all items for empty text |
 | `sort(list, 'price')`, `sort(list, 'price', 'desc')`, `sort(list)` | A sorted copy, by a field or by value |
 | `take(list, 3)` | The first items |
+| `first(list)`, `last(list)` | The first or last item, or nothing for an empty list: `first(sort(sales, 'revenue', 'desc')).month` is the best month |
 | `join(list)`, `join(list, 'name', ' / ')` | Text listing the items, or a field of each |
 | `includes(list, value)` | Whether the list holds a value (or text contains other text) |
 
@@ -72,7 +73,7 @@ They combine:
 state tx=[{name: "Market", cat: "Food", amount: 64.5}, {name: "Fuel", cat: "Transit", amount: 42}, {name: "Bistro", cat: "Food", amount: 87.5}]
 card
   text "Food: {money(sum(filter(tx, 'cat', 'Food'), 'amount'))}"
-  text "Biggest: {take(sort(tx, 'amount', 'desc'), 1)[0].name}"
+  text "Biggest: {first(sort(tx, 'amount', 'desc')).name}"
   text "{join(tx, 'name', ', ')}" tone=muted
 ```
 

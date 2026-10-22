@@ -105,6 +105,10 @@ const BUILTINS: Record<string, Fn> = {
     return makeList([...v].sort((x, y) => (desc ? -1 : 1) * order(key(x), key(y))));
   },
   /** The first n items: take(sort(players, 'score', 'desc'), 3). */
+  /** The first item of a list, or null when it's empty: first(sort(sales, 'revenue', 'desc')).month. */
+  first: (v) => (isList(v) ? v[0] ?? null : NaN),
+  /** The last item of a list, or null when it's empty. */
+  last: (v) => (isList(v) ? v[v.length - 1] ?? null : NaN),
   take: (v, n) => (isList(v) ? makeList(v.slice(0, Math.max(0, Math.floor(toNumber(n ?? 0)) || 0))) : NaN),
   sum: (v, a, b) => amounts(v, a, b)?.reduce((t, x) => t + x, 0) ?? NaN,
   avg: (v, a, b) => {
@@ -167,6 +171,28 @@ const BUILTINS: Record<string, Fn> = {
 const FUNCTIONS: Readonly<Record<string, Fn>> = Object.freeze(Object.assign(Object.create(null) as Record<string, Fn>, BUILTINS));
 const isFunctionName = (name: string) => Object.hasOwn(FUNCTIONS, name);
 export const EXPRESSION_FUNCTIONS = Object.keys(FUNCTIONS);
+
+/** Names models reach for from other languages, and what to write instead. */
+const FUNCTION_HINTS: Record<string, string> = {
+  length: "len(list)", size: "len(list)", length_of: "len(list)",
+  head: "first(list)", tail: "last(list)", top: "take(list, n)", limit: "take(list, n)", slice: "take(list, n)",
+  argmax: "first(sort(list, 'field', 'desc'))", argmin: "first(sort(list, 'field'))",
+  maxby: "first(sort(list, 'field', 'desc'))", minby: "first(sort(list, 'field'))",
+  max_by: "first(sort(list, 'field', 'desc'))", min_by: "first(sort(list, 'field'))",
+  mean: "avg(list, 'field')", average: "avg(list, 'field')", total: "sum(list, 'field')",
+  where: "filter(list, 'field', value)", contains: "includes(list, value)",
+  format: "number(n) or money(n)", currency: "money(n)", tofixed: "fixed(n, 2)", str: "text in quotes: \"{n} items\"", string: "text in quotes: \"{n} items\"",
+  if: "a ? b : c", iif: "a ? b : c", concat: "join(list) or text in quotes", map: "each, or sum/avg/join with a field",
+};
+
+function unknownFunction(name: string): string {
+  const key = name.toLowerCase();
+  // hasOwn: names like "constructor" must not find Object's own properties.
+  const hint = Object.hasOwn(FUNCTION_HINTS, key) ? FUNCTION_HINTS[key] : undefined;
+  const near = EXPRESSION_FUNCTIONS.find((f) => f === key);
+  const tip = hint ? ` Use ${hint}.` : near ? ` Did you mean ${near}?` : "";
+  return `Unknown function "${name}".${tip} Functions: ${EXPRESSION_FUNCTIONS.join(", ")}`;
+}
 
 const OPS = ["===", "!==", "==", "!=", "<=", ">=", "&&", "||", "<", ">", "+", "-", "*", "/", "%", "!", "?", ":", "(", ")", ",", "[", "]", "{", "}"];
 
@@ -268,7 +294,7 @@ function parseExpr(src: string): Node {
       if (t.v === "false") return { k: "lit", v: false };
       if (t.v === "null") return { k: "lit", v: null };
       if (peek().v === "(") {
-        if (!isFunctionName(t.v)) throw new ExprError(`Unknown function "${t.v}"`);
+        if (!isFunctionName(t.v)) throw new ExprError(unknownFunction(t.v));
         next();
         const args: Node[] = [];
         if (peek().v !== ")") {

@@ -10,11 +10,13 @@
  *   message in the conversation, with the action, its value and the
  *   interface's state, so the model can answer it.
  */
+import "./no-eval";
 import { App, applyHostFonts, applyHostStyleVariables, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import { SayShape } from "../../../src/engine";
 import { coreComponents } from "../../../src/components";
 import { darkTheme, lightTheme, type Theme } from "../../../src/theme";
 import type { Value } from "../../../src/types";
+import { tidySpec } from "../../../src/model/clean";
 import { eventMessage, nextChunk } from "./messages";
 import { firstFamily, hostTheme, type ReadVar } from "./host-theme";
 
@@ -153,13 +155,15 @@ function specOf(args: Record<string, unknown> | undefined): string | null {
   return typeof s === "string" ? s : null;
 }
 
+// Tidied the way the server checks it (fences, typographic quotes). While streaming,
+// only complete lines are tidied and shown, so each step extends the last one.
 app.ontoolinputpartial = (p) => {
   const spec = specOf(p.arguments);
-  if (spec !== null) show(spec, false);
+  if (spec !== null) show(tidySpec(spec.slice(0, spec.lastIndexOf("\n") + 1)), false);
 };
 app.ontoolinput = (p) => {
   const spec = specOf(p.arguments);
-  if (spec !== null) show(spec, true);
+  if (spec !== null) show(tidySpec(spec), true);
   const data = dataOf(p.arguments);
   if (data) void loadData(data);
 };

@@ -53,7 +53,13 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   await page.setContent(`<!doctype html><body style="margin:20px;font-family:sans-serif;background:#fff"><script>${hostJs}</script></body>`);
-  await page.evaluate((html) => window.TestHost.mount(html, "light"), uiHtml);
+  // The same Content Security Policy chat apps give the view: inline scripts and styles, no eval.
+  // A violation is logged as a console error, so "no errors in the page" catches it.
+  const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data:">`;
+  const listen = `<script>document.addEventListener("securitypolicyviolation", (e) => console.error("Content Security Policy blocked " + e.violatedDirective))</script>`;
+  const strict = uiHtml.replace(/<head>/i, `<head>${csp}${listen}`);
+  check(strict !== uiHtml, "the view runs under a strict Content Security Policy");
+  await page.evaluate((html) => window.TestHost.mount(html, "light"), strict);
   await page.evaluate(() => window.host.ready);
   check(true, "the view completed the MCP Apps handshake");
 
@@ -65,7 +71,8 @@ try {
     await page.waitForTimeout(40);
     if (n === 8) await page.screenshot({ path: out + "1-streaming.png" });
   }
-  await page.evaluate((spec) => window.host.bridge.sendToolInput({ arguments: { spec } }), SPEC);
+  // Sent with the fences and typographic quotes models slip into; the view tidies them like the server.
+  await page.evaluate((spec) => window.host.bridge.sendToolInput({ arguments: { spec } }), "```\n" + SPEC.replace('"Weekend hike planner"', "“Weekend hike planner”") + "```\n");
   await page.evaluate(() => window.host.bridge.sendToolResult({ content: [{ type: "text", text: "The interface is showing in the conversation, with no problems." }] }));
   await page.waitForTimeout(600);
   await page.screenshot({ path: out + "2-final-light.png" });

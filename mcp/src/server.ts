@@ -38,6 +38,8 @@ import { Registry } from "../../src/registry";
 import { coreComponents } from "../../src/components";
 import { elementGuide, elementIndex, guideSections, languageGuide } from "../../src/prompt";
 import type { Diagnostic } from "../../src/types";
+import { tidySpec } from "../../src/model/clean";
+import { EXPRESSION_FUNCTIONS } from "../../src/expr";
 import { QueryError, summarize, type DataSource } from "./data";
 
 export const VERSION = "0.1.0";
@@ -95,6 +97,7 @@ export function quickStart(withData = false): string {
     "QUICK START (the language is also called Loom)",
     sectionText("compact", "format").replace(/^FORMAT\n/, ""),
     "- Text and props can show state: text \"Total: {money(total)}\"; actions run on press: button \"Add\" on=inc:count",
+    `- Functions (no others exist): ${EXPRESSION_FUNCTIONS.join(", ")}. The best row: first(sort(rows, 'revenue', 'desc')).month; a total: sum(rows, 'revenue')`,
     `ELEMENTS\n${elementIndex(coreComponents)}`,
     "IN A CHAT: one card with a title; the column is about 600px wide, so use grid min=140 for side-by-side figures; say in a caption when numbers come from your own knowledge; on=emit:name lets the person send a choice back to you.",
     `BEFORE YOU USE AN ELEMENT for the first time in a conversation, get its props and an example with sayshape_docs (elements: ["chart", "table"]). Topics: ${Object.keys(topics(withData)).join(", ")}.`,
@@ -143,15 +146,26 @@ export function checkSpec(spec: string, hostNames: readonly string[] = []): Spec
   };
 }
 
+/**
+ * Warnings that change nothing on screen: the parser ignored a prop or some text.
+ * Every other warning (a bad expression, a value outside a prop's choices, a
+ * name nothing defines) leaves part of the interface wrong, so it needs a fix.
+ */
+const HARMLESS = /has no prop "|doesn't take quoted text; it was ignored|state lines should not be indented/;
+export const isHarmless = (d: Diagnostic) => d.severity !== "error" && HARMLESS.test(d.message);
+
 function describeCheck(c: SpecCheck): string {
   const all = [...c.errors, ...c.warnings];
-  if (!all.length) return "The interface is showing in the conversation, with no problems.";
-  const lines = all.slice(0, MAX_REPORTED).map((d) => `line ${d.line} (${d.severity}): ${d.message}`);
-  if (all.length > MAX_REPORTED) lines.push(`…and ${all.length - MAX_REPORTED} more.`);
-  const lead = c.errors.length
-    ? `The interface is showing, but ${c.errors.length} line${c.errors.length === 1 ? " was" : "s were"} skipped. Fix these and call show_interface again with the whole corrected spec:`
-    : "The interface is showing. The parser noted these smaller problems; fix them if they matter:";
-  return `${lead}\n${lines.join("\n")}`;
+  if (!all.length) return "The interface is showing in the conversation, with no problems. Don't call show_interface again unless the person asks for a change.";
+  const fix = all.filter((d) => !isHarmless(d));
+  const minor = all.filter(isHarmless);
+  // The ones to fix come first, so they survive the cut.
+  const listed = [...fix, ...minor].slice(0, MAX_REPORTED).map((d) => `line ${d.line} (${isHarmless(d) ? "ignored" : d.severity}): ${d.message}`);
+  if (all.length > MAX_REPORTED) listed.push(`…and ${all.length - MAX_REPORTED} more.`);
+  const lead = fix.length
+    ? `The interface is showing, but ${fix.length} problem${fix.length === 1 ? "" : "s"} leave${fix.length === 1 ? "s" : ""} part of it wrong or missing. Fix ${fix.length === 1 ? "it" : "them"} and call show_interface again with the whole corrected spec:`
+    : "The interface is showing correctly. The parser ignored these small things, which change nothing on screen, so there's no need to call show_interface again:";
+  return `${lead}\n${listed.join("\n")}`;
 }
 
 export interface ServerOptions {
@@ -228,7 +242,9 @@ export function createServer(opts: ServerOptions): McpServer {
       _meta: { ui: { resourceUri: UI_URI } },
     },
     async (args) => {
-      const { spec, title } = args;
+      const { title } = args;
+      // Fences and typographic quotes would otherwise cost a retry; the view tidies the same way.
+      const spec = tidySpec(args.spec);
       const wanted = ((args as { data?: Record<string, string> }).data ?? {}) as Record<string, string>;
       const datasets: Record<string, { id: string; rows: number }> = {};
       for (const [name, id] of Object.entries(wanted)) {
@@ -246,7 +262,7 @@ export function createServer(opts: ServerOptions): McpServer {
         ...(declared.length ? [`Remove ${declared.join(", ")} from the state line: the interface fills ${declared.length === 1 ? "it" : "them"} in from the dataset.`] : []),
       ];
       // A wrong guess comes back with the docs it needed, instead of the model reading every element up front.
-      const failing = elementsOnLines(spec, [...check.errors, ...check.warnings]);
+      const failing = elementsOnLines(spec, [...check.errors, ...check.warnings].filter((d) => !isHarmless(d)));
       if (failing.length) notes.push(`\nDocs for ${failing.join(", ")}:\n${elementGuide(registry, failing).text}`);
       return {
         content: [{ type: "text", text: [describeCheck(check), ...notes].join("\n") }],
@@ -255,6 +271,7 @@ export function createServer(opts: ServerOptions): McpServer {
           title: title ?? null,
           errors: check.errors.length,
           warnings: check.warnings.length,
+          toFix: [...check.errors, ...check.warnings].filter((d) => !isHarmless(d)).length,
           diagnostics: [...check.errors, ...check.warnings].slice(0, MAX_REPORTED).map((d) => ({ line: d.line, severity: d.severity, message: d.message })),
         },
       };

@@ -16,7 +16,7 @@ you: "Compare the three phone plans I pasted"
 
 | | |
 |---|---|
-| `show_interface` | Takes a spec (and an optional title), checks it with SayShape's own parser and returns any skipped lines with line numbers, along with the docs for the elements on those lines. The chat app shows the result in the view. Its description carries a short quick start (about 400 tokens): the syntax, every element's name and how to write for a chat. |
+| `show_interface` | Takes a spec (and an optional title), checks it with SayShape's own parser and returns any skipped lines with line numbers, along with the docs for the elements on those lines. The chat app shows the result in the view. Its description carries a short quick start (about 450 tokens): the syntax, every element's name, every expression function and how to write for a chat. |
 | `sayshape_docs` | Props and an example for just the elements the model names (a `table` brings its `table-column`), and topics on request: expressions, actions, lists, rules, examples, chat, database. |
 | `ui://sayshape/interface.html` | The view: the SayShape engine, the Instrument Sans font and a small bridge script, all in one HTML file. It loads nothing from anywhere else. |
 
@@ -26,7 +26,7 @@ Interfaces match the chat app they're in. The view follows its light or dark mod
 
 ## Tokens
 
-A model never reads the whole language guide (about 7,500 tokens). It gets a quick start in `show_interface`'s description (about 400) and asks `sayshape_docs` for only the elements it's about to use: about 140 tokens for a button, 700 for a chart and a table, 1,200 for a six-element dashboard. If it guesses an element wrong, the result of `show_interface` brings that element's docs, so a wrong guess costs one retry, not the whole guide. With a database, the rows go from the database to the interface, so the model's tokens don't grow with the data either.
+A model never reads the whole language guide (about 7,500 tokens). It gets a quick start in `show_interface`'s description (about 450) and asks `sayshape_docs` for only the elements it's about to use: about 140 tokens for a button, 700 for a chart and a table, 1,200 for a six-element dashboard. If it guesses an element wrong, the result of `show_interface` brings that element's docs, so a wrong guess costs one retry, not the whole guide. Retries are the expensive part, because each call resends the whole conversation, so the server avoids the needless ones: it quietly fixes Markdown fences and typographic quotes (the view tidies the same way), tells the model when a problem was only an ignored prop and needs no new call, and answers an unknown function like `argmax` with the one to use instead (`first(sort(rows, 'revenue', 'desc'))`). With a database, the rows go from the database to the interface, so the model's tokens don't grow with the data either.
 
 ## Show data from a database
 

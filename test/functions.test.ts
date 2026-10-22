@@ -70,6 +70,23 @@ describe("sorting and taking", () => {
     expect(json(val("nums"))).toEqual([3, 9, 4]);
   });
 
+  it("picks the first and last item, so the best row is first(sort(...))", () => {
+    expect(val("first(sort(items, 'price', 'desc')).name")).toBe("Shell");
+    expect(val("last(sort(rooms, 'rate')).id")).toBe("k");
+    expect(val("first(nums)")).toBe(3);
+    expect(val("last(nums)")).toBe(4);
+    expect(val("first([])")).toBe(null);
+    expect(interpolate("{first([]).name}", store.scope)).toBe("—");
+  });
+
+  it("names the right function when a model reaches for one from another language", () => {
+    const err = (src: string) => { const r = evaluate(src, store.scope); return r.ok ? "" : r.error; };
+    expect(err("length(items)")).toMatch(/Unknown function "length"\. Use len\(list\)\. Functions: .*first/);
+    expect(err("argmax(items)")).toMatch(/Use first\(sort\(list, 'field', 'desc'\)\)/);
+    expect(err("SUM(nums)")).toMatch(/Did you mean sum\?/);
+    expect(err("constructor(nums)")).not.toMatch(/Use /);
+  });
+
   it("finds the smallest and largest of a field", () => {
     expect(val("max(tx, 'amount')")).toBe(2400);
     expect(val("min(rooms, 'rate')")).toBe(189);

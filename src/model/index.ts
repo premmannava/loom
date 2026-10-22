@@ -6,4 +6,4 @@
 export { generateSpec, repairPrompt, type Attempt, type GenerateOptions, type GenerateResult, type Phase } from "./generate";
 export { refineMessages, nextRefineContext, sumUsage, DEFAULT_MAX_CHANGES, type RefineContext, type ContextPolicy, type ContextInfo, type UsageTotals } from "./context";
 export { streamChat, ModelError, type ChatMessage, type ModelConfig, type StreamPart, type Usage } from "./stream";
-export { SpecFilter, loomLineTest, type FilterOutput } from "./clean";
+export { SpecFilter, loomLineTest, tidySpec, type FilterOutput } from "./clean";

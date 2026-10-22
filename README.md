@@ -268,6 +268,7 @@ List functions, for computing instead of typing numbers:
 | `search(list, 'name', query)` | Items whose field contains some text, ignoring case (all of them for empty text) |
 | `sort(list, 'price')`, `sort(list, 'price', 'desc')`, `sort(list)` | The list in order, by a field or by value |
 | `take(list, 3)` | The first items |
+| `first(list)`, `last(list)` | The first or last item, or nothing for an empty list: `first(sort(sales, 'revenue', 'desc')).month` is the best month |
 
 They combine: `{money(sum(filter(tx, 'cat', 'Gas'), 'amount'))}`, `{take(sort(runners, 'miles', 'desc'), 3)}`. Use them for counts and totals. To hide items people can still change (`bind=t.done`), keep `each items=todos` and put `if=` on the repeated element, because a filtered list is a copy and can't be written to.
 
