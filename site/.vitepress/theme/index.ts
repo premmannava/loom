@@ -15,6 +15,7 @@ import Landing from "./components/Landing.vue";
 import Gallery from "./components/Gallery.vue";
 import Playground from "./components/Playground.vue";
 import EngineDiagram from "./components/EngineDiagram.vue";
+import Chat from "./components/Chat.vue";
 
 export default {
   extends: DefaultTheme,
@@ -24,5 +25,6 @@ export default {
     app.component("Gallery", Gallery);
     app.component("Playground", Playground);
     app.component("EngineDiagram", EngineDiagram);
+    app.component("Chat", Chat);
   },
 } satisfies Theme;
