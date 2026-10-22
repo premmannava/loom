@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { withBase } from "vitepress";
+import { generationAvailable } from "../loom/generate";
 import Workbench from "./Workbench.vue";
 import { highlightSpec } from "../loom/highlight";
 
@@ -73,6 +74,7 @@ const href = (p: string) => withBase(p);
         <div class="hero-cta">
           <a class="loom-btn primary" :href="href('/playground.html')">Try the playground</a>
           <a class="loom-btn quiet" :href="href('/docs/')">Read the docs</a>
+          <a v-if="generationAvailable" class="loom-btn quiet" :href="href('/chat.html')">Build with AI</a>
         </div>
         <p class="hero-status">Early prototype, v0.1. Open source under MIT. <a :href="href('/docs/architecture/limitations.html')">What works and what doesn't</a>.</p>
       </div>

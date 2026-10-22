@@ -24,11 +24,24 @@ export type GenerateEvent =
   | { t: "error"; message: string };
 
 /** Send a request and call onEvent for each line the proxy streams back. */
-export async function generate(request: string, opts: { token?: string; signal: AbortSignal; onEvent: (e: GenerateEvent) => void }): Promise<void> {
+/** What a follow-up message changes: the first request, the changes since, and the current spec. */
+export interface Refinement {
+  task: string;
+  changes: string[];
+  spec: string;
+}
+/** The proxy accepts at most this many earlier changes; older ones are dropped (the spec already has their effect). */
+export const MAX_CHANGES = 10;
+
+export async function generate(request: string, opts: { token?: string; refine?: Refinement; signal: AbortSignal; onEvent: (e: GenerateEvent) => void }): Promise<void> {
   const res = await fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ request, token: opts.token }),
+    body: JSON.stringify({
+      request,
+      token: opts.token,
+      refine: opts.refine ? { ...opts.refine, changes: opts.refine.changes.slice(-MAX_CHANGES) } : undefined,
+    }),
     signal: opts.signal,
   });
   if (!res.ok || !res.body) {
