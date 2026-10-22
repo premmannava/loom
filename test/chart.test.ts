@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coreComponents } from "../src/components";
-import { chartData, chartScale, MAX_CHART_ITEMS, niceStep, tickLabel, type ChartGeometry } from "../src/components/chart";
+import { chartData, chartScale, MAX_CHART_ITEMS, niceStep, tickLabels, type ChartGeometry } from "../src/components/chart";
 import { toData } from "../src/data";
 import { parse } from "../src/parser";
 import { Registry } from "../src/registry";
@@ -104,13 +104,56 @@ describe("chart scale", () => {
   });
 
   it("formats ticks for the step, compactly when large", () => {
-    expect(tickLabel(20000, 10000, "money", 20000)).toBe("$20K");
-    expect(tickLabel(-10000, 10000, "number", 20000)).toBe("-10K");
-    expect(tickLabel(2000, 2000, "number", 6000)).toBe("2,000");
-    expect(tickLabel(0.4, 0.2, "number", 1)).toBe("0.4");
-    expect(tickLabel(0.4, 0.2, "money", 1)).toBe("$0.40");
-    expect(tickLabel(4, 2, "money", 6)).toBe("$4");
-    expect(tickLabel(-0, 1, "number", 1)).toBe("0");
+    expect(tickLabels([0, 10000, 20000], 10000, "money")).toEqual(["$0", "$10K", "$20K"]);
+    expect(tickLabels([-10000, 0, 10000], 10000, "number")).toEqual(["-10K", "0", "10K"]);
+    expect(tickLabels([0, 2500, 5000, 7500, 10000], 2500, "number")).toEqual(["0", "2.5K", "5K", "7.5K", "10K"]);
+    expect(tickLabels([0, 2000, 4000, 6000], 2000, "number")).toEqual(["0", "2,000", "4,000", "6,000"]);
+    expect(tickLabels([0.2, 0.4, 0.6], 0.2, "number")).toEqual(["0.2", "0.4", "0.6"]);
+    expect(tickLabels([0.2, 0.4, 0.6], 0.2, "money")).toEqual(["$0.20", "$0.40", "$0.60"]);
+    expect(tickLabels([0, 2, 4], 2, "money")).toEqual(["$0", "$2", "$4"]);
+    expect(tickLabels([-0, 1], 1, "number")).toEqual(["0", "1"]);
+  });
+
+  /** Labels for values as the chart would scale them. */
+  const labelsFor = (values: number[], kind: "bar" | "line", format: "number" | "money" = "number") => {
+    const s = chartScale(values, kind, 4);
+    return { ...s, labels: tickLabels(s.ticks, s.step, format) };
+  };
+
+  it("never shows two ticks with the same label", () => {
+    const cases: Array<[number[], "bar" | "line"]> = [
+      [[10000, 10001, 10002], "line"],
+      [[10000, 10001, 10002], "bar"],
+      [[999_999, 1_000_001], "line"],
+      [[1.0001, 1.0002], "line"],
+      [[1e-101, 3e-101], "line"],
+      [[1e-101, 3e-101], "bar"],
+      [[-1e308, 1e308], "bar"],
+      [[Number.MAX_VALUE, Number.MAX_VALUE], "line"],
+      [[Number.MIN_VALUE, Number.MIN_VALUE], "line"],
+      [[1e15, 1e15 + 0.25], "line"],
+      [[2e21, 3e21], "line"],
+    ];
+    for (const [values, kind] of cases) {
+      for (const format of ["number", "money"] as const) {
+        const { labels, ticks, min, max } = labelsFor(values, kind, format);
+        const what = `${kind} ${values.join(", ")} ${format}: ${labels.join(" | ")}`;
+        expect(new Set(labels).size, what).toBe(labels.length);
+        expect(ticks.length, what).toBeGreaterThanOrEqual(2);
+        expect(ticks.every(Number.isFinite), what).toBe(true);
+        expect(max, what).toBeGreaterThan(min);
+        // The scale covers every value.
+        expect(min, what).toBeLessThanOrEqual(Math.min(...values));
+        expect(max, what).toBeGreaterThanOrEqual(Math.max(...values));
+        for (const l of labels) expect(l.length, what).toBeLessThan(30);
+      }
+    }
+  });
+
+  it("keeps the precision that tells close ticks apart", () => {
+    expect(labelsFor([10000, 10001, 10002], "line").labels).toEqual(["10,000.0", "10,000.5", "10,001.0", "10,001.5", "10,002.0"]);
+    expect(labelsFor([1e-101, 3e-101], "line").labels).toEqual(["1E-101", "1.5E-101", "2E-101", "2.5E-101", "3E-101"]);
+    expect(labelsFor([1e-101, 3e-101], "bar").labels).toEqual(["0", "1E-101", "2E-101", "3E-101"]);
   });
 });
 
@@ -206,6 +249,32 @@ describe("line geometry", () => {
     expect(Number.isFinite(y)).toBe(true);
     expect(y).toBeGreaterThan(g.plot.y);
     expect(y).toBeLessThan(g.plot.y + g.plot.h);
+  });
+});
+
+describe("extreme values", () => {
+  it.each([
+    ["tiny", `[{k: "a", v: 1e-101}, {k: "b", v: 3e-101}, {k: "c", v: 2e-101}]`],
+    ["huge", `[{k: "a", v: -1e308}, {k: "b", v: 1e308}]`],
+    ["close", `[{k: "a", v: 10000}, {k: "b", v: 10001}, {k: "c", v: 10002}]`],
+  ])("draws %s values inside the plot, with distinct axis labels", (_, rows) => {
+    for (const kind of ["bar", "line"]) {
+      const ui = chartOf(rows, kind);
+      const g = geo(ui);
+      expect(g.message, kind).toBeUndefined();
+      expect(new Set(g.ticks.map((t) => t.label)).size).toBe(g.ticks.length);
+      for (const s of g.slots) {
+        const ys = s.bar ? [s.bar.y, s.bar.y + s.bar.h] : [s.point!.y];
+        for (const y of ys) {
+          expect(Number.isFinite(y)).toBe(true);
+          expect(y).toBeGreaterThanOrEqual(g.plot.y - 1e-6);
+          expect(y).toBeLessThanOrEqual(g.plot.y + g.plot.h + 1e-6);
+        }
+      }
+      // Distinct values stay distinct on screen.
+      const ends = g.slots.map((s) => (s.bar ? (s.value! >= 0 ? s.bar.y : s.bar.y + s.bar.h) : s.point!.y));
+      expect(new Set(ends.map((y) => y.toFixed(3))).size).toBe(g.slots.length);
+    }
   });
 });
 

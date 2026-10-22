@@ -123,6 +123,12 @@ export function niceStep(raw: number): number {
   return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
 }
 
+/** Clean float noise (0.1 + 0.2) from a tick without toFixed, which fails past 100 digits. */
+function cleanTick(v: number, step: number): number {
+  if (Math.abs(v) < step * 1e-9) return 0;
+  return Number(v.toPrecision(15));
+}
+
 /** The value range and ticks: bars include 0; a constant line gets room around it. */
 export function chartScale(values: readonly number[], kind: Kind, target: number): { min: number; max: number; step: number; ticks: number[] } {
   let lo = Math.min(...values), hi = Math.max(...values);
@@ -131,25 +137,70 @@ export function chartScale(values: readonly number[], kind: Kind, target: number
     // Constant values: never divide by zero; keep 0 as a bound when it is one.
     if (lo === 0) hi = 1;
     else if (kind === "bar") lo < 0 ? (hi = 0) : (lo = 0);
-    else { const pad = Math.abs(lo) * 0.1; lo -= pad; hi += pad; }
+    else {
+      // At least the smallest number, so even 5e-324 gets room; never past the largest.
+      const pad = Math.max(Math.abs(lo) * 0.1, Number.MIN_VALUE);
+      lo = Math.max(lo - pad, -Number.MAX_VALUE);
+      hi = Math.min(hi + pad, Number.MAX_VALUE);
+    }
   }
-  const step = niceStep((hi - lo) / Math.max(1, target));
-  const min = Math.floor(lo / step + 1e-9) * step, max = Math.ceil(hi / step - 1e-9) * step;
-  const digits = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+  // Halves, so a range like -1e308..1e308 doesn't overflow to Infinity.
+  const step = niceStep((hi / 2 - lo / 2) / Math.max(1, target) * 2);
+  const first = Math.floor(lo / step + 1e-9), last = Math.ceil(hi / step - 1e-9);
   const ticks: number[] = [];
-  for (let i = 0, v = min; v <= max + step / 2 && i < 50; i++, v = min + i * step) ticks.push(Number(v.toFixed(digits)));
+  // Count steps with k, not first + k: past 2^53, adding 1 to first changes nothing.
+  const count = last - first;
+  for (let k = 0; k <= count && k <= 50; k++) {
+    const v = cleanTick((first + k) * step, step);
+    if (isFinite(v) && v !== ticks[ticks.length - 1]) ticks.push(v);
+  }
+  // Ticks that don't cover the values or can't be told apart (numbers past
+  // what a double can step through, like 1e15 + 0.1): use the values' own bounds.
+  if (ticks.length < 2 || ticks[0]! > lo || ticks[ticks.length - 1]! < hi) return { min: lo, max: hi, step: hi / 2 - lo / 2, ticks: [lo, hi] };
   return { min: ticks[0]!, max: ticks[ticks.length - 1]!, step, ticks };
 }
 
-/** A tick label: compact for big numbers ($12K), with as many decimals as the step needs. */
-export function tickLabel(v: number, step: number, format: Format, biggest: number): string {
-  const compact = biggest >= 10_000;
-  const decimals = compact ? 0 : Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
-  const opts: Intl.NumberFormatOptions = compact
-    ? { notation: "compact", minimumFractionDigits: 0, maximumFractionDigits: 1 }
-    : { minimumFractionDigits: format === "money" && decimals > 0 ? 2 : decimals, maximumFractionDigits: format === "money" && decimals > 0 ? 2 : decimals };
-  if (format === "money") Object.assign(opts, { style: "currency", currency: "USD" });
-  return new Intl.NumberFormat(LOCALE, opts).format(Object.is(v, -0) ? 0 : v);
+/** The fewest decimals that show x exactly (2.5 → 1), or 21 when none up to 20 do. */
+function decimalsOf(x: number): number {
+  for (let d = 0; d <= 20; d++) {
+    const s = x * 10 ** d;
+    if (Math.abs(s - Math.round(s)) <= 1e-6 * Math.max(1, Math.abs(s))) return d;
+  }
+  return 21;
+}
+
+/**
+ * Labels for a whole axis, in one format, chosen so every tick reads exactly
+ * and no two read the same: compact ($12K) when the step allows it, then
+ * plain numbers, then scientific notation for very large or small values.
+ */
+export function tickLabels(ticks: readonly number[], step: number, format: Format): string[] {
+  const money = format === "money";
+  const biggest = Math.max(...ticks.map(Math.abs));
+  const tries: Intl.NumberFormatOptions[] = [];
+  if (biggest >= 10_000 && biggest < 1e15) {
+    const unit = 10 ** (3 * Math.floor(Math.log10(biggest) / 3));
+    const f = decimalsOf(step / unit);
+    if (f <= 2) tries.push({ notation: "compact", minimumFractionDigits: 0, maximumFractionDigits: f });
+  }
+  const d = decimalsOf(step);
+  if (biggest < 1e15 && d <= 6) {
+    const digits = money && d > 0 ? Math.max(2, d) : d;
+    tries.push({ minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+  for (let f = 0; f <= 15; f++) tries.push({ notation: "scientific", minimumFractionDigits: 0, maximumFractionDigits: f });
+  for (const opts of tries) {
+    try {
+      const nf = new Intl.NumberFormat(LOCALE, money ? { ...opts, style: "currency", currency: "USD" } : opts);
+      // Zero reads as 0 in every format, not 0E0.
+      const out = ticks.map((v) => (v === 0 && opts.notation === "scientific" ? (money ? "$0" : "0") : nf.format(Object.is(v, -0) ? 0 : v)));
+      if (new Set(out).size === out.length) return out;
+    } catch {
+      // An option this runtime doesn't support: try the next.
+    }
+  }
+  // JavaScript's own shortest form always tells two different numbers apart.
+  return ticks.map((v) => (money ? "$" : "") + String(v));
 }
 
 // ---------------------------------------------------------------- layout
@@ -192,8 +243,7 @@ function geometry(box: { w: number }, d: ChartData, kind: Kind, format: Format, 
   const values = d.slots.flatMap((s) => (s.value === null ? [] : [s.value]));
   const plotH = plotHeight(box.w);
   const scale = chartScale(values, kind, Math.max(2, Math.min(6, Math.floor(plotH / 44))));
-  const biggest = Math.max(Math.abs(scale.min), Math.abs(scale.max));
-  const tickText = scale.ticks.map((v) => tickLabel(v, scale.step, format, biggest));
+  const tickText = tickLabels(scale.ticks, scale.step, format);
   const axisW = Math.ceil(Math.max(...tickText.map((s) => m.width(s, labelFont)))) + t.space.sm;
   const plot: Rect = { x: axisW, y: top + Math.ceil(labelLH / 2), w: Math.max(0, box.w - axisW), h: plotH };
   const n = d.slots.length;
@@ -204,7 +254,8 @@ function geometry(box: { w: number }, d: ChartData, kind: Kind, format: Format, 
     return say(`Too narrow to chart ${n} items`);
   }
 
-  const y = (v: number) => plot.y + INSET + (plot.h - 2 * INSET) * (1 - (v - scale.min) / (scale.max - scale.min));
+  // Halves again, so (max - min) can't overflow for values near the largest number.
+  const y = (v: number) => plot.y + INSET + (plot.h - 2 * INSET) * (1 - (v / 2 - scale.min / 2) / (scale.max / 2 - scale.min / 2));
   const zeroY = scale.min <= 0 && scale.max >= 0 ? y(0) : null;
 
   // Category labels: thin them out evenly when they'd overlap, never the data.
