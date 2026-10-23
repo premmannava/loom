@@ -20,7 +20,7 @@ card
 
 > **Name:** SayShape was called Loom while it was being built. The package (`loom-ui`), CSS variables (`--loom-*`) and the model guide still use that name; they'll be renamed before the first npm release.
 
-> **Status: 0.1, early foundation.** The engine, derived values, 42 components including text input, selects, a date picker, lists and data, charts (bar, horizontal bar and line with up to 6 series, pie and donut), stats with a change and sparkline, callouts, its own icons, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 48 components including text input, selects, a date picker, lists and data, charts (bar, horizontal bar and line with up to 6 series, pie and donut), stats with a change and sparkline, callouts, its own icons, timelines, carousels, segmented toggles, comparisons, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -439,10 +439,10 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 <!-- CATEGORIES:START (generated from src/components) -->
 | Category | Components |
 |---|---|
-| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
+| Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each), [`timeline`](#timeline), [`step`](#step), [`carousel`](#carousel) |
 | Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar), [`callout`](#callout), [`icon`](#icon) |
-| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
-| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`date-picker`](#date-picker), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
+| Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`compare`](#compare), [`compare-row`](#compare-row), [`map`](#map), [`pin`](#pin) |
+| Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`date-picker`](#date-picker), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input), [`segmented`](#segmented) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
 | Feedback | [`progress`](#progress), [`skeleton`](#skeleton), [`empty`](#empty) |
 <!-- CATEGORIES:END -->
@@ -614,6 +614,69 @@ state gear=[{name: "Tent", kg: 2.1}, {name: "Stove", kg: 0.4}, {name: "Headlamp"
 column gap=6
   each items=gear as=g index=i key={g.name}
     text "{i + 1}. {g.name}, {g.kg} kg"
+```
+
+### `timeline`
+
+Steps in order with a line joining them, each done, current or upcoming: order tracking, itineraries, project history, how-to guides.
+
+| Prop | Type | Description |
+|---|---|---|
+| `gap` | number | Space between children in pixels (default 20). |
+
+Children: `step`.
+
+```
+timeline
+  step "Ordered" detail="Oct 18, 9:12 AM" status=done
+  step "Shipped" detail="Phoenix, AZ" status=done
+  step "Out for delivery" detail="Arrives by 8 PM" status=current
+  step "Delivered" status=upcoming
+```
+
+### `step`
+
+One step of a timeline: a title, an optional detail line and time, and whether it's done, current or upcoming.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text, required | The step's title, e.g. Shipped. |
+| `status` | `done` / `current` / `upcoming` | done, current or upcoming. Upcoming steps are muted. |
+| `detail` | string | A quieter line under the title, like a place or a note. |
+| `time` | string | A short date or time on the right, e.g. Oct 18 or 9:12 AM. |
+| `icon` | string | An icon in the step's marker instead of the check or dot, by name from icon's list, e.g. icon=truck. |
+
+Only inside: `timeline`.
+
+```
+step "Shipped" detail="Left the Phoenix warehouse" time="Oct 19" status=done icon=truck
+```
+
+### `carousel`
+
+Cards side by side, a page at a time, with arrows and dots: a few options to browse, like products, hotels or recipes. Put a card per option inside it (or each over a list).
+
+| Prop | Type | Description |
+|---|---|---|
+| `bind` | state, required | The state name holding the page shown, starting at 0. |
+| `min` | number | The narrowest a card may be (default 220); as many fit side by side as the width allows. |
+| `gap` | number | Space between children in pixels (default 12). |
+| `on` | action | Actions to run after the page changes, e.g. emit:changed. Separate several with ; |
+
+Children: any elements.
+
+```
+state page=0
+carousel bind=page
+  card
+    text "Desert Rose Inn" style=lead weight=semibold
+    text "$189 a night · 4.6 stars" tone=muted
+  card
+    text "Saguaro Lodge" style=lead weight=semibold
+    text "$149 a night · 4.3 stars" tone=muted
+  card
+    text "Camelback Suites" style=lead weight=semibold
+    text "$229 a night · 4.8 stars" tone=muted
 ```
 
 ### `text`
@@ -820,6 +883,44 @@ Only inside: `table`.
 table-column "Price" field=price format=money
 ```
 
+### `compare`
+
+Two to four options side by side with one row per attribute, marking the best value in each row: plans, products or choices to weigh up. Use compare-row children.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | A title above the comparison. |
+| `items` | expression, required | The options, a list of records, e.g. items=plans. Two to four. |
+| `name` | name | The field holding each option's name, shown at the top of its column (default name). |
+| `pick` | string | The name of the option to recommend: its column is highlighted and marked Recommended. |
+
+Children: `compare-row`.
+
+```
+state plans=[{name: "Basic", price: 9, storage: 50, support: "Email"}, {name: "Pro", price: 19, storage: 500, support: "Chat"}, {name: "Team", price: 49, storage: 2000, support: "Phone"}]
+compare items=plans pick="Pro"
+  compare-row "Price a month" field=price format=money best=low
+  compare-row "Storage (GB)" field=storage format=number best=high
+  compare-row "Support" field=support
+```
+
+### `compare-row`
+
+One row of a comparison: an attribute and the field each option's value comes from.
+
+| Prop | Type | Description |
+|---|---|---|
+| `"text"` | text | The attribute's name. Defaults to the field name. |
+| `field` | name, required | The field of each option to show, e.g. field=price. true and false show as a check and a dash. |
+| `format` | `text` / `number` / `money` | text, number (1,200.5) or money ($1,200.00). |
+| `best` | `low` / `high` | low or high: mark the lowest or highest number in the row as the best. Leave out when neither is better. |
+
+Only inside: `compare`.
+
+```
+compare-row "Price a month" field=price format=money best=low
+```
+
 ### `button`
 
 A pressable button that runs actions. Use emit: to tell the app what the user chose.
@@ -991,6 +1092,22 @@ A text field people type into, such as a name, an email, a search or a new item.
 state task="" todos=[]
 input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
 text "{plural(len(todos), 'item')}" tone=muted
+```
+
+### `segmented`
+
+Two to six short options in one track, one chosen, like Week | Month | Year or Chart | Table. Show different content for each with if=.
+
+| Prop | Type | Description |
+|---|---|---|
+| `bind` | state, required | The state name holding the chosen option's text. |
+| `options` | string, required | The options, comma-separated, e.g. options="Week,Month,Year". At most 6, one or two words each. |
+| `on` | action | Actions to run after the choice changes, e.g. emit:changed. Separate several with ; |
+
+```
+state view="Chart"
+segmented bind=view options="Chart,Table"
+text "Showing the {lower(view)}" tone=muted
 ```
 
 ### `screen`

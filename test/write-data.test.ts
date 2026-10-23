@@ -71,6 +71,8 @@ describe("bind= inside each, for every component that binds", () => {
     ["select", `select items=rows value=name bind=r.v`, "v", "", "pick"],
     ["date-picker", `date-picker bind=r.v`, "v", "", "pick"],
     ["table", `table items=rows key=name bind=r.v\n      table-column "Name" field=name`, "v", "", "press"],
+    ["segmented", `segmented bind=r.v options="A,B"`, "v", "A", "last"],
+    ["carousel", `carousel bind=r.v min=400\n      card\n        text "a"\n      card\n        text "b"`, "v", 0, "last"],
   ];
 
   it("covers all of them", () => {

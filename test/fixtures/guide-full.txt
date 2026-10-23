@@ -94,10 +94,10 @@ EVERY ELEMENT ACCEPTS
     if=<condition>  Show only when this expression is true, e.g. if=done or if={count>0}.
 
 ELEMENTS AT A GLANCE
-- layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
+- layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each, timeline, step, carousel
 - content: text, image, code, badge, avatar, callout, icon
-- data: stat, rating, chart, table, table-column, map, pin
-- input: button, link, check, switch, radio, select, date-picker, stepper, slider, input
+- data: stat, rating, chart, table, table-column, compare, compare-row, map, pin
+- input: button, link, check, switch, radio, select, date-picker, stepper, slider, input, segmented
 - navigation: screen, tabs, tab, breadcrumb, pagination
 - feedback: progress, skeleton, empty
 
@@ -195,6 +195,45 @@ ELEMENTS
       column gap=6
         each items=gear as=g index=i key={g.name}
           text "{i + 1}. {g.name}, {g.kg} kg"
+
+  timeline  — Steps in order with a line joining them, each done, current or upcoming: order tracking, itineraries, project history, how-to guides.
+    gap=<number>  Space between children in pixels (default 20).
+    children: step
+    example:
+      timeline
+        step "Ordered" detail="Oct 18, 9:12 AM" status=done
+        step "Shipped" detail="Phoenix, AZ" status=done
+        step "Out for delivery" detail="Arrives by 8 PM" status=current
+        step "Delivered" status=upcoming
+
+  step "<text>"  — One step of a timeline: a title, an optional detail line and time, and whether it's done, current or upcoming.
+    "<text>" (required)  The step's title, e.g. Shipped.
+    status=<done|current|upcoming>  done, current or upcoming. Upcoming steps are muted.
+    detail=<string>  A quieter line under the title, like a place or a note.
+    time=<string>  A short date or time on the right, e.g. Oct 18 or 9:12 AM.
+    icon=<string>  An icon in the step's marker instead of the check or dot, by name from icon's list, e.g. icon=truck.
+    only inside: timeline
+    example:
+      step "Shipped" detail="Left the Phoenix warehouse" time="Oct 19" status=done icon=truck
+
+  carousel  — Cards side by side, a page at a time, with arrows and dots: a few options to browse, like products, hotels or recipes. Put a card per option inside it (or each over a list).
+    bind=<state, required>  The state name holding the page shown, starting at 0.
+    min=<number>  The narrowest a card may be (default 220); as many fit side by side as the width allows.
+    gap=<number>  Space between children in pixels (default 12).
+    on=<action>  Actions to run after the page changes, e.g. emit:changed. Separate several with ;
+    children: any elements
+    example:
+      state page=0
+      carousel bind=page
+        card
+          text "Desert Rose Inn" style=lead weight=semibold
+          text "$189 a night · 4.6 stars" tone=muted
+        card
+          text "Saguaro Lodge" style=lead weight=semibold
+          text "$149 a night · 4.3 stars" tone=muted
+        card
+          text "Camelback Suites" style=lead weight=semibold
+          text "$229 a night · 4.8 stars" tone=muted
 
   text "<text>"  — A paragraph or heading that wraps to the available width. Use {expressions} to show state.
     "<text>" (required)  The words to show. May include {expressions}.
@@ -314,6 +353,28 @@ ELEMENTS
     example:
       table-column "Price" field=price format=money
 
+  compare "<text>"  — Two to four options side by side with one row per attribute, marking the best value in each row: plans, products or choices to weigh up. Use compare-row children.
+    "<text>"  A title above the comparison.
+    items=<expression, required>  The options, a list of records, e.g. items=plans. Two to four.
+    name=<name>  The field holding each option's name, shown at the top of its column (default name).
+    pick=<string>  The name of the option to recommend: its column is highlighted and marked Recommended.
+    children: compare-row
+    example:
+      state plans=[{name: "Basic", price: 9, storage: 50, support: "Email"}, {name: "Pro", price: 19, storage: 500, support: "Chat"}, {name: "Team", price: 49, storage: 2000, support: "Phone"}]
+      compare items=plans pick="Pro"
+        compare-row "Price a month" field=price format=money best=low
+        compare-row "Storage (GB)" field=storage format=number best=high
+        compare-row "Support" field=support
+
+  compare-row "<text>"  — One row of a comparison: an attribute and the field each option's value comes from.
+    "<text>"  The attribute's name. Defaults to the field name.
+    field=<name, required>  The field of each option to show, e.g. field=price. true and false show as a check and a dash.
+    format=<text|number|money>  text, number (1,200.5) or money ($1,200.00).
+    best=<low|high>  low or high: mark the lowest or highest number in the row as the best. Leave out when neither is better.
+    only inside: compare
+    example:
+      compare-row "Price a month" field=price format=money best=low
+
   button "<text>"  — A pressable button that runs actions. Use emit: to tell the app what the user chose.
     "<text>" (required)  The button label.
     on=<action>  What happens when pressed, e.g. inc:count, set:done:true, emit:book. Separate several with ;
@@ -416,6 +477,15 @@ ELEMENTS
       state task="" todos=[]
       input "New item" bind=task placeholder="e.g. Sunscreen" on="add:todos:{task};set:task:''"
       text "{plural(len(todos), 'item')}" tone=muted
+
+  segmented  — Two to six short options in one track, one chosen, like Week | Month | Year or Chart | Table. Show different content for each with if=.
+    bind=<state, required>  The state name holding the chosen option's text.
+    options=<string, required>  The options, comma-separated, e.g. options="Week,Month,Year". At most 6, one or two words each.
+    on=<action>  Actions to run after the choice changes, e.g. emit:changed. Separate several with ;
+    example:
+      state view="Chart"
+      segmented bind=view options="Chart,Table"
+      text "Showing the {lower(view)}" tone=muted
 
   screen  — One screen of a multi-screen interface. Only one screen shows at a time: the first, until a button runs go:name or back.
     name=<name, required>  The screen's name, used by go:name. The visible screen's name is in {screen}.
