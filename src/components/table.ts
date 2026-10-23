@@ -36,6 +36,7 @@ import { wrapText } from "../text";
 import type { Theme } from "../theme";
 import type { Box, SayShapeNode, Value } from "../types";
 import { chevron, fillTint, onProp, partBox, runOn, themeFont } from "./util";
+import { paintGhost, staggered } from "../ghost";
 
 /** The most rows one table shows. Larger lists show a message: page them with take() or pagination. */
 export const MAX_TABLE_ROWS = 200;
@@ -101,7 +102,12 @@ export type TableGeometry = {
   /** Shown under the header when there are no rows. */
   empty?: string;
   sortable: boolean;
+  /** Data still loading: placeholder rows of this height under the real header. */
+  loading?: { rows: number; h: number };
 };
+
+/** Placeholder rows a loading table shows. */
+const GHOST_ROWS = 5;
 
 // ---------------------------------------------------------------- cells
 
@@ -234,7 +240,7 @@ function readColumns(node: SayShapeNode, ctx: Pick<LayoutContext, "visibleChildr
   });
 }
 
-function tableLayout(box: { w: number; node: SayShapeNode }, p: PropReader, ctx: Pick<LayoutContext, "theme" | "measure" | "warn" | "visibleChildren" | "props">): TableGeometry {
+function tableLayout(box: { w: number; node: SayShapeNode }, p: PropReader, ctx: Pick<LayoutContext, "theme" | "measure" | "warn" | "visibleChildren" | "props">, loading = false): TableGeometry {
   const t: Theme = ctx.theme, m = ctx.measure;
   const line = box.node.line;
   const warn = (msg: string) => ctx.warn?.(`table on line ${line}: ${msg}`);
@@ -256,8 +262,8 @@ function tableLayout(box: { w: number; node: SayShapeNode }, p: PropReader, ctx:
     return say(`Too many columns: at most ${MAX_TABLE_COLUMNS}`);
   }
 
-  const raw = p.expr("items");
-  if (p.has("items") && !isList(raw)) warn(`items is not a list. Use a list of records, like items=equipment`);
+  const raw = loading ? undefined : p.expr("items");
+  if (!loading && p.has("items") && !isList(raw)) warn(`items is not a list. Use a list of records, like items=equipment`);
   const items: readonly Value[] = isList(raw) ? raw : [];
   if (items.length > MAX_TABLE_ROWS) {
     warn(`${items.length} rows is more than the ${MAX_TABLE_ROWS} a table shows. Show a page with take() or pagination`);
@@ -343,6 +349,9 @@ function tableLayout(box: { w: number; node: SayShapeNode }, p: PropReader, ctx:
       cells: texts[r]!.map((full, ci) => ({ full, text: fit(full, columns[ci]!.w - 2 * pad, cellFont, m) })),
     };
   });
+  if (loading) {
+    return { ...base, frame: { x: 0, y: top, w: box.w, h: headerH + GHOST_ROWS * rowH }, columns, rows: [], sortable: false, loading: { rows: GHOST_ROWS, h: rowH } };
+  }
   const emptyH = items.length ? 0 : rowH * 1.5;
   return {
     ...base,
@@ -422,10 +431,32 @@ function paintTable(box: Box, ctx: PaintContext): void {
   }
   rule(f.y + d.headerH);
 
-  // Rows.
+  if (d.loading) {
+    // Placeholder cells, a little shorter than their columns and of varied lengths.
+    const { rows, h } = d.loading;
+    for (let r = 1; r < rows; r++) rule(f.y + d.headerH + r * h);
+    const pillH = 10;
+    paintGhost(ctx, { x: ox, y: oy + f.y + d.headerH, w: f.w, h: rows * h }, (s) => {
+      for (let r = 0; r < rows; r++) {
+        const cy = oy + f.y + d.headerH + r * h + h / 2;
+        d.columns.forEach((col, ci) => {
+          const room = col.w - 2 * pad;
+          const w = Math.max(12, room * (col.align === "right" ? 0.5 : 0.55 + 0.35 * (((r * 7 + ci * 3) % 5) / 4)));
+          s.pill(col.align === "right" ? ox + col.x + col.w - pad - w : ox + col.x + pad, cy - pillH / 2, Math.min(room, w), pillH);
+        });
+      }
+    });
+    return;
+  }
+
+  // Rows. Just after the data arrived, they slide in one after another.
+  const reveal = ctx.reveal(box.node);
+  const base = g.globalAlpha;
   g.font = d.cellFont;
   d.rows.forEach((row, r) => {
-    const ry = oy + row.y;
+    const shown = reveal < 1 ? staggered(reveal, r, d.rows.length, 0.5) : 1;
+    g.globalAlpha = base * shown;
+    const ry = oy + row.y + (1 - shown) * 6;
     const last = r === d.rows.length - 1;
     if (row.selected || (row.detail && ctx.isHovered(box.node, row.detail))) {
       if (last) ctx.roundRect(ox + f.x + 1, ry, f.w - 2, row.h - 1, theme.radius.md - 1);
@@ -449,6 +480,7 @@ function paintTable(box: Box, ctx: PaintContext): void {
     if (!last) rule(row.y + row.h);
     if (row.detail && ctx.isFocused(box.node, row.detail)) focusRing(ox + f.x, ry, f.w, row.h);
   });
+  g.globalAlpha = base;
 
   if (d.empty) {
     g.fillStyle = c.muted;
@@ -481,11 +513,13 @@ table items=gear key=id bind=picked sort=by direction=dir
   minWidth: () => 200,
   layout(box, ctx) {
     const p = ctx.props(box.node);
-    const geo = tableLayout(box, p, ctx);
+    const geo = tableLayout(box, p, ctx, !!ctx.isLoading?.(box.node));
     box.data = geo;
     box.h = geo.frame.y + geo.frame.h;
   },
   paint: paintTable,
+  // The header is real while rows load; paintTable draws placeholder rows under it.
+  paintLoading: paintTable,
   press(ctx) {
     const detail = ctx.target.detail;
     if (typeof detail !== "string") return;

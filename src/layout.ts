@@ -48,7 +48,10 @@ export function shownChildren(node: SayShapeNode, scope: Scope, registry?: Regis
   return out;
 }
 
-export function createLayoutContext(registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void, today: () => string = localToday): LayoutContext {
+export function createLayoutContext(
+  registry: Registry, theme: Theme, measure: TextMeasurer, scope: Scope, warn?: (message: string) => void, today: () => string = localToday,
+  isLoading?: (node: SayShapeNode) => boolean,
+): LayoutContext {
   const readers = new WeakMap<SayShapeNode, PropReader>();
   // Containers may ask more than once per layout; copies must stay the same objects.
   const kids = new WeakMap<SayShapeNode, SayShapeNode[]>();
@@ -94,6 +97,7 @@ export function createLayoutContext(registry: Registry, theme: Theme, measure: T
     shift: shiftBox,
     warn,
     today,
+    ...(isLoading ? { isLoading } : {}),
   };
   return ctx;
 }

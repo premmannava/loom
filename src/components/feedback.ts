@@ -2,6 +2,7 @@ import type { ComponentDef } from "../component";
 import { wrapText } from "../text";
 import { fillTint, onProp, partBox, themeFont } from "./util";
 import { fitText } from "./input";
+import { paintGhost } from "../ghost";
 
 const SHAPES = ["text", "block", "circle"] as const;
 const LINE_H = 12, LINE_GAP = 10;
@@ -29,27 +30,17 @@ skeleton shape=block height=80`,
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
-    const { g, theme } = ctx;
-    // A gentle pulse while animation is on; a still frame otherwise.
-    const alpha = ctx.motion ? 0.7 + 0.3 * Math.sin(ctx.now / 320) : 1;
-    if (ctx.motion) ctx.requestFrame();
+    const { theme } = ctx;
     const shape = p.oneOf("shape", SHAPES, "text");
-    g.beginPath();
-    if (shape === "circle") {
-      g.arc(box.x + box.h / 2, box.y + box.h / 2, box.h / 2, 0, Math.PI * 2);
-    } else if (shape === "block") {
-      ctx.roundRect(box.x, box.y, box.w, box.h, theme.radius.md);
-    } else {
-      const n = Math.round((box.h + LINE_GAP) / (LINE_H + LINE_GAP));
-      for (let i = 0; i < n; i++) {
-        const w = i === n - 1 && n > 1 ? box.w * 0.6 : box.w;
-        ctx.roundRect(box.x, box.y + i * (LINE_H + LINE_GAP), w, LINE_H, LINE_H / 2);
-        fillTint(g, theme.colors.line, alpha);
-        g.beginPath();
+    // A highlight sweeps across while animation is on; a still tint otherwise.
+    paintGhost(ctx, box, (s) => {
+      if (shape === "circle") s.circle(box.x + box.h / 2, box.y + box.h / 2, box.h / 2);
+      else if (shape === "block") s.rect(box.x, box.y, box.w, box.h, theme.radius.md);
+      else {
+        const n = Math.round((box.h + LINE_GAP) / (LINE_H + LINE_GAP));
+        for (let i = 0; i < n; i++) s.pill(box.x, box.y + i * (LINE_H + LINE_GAP), i === n - 1 && n > 1 ? box.w * 0.6 : box.w, LINE_H);
       }
-      return;
-    }
-    fillTint(g, theme.colors.line, alpha);
+    });
   },
 };
 

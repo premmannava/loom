@@ -291,6 +291,16 @@ ui.state.set("products", await fetchProducts());
 ui.on("change", ({ key, value }) => { if (key === "cart") saveCart(value); });
 ```
 
+While data is on its way, name it with `setLoading`. Elements that read it, directly or through `derive` lines, draw a placeholder shaped like themselves (bars or a line for a chart, rows under the real header for a table, the label and a bar for a stat) with a soft highlight sweeping over them, instead of an empty state. When the data arrives they draw in: bars grow, lines run in from the left, pies sweep round, rows slide in and stat figures count up. With reduced motion, placeholders are still and the data simply appears.
+
+```ts
+ui.setLoading(["products"]);            // before or after setSpec
+ui.state.set("products", await fetchProducts());
+ui.setLoading([]);                      // whatever is still loading; [] when all is here
+```
+
+`setAwaiting(true)` treats every name an element reads that has no value yet as loading. Use it while a spec streams in and you don't yet know which names you'll fill; turn it off when you do.
+
 #### Charts
 
 `chart` draws a list of records as bars, lines, a pie or a donut, and redraws whenever the list changes, from state, the screen's own controls or the host:
@@ -1170,6 +1180,7 @@ The canvas fills its parent's width and grows to fit its content.
 | `endStream()` | Finish the stream and render the last line |
 | `on(event, handler)` | Subscribe to an event; returns an unsubscribe function |
 | `state.get(key)` / `state.set(key, value)` | Read or change state from your app |
+| `setLoading(names)` / `setAwaiting(on)` | Show placeholders for data still on its way, then draw it in when it arrives |
 | `go(screen)` / `back()` | Show another screen, or the previous one |
 | `screens` / `currentScreen` / `canGoBack` | The spec's screen names, the visible one, and whether `back()` can move |
 | `notify(text)` | Show a short message, as `notify:` does |

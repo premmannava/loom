@@ -3,6 +3,7 @@ import type { TextMeasurer } from "../text";
 import type { Theme } from "../theme";
 import { fitLines, wrapText } from "../text";
 import { fitText } from "./input";
+import { easeOut, paintGhost } from "../ghost";
 import { fillTint, TEXT_STYLES, textMetrics, textWidth, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
 
 const ALIGN = ["left", "center", "right"] as const;
@@ -98,11 +99,43 @@ stat label="Total" value="\${price*qty}"`,
     g.fillStyle = ctx.theme.colors.muted;
     d.label.forEach((l, i) => g.fillText(l, x, box.y + 12 + i * STAT_LABEL_LH));
     if ("letterSpacing" in g) (g as unknown as { letterSpacing: string }).letterSpacing = "0px";
+    if (ctx.isLoading(box.node)) {
+      // The figure is on its way: a placeholder where it will be.
+      const h = Math.round(d.size * 0.62), w = Math.min(box.w, Math.max(56, d.size * 3.2));
+      const y = box.y + d.valueTop + d.valueLH - d.size * 0.72;
+      paintGhost(ctx, { x: box.x, y, w: box.w, h }, (s) => s.rect(center ? x - w / 2 : x, y, w, h, ctx.theme.radius.sm));
+      return;
+    }
+    // Just after its data arrived, the figure rises in and counts up to its value.
+    const reveal = ctx.reveal(box.node);
+    const base = g.globalAlpha;
+    g.globalAlpha = base * easeOut(reveal * 1.6);
+    const rise = (1 - easeOut(reveal * 1.6)) * 6;
     g.font = ctx.font(700, d.size);
     g.fillStyle = toneColor(ctx.theme, p.oneOf("tone", TONES, "default"));
-    d.value.forEach((l, i) => g.fillText(l, x, box.y + d.valueTop + d.valueLH * (i + 1)));
+    d.value.forEach((l, i) => g.fillText(reveal < 1 && d.value.length === 1 ? countUp(l, easeOut(reveal)) : l, x, box.y + d.valueTop + d.valueLH * (i + 1) + rise));
+    g.globalAlpha = base;
+  },
+  paintLoading(box, ctx) {
+    stat.paint!(box, ctx);
   },
 };
+
+/**
+ * A figure part of the way to its value: "$1,240.50" at 0.5 is "$620.25".
+ * Keeps everything around the number, its decimals and its thousands commas.
+ */
+export function countUp(text: string, progress: number): string {
+  const m = /(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/.exec(text);
+  if (!m || progress >= 1) return text;
+  const decimals = m[2] ? m[2].length - 1 : 0;
+  const full = Number(m[1]!.replace(/,/g, "") + (m[2] ?? ""));
+  if (!Number.isFinite(full) || full > 1e15) return text;
+  const now = (full * Math.max(0, progress)).toFixed(decimals);
+  const [whole, frac] = now.split(".");
+  const grouped = m[1]!.includes(",") ? whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : whole!;
+  return text.slice(0, m.index) + grouped + (frac !== undefined ? "." + frac : "") + text.slice(m.index + m[0].length);
+}
 
 /** Value sizes a stat tries, largest first, before it wraps the value at the smallest. */
 const STAT_SIZES = [28, 24, 20, 18];

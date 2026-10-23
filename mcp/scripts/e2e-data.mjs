@@ -74,17 +74,36 @@ try {
   const page = await browser.newPage({ viewport: { width: 680, height: 1100 }, deviceScaleFactor: 2 });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.exposeFunction("callServer", async (name, a) => client.callTool({ name, arguments: a }));
+  // Rows are held back until released, to look at the interface while they load.
+  let release;
+  const held = new Promise((r) => { release = r; });
+  await page.exposeFunction("callServer", async (name, a) => { await held; return client.callTool({ name, arguments: a }); });
   await page.setContent(`<!doctype html><body style="margin:20px;background:#fff"><script>${hostJs}</script></body>`);
   await page.evaluate((html) => window.TestHost.mount(html, "light", undefined, true), uiHtml);
   await page.evaluate(() => window.host.ready);
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  const ink = () => frame.evaluate(() => {
+    const c = document.querySelector("canvas");
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4 * 97) if (d[i] > 0) n++;
+    return { h: c.height, n };
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: out + "6a-before-input.png" });
+  const intro = await ink();
+  check(intro.h > 100 && intro.n > 20, `before any input, the view shows a placeholder card (${intro.n} sampled pixels)`);
   await page.evaluate((a) => window.host.bridge.sendToolInput({ arguments: a }), args);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: out + "6b-loading.png" });
+  const loading = await ink();
+  check(loading.h > intro.h, `while the rows load, the interface is laid out at full size with placeholders (${loading.h}px tall)`);
+  release();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: out + "6-data.png" });
   const calls = await page.evaluate(() => window.host.calls);
   check(calls.some((c) => c.name === "fetch_dataset" && c.arguments.id === id), "the interface fetched the dataset itself");
 
-  const frame = page.frames().find((f) => f !== page.mainFrame());
   await frame.locator("canvas").focus();
   let sent = [];
   for (let i = 0; i < 30 && !sent.length; i++) {
