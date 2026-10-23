@@ -10,7 +10,7 @@ SayShape is an **early prototype, version 0.1**. This page separates what's buil
 ## Built
 
 - The engine: parser, expressions, actions, layout, painting, hit testing, keyboard focus (including parts of elements), popups and the inspector.
-- 40 components ([reference](../components/)): layout, content, data (stat, rating, charts: multi-series bar and line, pie and donut, tables with sorting and selection, the world map), input (buttons, checks, switches, radios, select, date picker, stepper, slider, text input), navigation (screens, tabs, breadcrumb, pagination) and feedback (progress, skeleton, empty).
+- 41 components ([reference](../components/)): layout, content (including callout), data (stat with a change and sparkline, rating, charts: multi-series bar, horizontal bar and line, pie and donut, tables with sorting and selection, the world map), input (buttons, checks, switches, radios, select, date picker, stepper, slider, text input), navigation (screens, tabs, breadcrumb, pagination) and feedback (progress, skeleton, empty).
 - State with lists and records, host data, `each` with keys and nesting, `bind=` and actions on paths, `add`, `remove` and `clear`, `if` blocks, `derive` lines, list and formatting functions, screens with `go:` and `back`, `notify:` messages, and images from allowed hosts.
 - The model guide (full and compact, with profiles), `loom-ui/model` (streaming, cleaning, checking, one repair, bounded refinement), an evaluation script, and `loom-ui/testing`.
 - Unit, contract, streaming, fuzz and visual tests, benchmarks, a component scaffold and CI.

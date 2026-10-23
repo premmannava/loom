@@ -95,7 +95,7 @@ EVERY ELEMENT ACCEPTS
 
 ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
-- content: text, image, code, badge, avatar
+- content: text, image, code, badge, avatar, callout
 - data: stat, rating, chart, table, table-column, map, pin
 - input: button, link, check, switch, radio, select, date-picker, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
@@ -182,11 +182,21 @@ ELEMENTS
     tone=<accent|good|warn|bad|muted>  Circle color role: accent, good, warn, bad or muted.
     name=<boolean>  Show the name beside the circle (default true).
 
-  stat  — A labelled number, for key figures like totals or counts.
+  callout "<text>"  — The one thing to notice in an answer: a key finding, a warning or a next step.
+    "<text>" (required)  The takeaway, in one short sentence. May include {expressions}. Long text wraps.
+    detail=<string>  An optional second line in muted text, e.g. what the finding is based on.
+    tone=<info|accent|good|warn|bad>  info (default, the accent color) for a finding, good for good news, warn for something to watch, bad for a problem. accent is the same as info.
+    icon=<boolean>  Show a small icon matching the tone: i, a tick, ! or ×.
+
+  stat  — A labelled number, for key figures like totals or counts. Add change= to show how it moved, and spark= for a small line of its recent values.
     label=<string, required>  Short caption above the value.
     value=<string, required>  The figure to show, usually an {expression}.
     tone=<default|muted|accent|good|warn|bad>  Color role: default, muted, accent, good, warn or bad.
     align=<left|center>  left or center.
+    change=<string>  How the figure moved, shown small beside or under it with ▲ or ▼, e.g. change="+12%" or change="{round(growth, 1)}%". Write the sign; don't add an arrow.
+    trend=<up|down|flat>  up, down or flat: which way the change went, for its arrow and color. Leave it out to take it from change's sign.
+    good=<up|down>  Which way is good news: up (default, colored good) or down, for figures like costs or churn where falling is good.
+    spark=<expression>  A list of numbers, oldest first, drawn as a small line under the value, e.g. spark={[12, 15, 14, 19]} or spark=weekly.
 
   rating  — A star rating. Shows value= as stars, or with bind= lets the user pick a rating.
     value=<number>  The rating to show, e.g. 4.5. Ignored when bind= is set.
@@ -194,14 +204,14 @@ ELEMENTS
     bind=<state>  A number state the user sets by pressing a star.
     on=<action>  Actions to run after the user picks a rating, e.g. emit:changed. Separate several with ;
 
-  chart "<text>"  — A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).
+  chart "<text>"  — A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, hbar for a ranking with long names, such as top customers, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).
     "<text>"  A title above the chart.
-    kind=<bar|line|pie|donut>  bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.
+    kind=<bar|hbar|line|pie|donut>  bar compares categories and always starts at 0; hbar draws the bars across, one row per item with its name on the left and its value at the end, for rankings and long names (top 10 artists or customers): sort the list and take() the top items, since rows are drawn in list order; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.
     items=<expression, required>  The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}.
     x=<name, required>  The field holding each item's label (each slice's name in a pie), e.g. x=month.
-    y=<names, required>  The field holding each item's number, e.g. y=revenue. Bar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.
-    labels=<string>  Bar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels="This year,Last year". Without it the legend shows the field names.
-    format=<number|money>  How values read on the axis, in a pie's legend and in a donut's middle: number (37K) or money ($37K).
+    y=<names, required>  The field holding each item's number, e.g. y=revenue. Bar, hbar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.
+    labels=<string>  Bar, hbar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels="This year,Last year". Without it the legend shows the field names.
+    format=<number|money>  How values read on the axis, at the ends of hbar bars, in a pie's legend and in a donut's middle: number (37K) or money ($37K).
 
   table "<text>"  — Rows of a list of records, one table-column per field, for things like inventory, orders or expenses. With sort= and direction=, pressing a header sorts by it; with bind= and key=, pressing a row selects it.
     "<text>"  A title above the table.

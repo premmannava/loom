@@ -84,7 +84,7 @@ describe("chart y with several fields", () => {
 
   it("keeps an unknown kind a warning, as before", () => {
     expect(parse(`${sales}\nchart kind=area items=sales x=month y=revenue\n`, registry).diagnostics.map((d) => d.message))
-      .toEqual([`kind should be one of bar, line, pie, donut; got "area"`]);
+      .toEqual([`kind should be one of bar, hbar, line, pie, donut; got "area"`]);
   });
 });
 
@@ -97,7 +97,7 @@ describe("pie and donut props", () => {
 
   it("warn about a comma list in y, keep the element, and say how to fix it", () => {
     const d = diags(`chart kind=pie items=regions x=name y=total,count`);
-    expect(d).toEqual([{ line: 2, severity: "warning", message: `chart kind=pie shows one field, so only y=total is used. Write y=total, or use kind=bar or kind=line to compare total, count` }]);
+    expect(d).toEqual([{ line: 2, severity: "warning", message: `chart kind=pie shows one field, so only y=total is used. Write y=total, or use kind=bar, kind=hbar or kind=line to compare total, count` }]);
     const ui = render(`${regions(3)}\nchart kind=donut items=regions x=name y=total,count\n`);
     expect(geo(ui).pie!.slices.map((s) => s.value)).toEqual([1000, 2000, 3000]);
   });

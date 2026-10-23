@@ -1,8 +1,9 @@
 /**
- * chart: bar and line charts of one or more fields of a list of records, and
- * pie and donut charts of one field.
+ * chart: bar, horizontal bar and line charts of one or more fields of a list
+ * of records, and pie and donut charts of one field.
  *
  *   chart "Monthly revenue" kind=bar items=sales x=month y=revenue format=money
+ *   chart "Top artists" kind=hbar items={take(sort(artists, 'sales', 'desc'), 10)} x=name y=sales
  *   chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year
  *   chart "Sales by region" kind=donut items=regions x=name y=total format=money
  *
@@ -21,6 +22,10 @@
  * - Bars always include 0; negative values go below it. Lines span the
  *   lowest to highest value, rounded out to whole ticks. Every series shares
  *   one scale.
+ * - Horizontal bars (hbar): one row per item, top to bottom in list order,
+ *   with the label on the left and the value at the end of each bar. Bars
+ *   grow from a zero line; negative values go left of it. Too many rows to
+ *   fit MAX_HBAR_HEIGHT shows a message suggesting take().
  * - Pie and donut: one slice per item with a positive y, in list order. Zero
  *   and gaps are left out. More than MAX_SLICES slices keeps the largest
  *   MAX_SLICES - 1 and adds an "Other" slice holding the rest. A negative
@@ -45,11 +50,17 @@ export const MAX_SERIES = SERIES_COUNT;
 export const MAX_SLICES = SERIES_COUNT;
 /** The narrowest slot per item, in pixels, before the chart says it's too narrow. */
 export const MIN_SLOT = { bar: 4, line: 3 } as const;
+/** The tallest a horizontal bar chart's rows get, in pixels; more rows show a message suggesting take(). */
+export const MAX_HBAR_HEIGHT = 1200;
+/** Horizontal bars: the most of the width the label column takes. */
+export const HBAR_LABEL_SHARE = 0.4;
+/** Horizontal bars: the narrowest the bars' own area gets before the chart says it's too narrow. */
+const MIN_HBAR_AREA = 40;
 /** Grouped bars: the narrowest bar, and the surface gap between bars in a group. */
 const MIN_GROUP_BAR = 3;
 const BAR_GAP = 2;
 
-const KINDS = ["bar", "line", "pie", "donut"] as const;
+const KINDS = ["bar", "hbar", "line", "pie", "donut"] as const;
 const FORMATS = ["number", "money"] as const;
 type Kind = (typeof KINDS)[number];
 type AxisKind = "bar" | "line";
@@ -90,6 +101,10 @@ export interface ChartSlot {
   point?: { x: number; y: number };
   /** Line charts: each series' point; null for a gap. */
   points?: Array<{ x: number; y: number } | null>;
+  /** Horizontal bars: the centre of the item's row along y. */
+  cy?: number;
+  /** Horizontal bars: each series' value as drawn at the end of its bar; null for a gap. */
+  valueLabels?: Array<{ text: string; x: number; y: number; align: "left" | "right" } | null>;
 }
 
 /** One entry of the legend below a chart, relative to the box. */
@@ -138,6 +153,10 @@ export type ChartGeometry = {
   ticks: Array<{ value: number; y: number; label: string }>;
   /** Where 0 is, when it's on the scale. */
   zeroY: number | null;
+  /** Horizontal bars: where 0 is across the plot. */
+  zeroX?: number;
+  /** Horizontal bars: each row's height. */
+  rowH?: number;
   min: number;
   max: number;
   slots: ChartSlot[];
@@ -587,6 +606,96 @@ function axisGeometry(
   };
 }
 
+/** Horizontal bars: how thick each bar is and how tall each row is, for ns series side by side. */
+export function hbarRows(t: Theme, ns: number): { rowH: number; barH: number; group: number } {
+  const barH = ns === 1 ? Math.round(t.text.caption * 1.5) : t.text.caption;
+  const group = ns * barH + (ns - 1) * BAR_GAP;
+  return { barH, group, rowH: Math.max(Math.round((t.control.height * 2) / 3), group + t.space.sm) };
+}
+
+/** Rows a loading horizontal bar chart keeps room for. */
+const GHOST_HBAR_ROWS = 5;
+
+function hbarGeometry(
+  box: { w: number }, d: SeriesData, series: ChartGeometry["series"], format: Format, title: string, line: number, ctx: Ctx,
+): { g: ChartGeometry; h: number } {
+  const t = ctx.theme, m = ctx.measure;
+  const { base, say, top } = header(box, "hbar", title, ctx);
+  const done = (g: ChartGeometry) => ({ g, h: g.plot.y + g.plot.h });
+  const labelFont = base.labelFont;
+
+  if (d.problem === "not-list" || d.problem === "empty") return done(say("No data to chart"));
+  if (d.problem === "too-many") return done(say(`Too many items to chart: at most ${MAX_CHART_ITEMS}`));
+  if (d.problem === "no-values") return done(say("No numbers to chart"));
+
+  const ns = series.length, n = d.slots.length;
+  const { rowH, barH, group } = hbarRows(t, ns);
+  if (n * rowH > MAX_HBAR_HEIGHT) {
+    const fits = Math.floor(MAX_HBAR_HEIGHT / rowH);
+    ctx.warn?.(`chart on line ${line}: ${n} rows of horizontal bars are too tall to show; at most ${fits} fit. Show the top ones with take(), like items={take(sort(list, 'field', 'desc'), ${Math.min(10, fits)})}`);
+    return done(say(`Too many rows to chart: at most ${fits}. Show the top ones with take()`));
+  }
+
+  // Values read at the end of each bar: room for them on the right, and on the left for negatives.
+  const texts = d.slots.map((s) => s.values.map((v) => (v === null ? null : valueText(v, format))));
+  const roomFor = (neg: boolean) => {
+    let w = -1;
+    d.slots.forEach((s, i) => s.values.forEach((v, k) => { if (v !== null && v < 0 === neg) w = Math.max(w, m.width(texts[i]![k]!, labelFont)); }));
+    return w < 0 ? 0 : Math.ceil(w) + t.space.xs;
+  };
+  const right = roomFor(false), left = roomFor(true);
+  const labelCol = Math.ceil(Math.min(Math.max(...d.slots.map((s) => m.width(s.label, labelFont))), box.w * HBAR_LABEL_SHARE));
+  const plot: Rect = { x: labelCol + t.space.sm, y: top, w: Math.max(0, box.w - labelCol - t.space.sm), h: n * rowH };
+  const area = plot.w - left - right;
+  if (area < MIN_HBAR_AREA) {
+    ctx.warn?.(`chart on line ${line}: ${Math.round(box.w)} pixels leave no room for horizontal bars beside their labels and values`);
+    return done(say("Too narrow to chart these values"));
+  }
+
+  const values = d.slots.flatMap((s) => s.values.flatMap((v) => (v === null ? [] : [v])));
+  const lo = Math.min(0, ...values);
+  let hi = Math.max(0, ...values);
+  if (lo === hi) hi = 1;
+  const ax = plot.x + left;
+  // Halves, so (hi - lo) can't overflow for values near the largest number.
+  const xOf = (v: number) => ax + area * ((v / 2 - lo / 2) / (hi / 2 - lo / 2));
+  const zeroX = xOf(0);
+
+  const slots: ChartSlot[] = d.slots.map((s, i) => {
+    const cy = plot.y + rowH * (i + 0.5);
+    const bars = s.values.map((v, k): Rect | null => {
+      if (v === null) return null;
+      const vx = xOf(v);
+      return { x: Math.min(vx, zeroX), y: cy - group / 2 + k * (barH + BAR_GAP), w: Math.abs(vx - zeroX), h: barH };
+    });
+    const valueLabels = bars.map((b, k) => {
+      const v = s.values[k];
+      if (!b || v === null || v === undefined) return null;
+      const neg = v < 0;
+      return { text: texts[i]![k]!, x: neg ? b.x - t.space.xs : b.x + b.w + t.space.xs, y: b.y + b.h / 2, align: neg ? "right" as const : "left" as const };
+    });
+    const slot: ChartSlot = {
+      label: s.label, shownLabel: ellipsize(s.label, labelCol, labelFont, m), labelX: 0, cx: zeroX, cy,
+      value: s.values[0] ?? null, values: s.values, bars, valueLabels,
+    };
+    if (bars[0]) slot.bar = bars[0];
+    return slot;
+  });
+  series.forEach((sr, k) => {
+    const gaps = d.gaps[k] ?? 0;
+    if (gaps) ctx.warn?.(`chart on line ${line}: ${gaps} of ${n} items have no number in their${ns > 1 ? ` ${sr.field} field` : " y field"}, so they're shown as gaps`);
+  });
+
+  let h = plot.y + plot.h;
+  let legend: LegendItem[] = [];
+  if (ns > 1) {
+    const l = flowLegend(series, box.w, h + t.space.sm, ctx);
+    legend = l.items;
+    h = l.bottom;
+  }
+  return { g: { ...base, plot, zeroX, rowH, min: lo, max: hi, slots, series, labelY: plot.y, legend }, h };
+}
+
 function roundGeometry(box: { w: number }, d: PieData, kind: "pie" | "donut", format: Format, title: string, line: number, ctx: Ctx): { g: ChartGeometry; h: number } {
   const t = ctx.theme, m = ctx.measure;
   const { base, say, top } = header(box, kind, title, ctx);
@@ -658,6 +767,13 @@ function loadingGeometry(box: { w: number }, kind: Kind, series: number, title: 
     const legendTop = top + size + t.space.md;
     return { g: { ...base, plot: { x: box.w / 2 - size / 2, y: top, w: size, h: size }, labelY: legendTop, loading: { series } }, h: legendTop + GHOST_LEGEND_ROWS * rowH };
   }
+  if (kind === "hbar") {
+    const { rowH } = hbarRows(t, Math.max(1, series));
+    const labelCol = Math.round(Math.min(box.w * 0.3, 100));
+    const plot: Rect = { x: labelCol + t.space.sm, y: top, w: Math.max(0, box.w - labelCol - t.space.sm), h: GHOST_HBAR_ROWS * rowH };
+    const legend = series > 1 ? t.space.sm + rowH : 0;
+    return { g: { ...base, plot, rowH, labelY: plot.y + plot.h, loading: { series } }, h: plot.y + plot.h + legend };
+  }
   const axisW = 28;
   const plot: Rect = { x: axisW, y: top + Math.ceil(labelLH / 2), w: Math.max(0, box.w - axisW), h: plotHeight(box.w) };
   const labelY = plot.y + plot.h + t.space.xs;
@@ -701,6 +817,11 @@ function paintChartLoading(box: Box, ctx: PaintCtx): void {
         s.pill(ox + box.w - 64, y - pillH / 2, 64, pillH);
       }
     });
+    return;
+  }
+
+  if (d.kind === "hbar") {
+    paintHbarLoading(ctx, d, box, bounds, pillH, rowH);
     return;
   }
 
@@ -749,6 +870,94 @@ function paintChartLoading(box: Box, ctx: PaintCtx): void {
   });
 }
 
+/** Rows of label pills and bars of varied lengths growing from the zero line. */
+function paintHbarLoading(ctx: PaintCtx, d: ChartGeometry, box: Box, bounds: Rect, pillH: number, rowH: number): void {
+  const { g, theme } = ctx;
+  const ox = box.x, oy = box.y;
+  const ns = Math.max(1, d.loading?.series ?? 1);
+  const { barH, group } = hbarRows(theme, ns);
+  const rows = d.rowH ? Math.round(d.plot.h / d.rowH) : GHOST_HBAR_ROWS;
+  const px = ox + d.plot.x, pw = d.plot.w;
+  // The zero line, as the real chart will have.
+  g.lineWidth = 1;
+  g.strokeStyle = theme.colors.line;
+  g.beginPath();
+  g.moveTo(Math.round(px) + 0.5, oy + d.plot.y);
+  g.lineTo(Math.round(px) + 0.5, oy + d.plot.y + d.plot.h);
+  g.stroke();
+  paintGhost(ctx, bounds, (s) => {
+    for (let i = 0; i < rows; i++) {
+      const cy = oy + d.plot.y + (d.rowH ?? rowH) * (i + 0.5);
+      // Longest first, as a ranking usually is.
+      const share = GHOST_SHAPE[GHOST_SHAPE.length - 1 - ((i * 2) % GHOST_SHAPE.length)]! * (1 - i * 0.08);
+      s.pill(ox, cy - pillH / 2, Math.max(24, (d.plot.x - theme.space.sm) * (0.55 + ((i * 37) % 40) / 100)), pillH);
+      for (let k = 0; k < ns; k++) {
+        const w = (pw - 48) * share * (k ? 0.8 : 1);
+        s.rect(px, cy - group / 2 + k * (barH + BAR_GAP), Math.max(8, w), barH, Math.min(theme.radius.sm, barH / 2));
+      }
+    }
+    if (ns > 1) {
+      const y = oy + d.plot.y + d.plot.h + theme.space.sm + rowH / 2;
+      for (let k = 0; k < ns; k++) {
+        const x = ox + k * 96;
+        if (x + 80 > ox + box.w) break;
+        s.rect(x, y - 5, 10, 10, 2);
+        s.pill(x + 16, y - pillH / 2, 60, pillH);
+      }
+    }
+  });
+}
+
+/** Draw horizontal bars: labels on the left, bars growing from the zero line, values at their ends. */
+function paintHbar(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, colorOf: (k: number) => string, reveal: number): void {
+  const { g, theme } = ctx;
+  const c = theme.colors;
+  const base = g.globalAlpha;
+  const fade = easeOut(reveal * 2.5);
+  const n = d.slots.length;
+  const zero = d.zeroX ?? d.plot.x;
+  g.globalAlpha = base * fade;
+  g.font = d.labelFont;
+  g.textBaseline = "middle";
+  g.textAlign = "left";
+  g.fillStyle = c.ink;
+  for (const s of d.slots) if (s.shownLabel && s.cy !== undefined) g.fillText(s.shownLabel, ox + s.labelX, oy + s.cy);
+  g.lineWidth = 1;
+  g.strokeStyle = d.min < 0 ? c.muted : c.line;
+  g.beginPath();
+  g.moveTo(Math.round(ox + zero) + 0.5, oy + d.plot.y);
+  g.lineTo(Math.round(ox + zero) + 0.5, oy + d.plot.y + d.plot.h);
+  g.stroke();
+
+  g.globalAlpha = base;
+  d.slots.forEach((s, i) => {
+    // A wave from top to bottom: each bar grows out of the zero line.
+    const grow = reveal < 1 ? staggered(reveal, i, n) : 1;
+    (s.bars ?? []).forEach((full, k) => {
+      if (!full || full.w <= 0) return;
+      const w = full.w * grow;
+      if (w <= 0.25) return;
+      const right = full.x >= zero - 0.01;
+      const b = { x: right ? full.x : full.x + full.w - w, y: full.y, w, h: full.h };
+      ctx.roundRect(ox + b.x, oy + b.y, b.w, b.h, Math.min(theme.radius.sm, b.w / 2, b.h / 2));
+      g.fillStyle = colorOf(k);
+      g.fill();
+    });
+  });
+
+  g.globalAlpha = base * fade;
+  g.fillStyle = c.muted;
+  for (const s of d.slots) {
+    for (const v of s.valueLabels ?? []) {
+      if (!v) continue;
+      g.textAlign = v.align;
+      g.fillText(v.text, ox + v.x, oy + v.y);
+    }
+  }
+  if (d.legend.length) paintLegend(ctx, d, ox, oy, colorOf);
+  g.globalAlpha = base;
+}
+
 /** Warnings about props that only make sense together, shown by the parser. */
 function check(props: Readonly<Record<string, string>>): string[] {
   const out: string[] = [];
@@ -758,7 +967,7 @@ function check(props: Readonly<Record<string, string>>): string[] {
   if (y === undefined || y.startsWith("{")) return out;
   const fields = fieldsOf(y);
   if (isRound(kind as Kind) && fields.length > 1) {
-    out.push(`chart kind=${kind} shows one field, so only y=${fields[0]} is used. Write y=${fields[0]}, or use kind=bar or kind=line to compare ${fields.join(", ")}`);
+    out.push(`chart kind=${kind} shows one field, so only y=${fields[0]} is used. Write y=${fields[0]}, or use kind=bar, kind=hbar or kind=line to compare ${fields.join(", ")}`);
   }
   if (!isRound(kind as Kind) && fields.length > MAX_SERIES) {
     out.push(`chart draws at most ${MAX_SERIES} series, and y lists ${fields.length}. Keep ${MAX_SERIES} fields or fewer, or make two charts`);
@@ -777,24 +986,24 @@ export const chart: ComponentDef = {
   type: "chart",
   category: "data",
   description:
-    "A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).",
+    "A chart of a list of records: bar or line for one or more numbers per item, such as revenue and last year's revenue by month, hbar for a ranking with long names, such as top customers, or pie or donut for how one number splits across items, such as sales by region. It redraws when the list changes, and shows at most 200 items, 6 series and 6 slices (smaller slices are summed into Other).",
   text: { description: "A title above the chart." },
   props: {
     kind: {
       type: "enum", values: KINDS, default: "bar",
-      description: "bar compares categories and always starts at 0; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.",
+      description: "bar compares categories and always starts at 0; hbar draws the bars across, one row per item with its name on the left and its value at the end, for rankings and long names (top 10 artists or customers): sort the list and take() the top items, since rows are drawn in list order; line shows a trend in list order, scaled to the values; pie and donut show each item's share of the total, and donut puts the total in the middle. pie and donut take one y field and no negative values.",
     },
     items: { type: "expression", required: true, description: "The list of records to chart, e.g. items=sales or items={filter(sales, 'open')}." },
     x: { type: "name", required: true, description: "The field holding each item's label (each slice's name in a pie), e.g. x=month." },
     y: {
       type: "names", required: true,
-      description: "The field holding each item's number, e.g. y=revenue. Bar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.",
+      description: "The field holding each item's number, e.g. y=revenue. Bar, hbar and line can compare up to 6 fields on one scale, separated by commas with no spaces, e.g. y=revenue,last_year; each gets its own color and a legend. Items without a number are shown as gaps, not zero.",
     },
     labels: {
       type: "string",
-      description: "Bar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels=\"This year,Last year\". Without it the legend shows the field names.",
+      description: "Bar, hbar and line with several y fields: the legend's names, in the same order, separated by commas, e.g. labels=\"This year,Last year\". Without it the legend shows the field names.",
     },
-    format: { type: "enum", values: FORMATS, default: "number", description: "How values read on the axis, in a pie's legend and in a donut's middle: number (37K) or money ($37K)." },
+    format: { type: "enum", values: FORMATS, default: "number", description: "How values read on the axis, at the ends of hbar bars, in a pie's legend and in a donut's middle: number (37K) or money ($37K)." },
   },
   example: `state sales=[{month: "Jan", revenue: 12000, last_year: 10000}, {month: "Feb", revenue: 18000, last_year: 14000}, {month: "Mar", revenue: 15000, last_year: 16000}]
 chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year labels="This year,Last year" format=money`,
@@ -827,7 +1036,8 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
       const ys = fields.length ? fields : [""];
       const labels = labelsOf(p.str("labels"));
       const series = ys.map((field, k) => ({ field, label: labels[k] || field, color: k }));
-      out = axisGeometry(box, chartSeries(items, x, ys), series, kind, format, p.text(), line, ctx);
+      const data = chartSeries(items, x, ys);
+      out = kind === "hbar" ? hbarGeometry(box, data, series, format, p.text(), line, ctx) : axisGeometry(box, data, series, kind, format, p.text(), line, ctx);
     }
     box.data = out.g;
     box.h = out.h;
@@ -874,6 +1084,12 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
       paintRound(ctx, d, ox, oy, palette, reveal);
       g.globalAlpha = base * fade;
       paintLegend(ctx, d, ox, oy, (k) => palette[k % palette.length]!);
+      g.globalAlpha = base;
+      return;
+    }
+
+    if (d.kind === "hbar") {
+      paintHbar(ctx, d, ox, oy, colorOf, reveal);
       g.globalAlpha = base;
       return;
     }
