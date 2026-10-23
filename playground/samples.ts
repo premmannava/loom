@@ -281,6 +281,22 @@ card
     button "Drop the last" variant=secondary on=remove:regions:{len(regions) - 1} disabled={len(regions) < 2}
 `,
   },
+  dashboardAnswer: {
+    label: "Dashboard answer",
+    prompt: "How did the music store do this quarter? Which genres and artists brought in the most?",
+    spec: `state genres=[{name: "Rock", revenue: 8260}, {name: "Latin", revenue: 3820}, {name: "Metal", revenue: 2610}, {name: "Alternative & Punk", revenue: 2230}, {name: "Jazz", revenue: 790}, {name: "Easy Listening", revenue: -120}] artists=[{name: "Iron Maiden", revenue: 1380, last: 1210}, {name: "U2", revenue: 1150, last: 1240}, {name: "Metallica", revenue: 980, last: 860}, {name: "Led Zeppelin", revenue: 920, last: 700}, {name: "Os Paralamas Do Sucesso and Friends", revenue: 610, last: 650}]
+card
+  text "Q3 at the music store" style=title
+  row align=top
+    stat label="Revenue" value="{money(sum(genres, 'revenue'))}" change="+12%" spark={[13100, 14200, 13800, 15400, 16200, 17590]}
+    stat label="Refunds" value="$1,240" change="-6%" good=down spark={[1520, 1480, 1390, 1410, 1320, 1240]}
+    stat label="Customers" value="59" change="0%" trend=flat
+  callout "Rock is 47% of revenue" detail="{money(8260)} of {money(sum(genres, 'revenue'))}; Latin is next at 22%" icon=true
+  chart "Revenue by genre" kind=hbar items={sort(genres, 'revenue', 'desc')} x=name y=revenue format=money
+  chart "Top artists, this quarter and last" kind=hbar items=artists x=name y=revenue,last labels="This quarter,Last quarter" format=money
+  callout "Easy Listening lost money after refunds" detail="Check its returns before restocking" tone=warn icon=true
+`,
+  },
   inventory: {
     label: "Inventory",
     prompt: "An equipment inventory table I can sort by any column, where picking a row shows that item's details.",

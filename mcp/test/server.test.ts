@@ -79,7 +79,7 @@ describe("SayShape MCP server", () => {
     const t = text(r);
     expect(t).toMatch(/line 2/);
     expect(t).toMatch(/Docs for chart:/);
-    expect(t).toMatch(/kind=<bar\|line/);
+    expect(t).toMatch(/kind=<bar\|hbar\|line/);
   });
 
   it("accepts a valid spec and reports no problems", async () => {

@@ -1,7 +1,9 @@
-import type { ComponentDef } from "../component";
+import type { ComponentDef, LayoutContext, PaintContext } from "../component";
 import type { TextMeasurer } from "../text";
 import type { Theme } from "../theme";
-import { fitLines, wrapText } from "../text";
+import type { Box, Value } from "../types";
+import { isList } from "../data";
+import { ellipsize, fitLines, wrapText } from "../text";
 import { fitText } from "./input";
 import { easeOut, paintGhost } from "../ghost";
 import { fillTint, TEXT_STYLES, textMetrics, textWidth, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
@@ -60,23 +62,49 @@ text "$160" tone=muted strike=true`,
   },
 };
 
+const TRENDS = ["up", "down", "flat"] as const;
+type Trend = (typeof TRENDS)[number];
+const GOOD_WAYS = ["up", "down"] as const;
+
 export const stat: ComponentDef = {
   type: "stat",
   category: "data",
-  description: "A labelled number, for key figures like totals or counts.",
+  description: "A labelled number, for key figures like totals or counts. Add change= to show how it moved, and spark= for a small line of its recent values.",
   props: {
     label: { type: "string", required: true, description: "Short caption above the value." },
     value: { type: "string", required: true, description: "The figure to show, usually an {expression}." },
     tone: toneProp,
     align: { type: "enum", values: ["left", "center"], default: "left", description: "left or center." },
+    change: {
+      type: "string",
+      description: "How the figure moved, shown small beside or under it with ▲ or ▼, e.g. change=\"+12%\" or change=\"{round(growth, 1)}%\". Write the sign; don't add an arrow.",
+    },
+    trend: {
+      type: "enum", values: TRENDS,
+      description: "up, down or flat: which way the change went, for its arrow and color. Leave it out to take it from change's sign.",
+    },
+    good: {
+      type: "enum", values: GOOD_WAYS, default: "up",
+      description: "Which way is good news: up (default, colored good) or down, for figures like costs or churn where falling is good.",
+    },
+    spark: {
+      type: "expression",
+      description: "A list of numbers, oldest first, drawn as a small line under the value, e.g. spark={[12, 15, 14, 19]} or spark=weekly.",
+    },
   },
   example: `state price=24 qty=2
 stat label="Total" value="\${price*qty}"`,
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const d = statLayout(p.str("label"), p.str("value"), box.w, ctx.theme, ctx.measure);
-    box.data = { ...d };
-    box.h = d.height;
+    if (!p.has("change") && !p.has("spark") && !p.has("trend")) {
+      box.data = { ...d };
+      box.h = d.height;
+      return;
+    }
+    const extra = statExtras(box, d, ctx);
+    box.data = { ...d, ...extra };
+    box.h = extra.height;
   },
   minWidth(node, ctx) {
     // What its label and its value need at the smallest size, so "Days 2" stays small; long values wrap below 110.
@@ -99,11 +127,16 @@ stat label="Total" value="\${price*qty}"`,
     g.fillStyle = ctx.theme.colors.muted;
     d.label.forEach((l, i) => g.fillText(l, x, box.y + 12 + i * STAT_LABEL_LH));
     if ("letterSpacing" in g) (g as unknown as { letterSpacing: string }).letterSpacing = "0px";
+    const extra = (box.data as Partial<StatExtras>).extras ? (box.data as unknown as StatExtras) : null;
     if (ctx.isLoading(box.node)) {
       // The figure is on its way: a placeholder where it will be.
       const h = Math.round(d.size * 0.62), w = Math.min(box.w, Math.max(56, d.size * 3.2));
       const y = box.y + d.valueTop + d.valueLH - d.size * 0.72;
-      paintGhost(ctx, { x: box.x, y, w: box.w, h }, (s) => s.rect(center ? x - w / 2 : x, y, w, h, ctx.theme.radius.sm));
+      if (!extra) {
+        paintGhost(ctx, { x: box.x, y, w: box.w, h }, (s) => s.rect(center ? x - w / 2 : x, y, w, h, ctx.theme.radius.sm));
+        return;
+      }
+      paintStatExtrasLoading(box, ctx, extra, { x, y, w, h, center });
       return;
     }
     // Just after its data arrived, the figure rises in and counts up to its value.
@@ -113,7 +146,15 @@ stat label="Total" value="\${price*qty}"`,
     const rise = (1 - easeOut(reveal * 1.6)) * 6;
     g.font = ctx.font(700, d.size);
     g.fillStyle = toneColor(ctx.theme, p.oneOf("tone", TONES, "default"));
-    d.value.forEach((l, i) => g.fillText(reveal < 1 && d.value.length === 1 ? countUp(l, easeOut(reveal)) : l, x, box.y + d.valueTop + d.valueLH * (i + 1) + rise));
+    // A change beside a centred value: centre the pair, so the value starts left of the middle.
+    const inline = extra?.change?.inline ?? false;
+    let vx = x;
+    if (inline && center && extra?.change) {
+      g.textAlign = "left";
+      vx = x - (extra.change.valueW + STAT_CHANGE_GAP + extra.change.width) / 2;
+    }
+    d.value.forEach((l, i) => g.fillText(reveal < 1 && d.value.length === 1 ? countUp(l, easeOut(reveal)) : l, vx, box.y + d.valueTop + d.valueLH * (i + 1) + rise));
+    if (extra) paintStatExtras(box, ctx, extra, { x, vx, center, reveal, rise, base });
     g.globalAlpha = base;
   },
   paintLoading(box, ctx) {
@@ -162,6 +203,196 @@ export function statLayout(label: string, value: string, width: number, theme: T
   const valueLH = Math.round(size * 1.3);
   const valueTop = 12 + Math.max(0, labelLines.length - 1) * STAT_LABEL_LH;
   return { label: labelLines, value: lines, size, valueLH, valueTop, height: valueTop + lines.length * valueLH + 6 };
+}
+
+/** Space between a value and a change beside it. */
+const STAT_CHANGE_GAP = 8;
+/** A sparkline's height and its widest; it's a hint of a trend, not a chart. */
+export const SPARK_H = 28;
+const SPARK_MAX_W = 200;
+const SPARK_INSET = 3;
+/** The placeholder sparkline's shape: a gentle rise, as shares of its height. */
+const SPARK_GHOST = [0.35, 0.5, 0.42, 0.62, 0.55, 0.78, 0.7, 0.9];
+
+interface StatChange {
+  /** As drawn: the arrow and the text as written, cut to fit. */
+  text: string;
+  width: number;
+  /** The value's width, to place a change beside it. */
+  valueW: number;
+  inline: boolean;
+  /** Baseline, relative to the box. */
+  y: number;
+}
+
+interface StatSpark {
+  /** Relative to the box; empty when there aren't two numbers to join. */
+  points: Array<{ x: number; y: number }>;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface StatExtras extends StatLayout {
+  extras: true;
+  change: StatChange | null;
+  spark: StatSpark | null;
+  dir: Trend | null;
+  /** The color role for the change and the sparkline. */
+  tone: "good" | "bad" | "muted" | "accent";
+}
+
+/**
+ * Which way a change went, from the first number in it: "+12%" up, "-3"
+ * and "−3" down, "0%" flat. Null when it holds no number.
+ */
+export function changeDirection(text: string): Trend | null {
+  const m = /([+\-−])?\s*[$€£¥]?\s*(\d[\d,]*(?:\.\d+)?|\.\d+)/.exec(text);
+  if (!m) return null;
+  const n = Number(m[2]!.replace(/,/g, ""));
+  if (!Number.isFinite(n) || n === 0) return "flat";
+  return m[1] === "-" || m[1] === "−" ? "down" : "up";
+}
+
+/** The arrow shown before a change. */
+const ARROWS: Record<Trend, string> = { up: "▲", down: "▼", flat: "" };
+
+/** The change and sparkline below or beside a stat's value, with the height they need. */
+function statExtras(box: Box, d: StatLayout, ctx: LayoutContext): StatExtras & { height: number } {
+  const p = ctx.props(box.node);
+  const t = ctx.theme, m = ctx.measure;
+  const w = Math.max(20, box.w);
+  const loading = ctx.isLoading?.(box.node) ?? false;
+  const center = p.oneOf("align", ["left", "center"] as const, "left") === "center";
+  const raw = p.has("change") ? p.str("change").trim() : "";
+  const dir: Trend | null = p.has("trend") ? p.oneOf("trend", TRENDS, "flat") : raw ? changeDirection(raw) : null;
+  const goodUp = p.oneOf("good", GOOD_WAYS, "up") === "up";
+  const tone = dir === "up" ? (goodUp ? "good" : "bad") : dir === "down" ? (goodUp ? "bad" : "good") : dir === "flat" ? "muted" : "accent";
+
+  let bottom = d.valueTop + d.value.length * d.valueLH;
+  let change: StatChange | null = null;
+  if (p.has("change") && (raw || loading)) {
+    const font = themeFont(t, 600, t.text.body);
+    const lh = Math.round(t.text.body * 1.35);
+    const arrow = dir ? ARROWS[dir] : "";
+    const full = raw ? (arrow ? `${arrow} ${raw}` : raw) : "";
+    // While loading, the size the placeholders take.
+    const valueW = loading ? Math.min(w, Math.max(56, d.size * 3.2)) : m.width(d.value[0] ?? "", themeFont(t, 700, d.size));
+    const natural = loading ? 48 : m.width(full, font);
+    const inline = d.value.length === 1 && valueW + STAT_CHANGE_GAP + natural <= w;
+    const text = inline ? full : ellipsize(full, w, font, m);
+    const width = loading ? natural : m.width(text, font);
+    if (inline) change = { text, width, valueW, inline, y: bottom };
+    else {
+      // A little space above, so the value's descenders stay clear of it.
+      change = { text, width, valueW, inline, y: bottom + t.space.xs + lh - 5 };
+      bottom += t.space.xs + lh;
+    }
+  }
+
+  let spark: StatSpark | null = null;
+  if (p.has("spark")) {
+    const sw = Math.min(w, SPARK_MAX_W);
+    const sx = center ? (w - sw) / 2 : 0;
+    const sy = bottom + t.space.sm;
+    spark = { points: [], x: sx, y: sy, w: sw, h: SPARK_H };
+    if (!loading) spark.points = sparkPoints(p.expr("spark"), spark, box.node.line, ctx);
+    bottom = sy + SPARK_H;
+  }
+  return { ...d, extras: true, change, spark, dir, tone, height: bottom + 6 };
+}
+
+/** Where a sparkline's numbers go in its area. Anything that isn't a number is left out, with a warning. */
+function sparkPoints(list: Value | undefined, area: Omit<StatSpark, "points">, line: number, ctx: LayoutContext): StatSpark["points"] {
+  if (list === undefined || list === null) return [];
+  if (!isList(list)) {
+    ctx.warn?.(`stat on line ${line}: spark should be a list of numbers, like spark={[12, 15, 14, 19]}`);
+    return [];
+  }
+  const nums = list.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (nums.length < list.length) ctx.warn?.(`stat on line ${line}: spark has ${list.length - nums.length} entries that aren't numbers, so they're left out. Give a list of numbers, like spark={[12, 15, 14, 19]}`);
+  if (nums.length < 2) return [];
+  // Halves, so the range can't overflow for values near the largest number.
+  const lo = Math.min(...nums), hi = Math.max(...nums);
+  const span = hi / 2 - lo / 2;
+  const inner = area.h - 2 * SPARK_INSET;
+  const stepX = (area.w - 2 * SPARK_INSET) / (nums.length - 1);
+  return nums.map((v, i) => ({
+    x: area.x + SPARK_INSET + i * stepX,
+    y: area.y + SPARK_INSET + (span > 0 ? inner * (1 - (v / 2 - lo / 2) / span) : inner / 2),
+  }));
+}
+
+function statToneColor(theme: Theme, tone: StatExtras["tone"]): string {
+  return theme.colors[tone];
+}
+
+function paintStatExtras(box: Box, ctx: PaintContext, e: StatExtras, at: { x: number; vx: number; center: boolean; reveal: number; rise: number; base: number }): void {
+  const { g, theme } = ctx;
+  if (e.change) {
+    g.font = ctx.font(600, theme.text.body);
+    g.fillStyle = statToneColor(theme, e.tone);
+    if (e.change.inline) {
+      g.textAlign = "left";
+      const left = at.center ? at.vx : at.x;
+      g.fillText(e.change.text, left + e.change.valueW + STAT_CHANGE_GAP, box.y + e.change.y + at.rise);
+    } else {
+      g.textAlign = at.center ? "center" : "left";
+      g.fillText(e.change.text, at.x, box.y + e.change.y + at.rise);
+    }
+  }
+  const s = e.spark;
+  if (s && s.points.length > 1) {
+    const color = e.tone === "muted" ? theme.colors.accent : statToneColor(theme, e.tone);
+    g.save();
+    // The line draws in from the left once the data arrives.
+    if (at.reveal < 1) {
+      g.beginPath();
+      g.rect(box.x + s.x - 4, box.y + s.y - 4, (s.w + 8) * easeOut(at.reveal), s.h + 8);
+      g.clip();
+    }
+    g.globalAlpha = at.base;
+    g.lineWidth = 2;
+    g.lineJoin = "round";
+    g.lineCap = "round";
+    g.strokeStyle = color;
+    g.beginPath();
+    s.points.forEach((pt, i) => (i ? g.lineTo(box.x + pt.x, box.y + pt.y) : g.moveTo(box.x + pt.x, box.y + pt.y)));
+    g.stroke();
+    const last = s.points[s.points.length - 1]!;
+    g.beginPath();
+    g.arc(box.x + last.x, box.y + last.y, 2.5, 0, Math.PI * 2);
+    g.fillStyle = color;
+    g.fill();
+    g.restore();
+  }
+}
+
+function paintStatExtrasLoading(box: Box, ctx: PaintContext, e: StatExtras, v: { x: number; y: number; w: number; h: number; center: boolean }): void {
+  const pillH = 10;
+  const lh = Math.round(ctx.theme.text.body * 1.35);
+  const changeW = e.change?.width ?? 0;
+  // A change beside a centred value: centre the pair.
+  const pair = e.change?.inline && v.center ? v.w + STAT_CHANGE_GAP + changeW : v.w;
+  const vx = v.center ? v.x - pair / 2 : v.x;
+  const top = box.y + e.valueTop;
+  paintGhost(ctx, { x: box.x, y: top, w: box.w, h: box.h - e.valueTop }, (s) => {
+    s.rect(vx, v.y, v.w, v.h, ctx.theme.radius.sm);
+    const c = e.change;
+    if (c) {
+      if (c.inline) s.pill(vx + v.w + STAT_CHANGE_GAP, v.y + v.h - pillH, changeW, pillH);
+      else s.pill(v.center ? v.x - changeW / 2 : v.x, box.y + c.y - lh / 2 - pillH / 2 + 1, changeW, pillH);
+    }
+    const sp = e.spark;
+    if (sp) {
+      const x0 = box.x + sp.x, bottom = box.y + sp.y + sp.h, n = SPARK_GHOST.length;
+      s.g.moveTo(x0, bottom);
+      SPARK_GHOST.forEach((f, i) => s.g.lineTo(x0 + (sp.w * i) / (n - 1), bottom - sp.h * f));
+      s.g.lineTo(x0 + sp.w, bottom);
+      s.g.closePath();
+    }
+  });
 }
 
 export const progress: ComponentDef = {

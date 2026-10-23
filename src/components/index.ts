@@ -9,10 +9,11 @@ import { button, check, input, link, radio, rating, slider, stepper, switchToggl
 import { accordion, card, column, divider, each, grid, list, listItem, row, spacer } from "./layout";
 import { image } from "./media";
 import { breadcrumb, pagination, screen, tab, tabs } from "./navigation";
+import { callout } from "./callout";
 
 export {
   column, row, grid, card, list, listItem, accordion, divider, spacer, each,
-  text, image, code, badge, avatar,
+  text, image, code, badge, avatar, callout,
   stat, rating, chart, table, tableColumn,
   button, link, check, switchToggle, radio, select, datePicker, stepper, slider, input,
   screen, tabs, tab, breadcrumb, pagination,
@@ -22,7 +23,7 @@ export {
 /** The built-in components (everything except the map, which is a separate entry). */
 export const coreComponents: ComponentDef[] = [
   column, row, grid, card, list, listItem, accordion, divider, spacer, each,
-  text, image, code, badge, avatar,
+  text, image, code, badge, avatar, callout,
   stat, rating, chart, table, tableColumn,
   button, link, check, switchToggle, radio, select, datePicker, stepper, slider, input,
   screen, tabs, tab, breadcrumb, pagination,
