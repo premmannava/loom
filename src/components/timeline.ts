@@ -18,7 +18,8 @@ import type { Box } from "../types";
 import { gapProp, iconProblems, iconProp, stack, themeFont } from "./util";
 
 const STATUSES = ["done", "current", "upcoming"] as const;
-type Status = (typeof STATUSES)[number];
+/** "plain" is a step with no status: a plan or itinerary, where nothing is done yet or tracked. */
+type Status = (typeof STATUSES)[number] | "plain";
 
 /** The marker's size, and where a step's words start. */
 const MARK = 22, TEXT_X = MARK + 12;
@@ -38,14 +39,18 @@ type StepLayout = {
 export const timeline: ComponentDef = {
   type: "timeline",
   category: "layout",
-  description: "Steps in order with a line joining them, each done, current or upcoming: order tracking, itineraries, project history, how-to guides.",
+  description: "Steps in order with a line joining them: itineraries, how-to guides, order tracking, project history. Give steps a status only to show progress, like where an order is or which step the person has reached.",
   props: {
     gap: gapProp(20),
   },
   children: ["step"],
   example: `timeline
-  step "Ordered" detail="Oct 18, 9:12 AM" status=done
-  step "Shipped" detail="Phoenix, AZ" status=done
+  step "Day 1: Sedona" detail="Cathedral Rock at sunrise"
+  step "Day 2: Flagstaff" detail="Lowell Observatory at night"
+  step "Day 3: Grand Canyon" detail="South Rim, Mather Point"
+# Showing progress: a status on every step
+timeline
+  step "Ordered" time="Oct 18" status=done
   step "Out for delivery" detail="Arrives by 8 PM" status=current
   step "Delivered" status=upcoming`,
   minWidth: () => 160,
@@ -56,7 +61,7 @@ export const timeline: ComponentDef = {
     const { g, theme } = ctx;
     const c = theme.colors;
     const steps = box.children.filter((k) => k.node.type === "step" && k.h > 0);
-    const statusOf = (k: Box) => ((k.data as StepLayout | undefined)?.status ?? "done");
+    const statusOf = (k: Box): Status => ((k.data as StepLayout | undefined)?.status ?? "plain");
     const centerY = (k: Box) => k.y + ((k.data as StepLayout | undefined)?.titleLH ?? MARK) / 2;
     const cx = box.x + MARK / 2;
     // The line between markers: accent up to the current step, then the line color.
@@ -88,10 +93,11 @@ export const timeline: ComponentDef = {
         g.strokeStyle = status === "current" ? c.accent : c.line;
         g.stroke();
         if (isIconName(icon)) drawIcon(g, icon, cx - 7, y - 7, 14, status === "current" ? c.accent : c.muted);
-        else if (status === "current") {
+        else if (status !== "upcoming") {
+          // Current: an accent dot. Plain (no status): a small muted dot, so nothing looks finished or pending.
           g.beginPath();
-          g.arc(cx, y, 4, 0, Math.PI * 2);
-          g.fillStyle = c.accent;
+          g.arc(cx, y, status === "current" ? 4 : 3, 0, Math.PI * 2);
+          g.fillStyle = status === "current" ? c.accent : c.muted;
           g.fill();
         }
       }
@@ -105,7 +111,10 @@ export const step: ComponentDef = {
   description: "One step of a timeline: a title, an optional detail line and time, and whether it's done, current or upcoming.",
   text: { description: "The step's title, e.g. Shipped.", required: true },
   props: {
-    status: { type: "enum", values: STATUSES, default: "done", description: "done, current or upcoming. Upcoming steps are muted." },
+    status: {
+      type: "enum", values: STATUSES,
+      description: "Only to show progress: done for finished steps, current for where the person is now, upcoming for what's left (muted). Leave it out on every step for a plan, itinerary or how-to that hasn't started.",
+    },
     detail: { type: "string", description: "A quieter line under the title, like a place or a note." },
     time: { type: "string", description: "A short date or time on the right, e.g. Oct 18 or 9:12 AM." },
     icon: { ...iconProp, description: "An icon in the step's marker instead of the check or dot, by name from icon's list, e.g. icon=truck." },
@@ -123,7 +132,7 @@ export const step: ComponentDef = {
     const textW = Math.max(40, box.w - TEXT_X - timeW);
     const title = wrapText(p.text(), textW, titleFont, m);
     const detail = p.has("detail") ? wrapText(p.str("detail"), Math.max(40, box.w - TEXT_X), detailFont, m) : [];
-    const data: StepLayout = { title, detail, time, titleFont, detailFont, timeFont, titleLH, detailLH, status: p.oneOf("status", STATUSES, "done") };
+    const data: StepLayout = { title, detail, time, titleFont, detailFont, timeFont, titleLH, detailLH, status: p.has("status") ? p.oneOf("status", STATUSES, "upcoming") : "plain" };
     box.data = data;
     box.h = title.length * titleLH + (detail.length ? detail.length * detailLH : 0);
   },
