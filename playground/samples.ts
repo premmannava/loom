@@ -319,6 +319,24 @@ card
       button "Request one" on="emit:request:{selected}" disabled={find(equipment, 'id', selected).stock == 0}
 `,
   },
+  tripStatus: {
+    label: "Trip status",
+    prompt: "What's the status of my Phoenix to Salt Lake City trip?",
+    spec: `card
+  text "Phoenix to Salt Lake City" style=title
+  text "Friday, Nov 14 · 2 travellers" tone=muted icon=calendar
+  grid min=140 gap=10
+    stat label="Departs" value="7:40 AM" change="On time" trend=up
+    stat label="Weather in SLC" value="41°F" change="Light snow" trend=flat
+  callout "Pack a warm layer: it's 56° colder than Phoenix" tone=warn
+  list
+    list-item "Flight booked" detail="Delta 1834 · Seat 14C, 14D" icon=plane
+    list-item "Rental car" detail="Pick up at SLC, Terminal 1" trailing="$148" icon=car
+    list-item "Hotel" detail="2 nights downtown" trailing="$312" icon=building
+  text "Check-in opens 24 hours before departure" icon=clock tone=muted style=caption
+  button "Check in now" on=emit:check_in
+`,
+  },
   directory: {
     label: "Directory",
     prompt: "A team directory with a department picker that filters the people shown.",

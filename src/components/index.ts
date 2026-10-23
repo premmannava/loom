@@ -3,7 +3,7 @@ import { chart } from "./chart";
 import { table, tableColumn } from "./table";
 import { select } from "./select";
 import { datePicker } from "./date-picker";
-import { avatar, badge, code, progress, stat, text } from "./content";
+import { avatar, badge, code, icon, progress, stat, text } from "./content";
 import { empty, skeleton } from "./feedback";
 import { button, check, input, link, radio, rating, slider, stepper, switchToggle } from "./input";
 import { accordion, card, column, divider, each, grid, list, listItem, row, spacer } from "./layout";
@@ -13,7 +13,7 @@ import { callout } from "./callout";
 
 export {
   column, row, grid, card, list, listItem, accordion, divider, spacer, each,
-  text, image, code, badge, avatar, callout,
+  text, image, code, badge, avatar, callout, icon,
   stat, rating, chart, table, tableColumn,
   button, link, check, switchToggle, radio, select, datePicker, stepper, slider, input,
   screen, tabs, tab, breadcrumb, pagination,
@@ -23,7 +23,7 @@ export {
 /** The built-in components (everything except the map, which is a separate entry). */
 export const coreComponents: ComponentDef[] = [
   column, row, grid, card, list, listItem, accordion, divider, spacer, each,
-  text, image, code, badge, avatar, callout,
+  text, image, code, badge, avatar, callout, icon,
   stat, rating, chart, table, tableColumn,
   button, link, check, switchToggle, radio, select, datePicker, stepper, slider, input,
   screen, tabs, tab, breadcrumb, pagination,

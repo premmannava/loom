@@ -1,6 +1,7 @@
 import type { ComponentDef } from "../component";
 import { wrapText } from "../text";
-import { chevron, fillTint, gapProp, onProp, padProp, partBox, row as rowLayout, ROW_ALIGN, rowMinWidth, runOn, stack, themeFont } from "./util";
+import { drawIcon, isIconName } from "../icons";
+import { chevron, fillTint, gapProp, iconProblems, iconProp, onProp, padProp, partBox, row as rowLayout, ROW_ALIGN, rowMinWidth, runOn, stack, themeFont } from "./util";
 
 export const column: ComponentDef = {
   type: "column",
@@ -185,6 +186,7 @@ export const list: ComponentDef = {
 };
 
 const ITEM_PAD_X = 16, ITEM_PAD_Y = 12;
+const ITEM_ICON = 20, ITEM_ICON_GAP = 12;
 
 export const listItem: ComponentDef = {
   type: "list-item",
@@ -194,10 +196,12 @@ export const listItem: ComponentDef = {
   props: {
     detail: { type: "string", description: "A second, quieter line under the title." },
     trailing: { type: "string", description: "A short value on the right, like a price or a count." },
+    icon: iconProp,
     on: onProp("when the row is pressed"),
   },
   parents: ["list"],
-  example: `list-item "Rain shell" detail="Packs into its pocket" trailing="$129" on=emit:open_shell`,
+  example: `list-item "Rain shell" detail="Packs into its pocket" trailing="$129" icon=package on=emit:open_shell`,
+  check: (props) => iconProblems(props.icon, "icon"),
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const t = ctx.theme;
@@ -205,34 +209,40 @@ export const listItem: ComponentDef = {
     const trailing = p.str("trailing");
     const trailingW = trailing ? ctx.measure.width(trailing, titleFont) + 12 : 0;
     const chevronW = p.has("on") ? 20 : 0;
-    const textW = Math.max(40, box.w - ITEM_PAD_X * 2 - trailingW - chevronW);
+    const iconW = isIconName(p.str("icon")) ? ITEM_ICON + ITEM_ICON_GAP : 0;
+    const textW = Math.max(40, box.w - ITEM_PAD_X * 2 - trailingW - chevronW - iconW);
     const title = wrapText(p.text(), textW, titleFont, ctx.measure);
     const detail = p.has("detail") ? wrapText(p.str("detail"), textW, detailFont, ctx.measure) : [];
     const titleLH = Math.round(t.text.body * 1.35), detailLH = 18;
-    box.data = { title, detail, titleFont, detailFont, titleLH, detailLH, trailing };
+    box.data = { title, detail, titleFont, detailFont, titleLH, detailLH, trailing, iconW };
     box.h = ITEM_PAD_Y * 2 + title.length * titleLH + (detail.length ? 2 + detail.length * detailLH : 0);
   },
   paint(box, ctx) {
     const { g, theme } = ctx;
     const c = theme.colors;
-    const d = box.data as { title: string[]; detail: string[]; titleFont: string; detailFont: string; titleLH: number; detailLH: number; trailing: string };
-    const pressable = ctx.props(box.node).has("on");
+    const d = box.data as { title: string[]; detail: string[]; titleFont: string; detailFont: string; titleLH: number; detailLH: number; trailing: string; iconW: number };
+    const p = ctx.props(box.node);
+    const pressable = p.has("on");
     if (pressable && ctx.isHovered(box.node)) {
       g.beginPath();
       g.rect(box.x + 1, box.y + 1, box.w - 2, box.h - 2);
       fillTint(g, c.accent, ctx.isPressed(box.node) ? 0.1 : 0.05);
     }
+    // A leading icon in the accent, level with the title's first line.
+    const name = p.str("icon");
+    if (d.iconW && isIconName(name)) drawIcon(g, name, box.x + ITEM_PAD_X, box.y + ITEM_PAD_Y + (d.titleLH - ITEM_ICON) / 2, ITEM_ICON, c.accent);
+    const tx = box.x + ITEM_PAD_X + d.iconW;
     g.textAlign = "left";
     g.textBaseline = "middle";
     let y = box.y + ITEM_PAD_Y;
     g.font = d.titleFont;
     g.fillStyle = c.ink;
-    for (const l of d.title) { g.fillText(l, box.x + ITEM_PAD_X, y + d.titleLH / 2); y += d.titleLH; }
+    for (const l of d.title) { g.fillText(l, tx, y + d.titleLH / 2); y += d.titleLH; }
     if (d.detail.length) {
       y += 2;
       g.font = d.detailFont;
       g.fillStyle = c.muted;
-      for (const l of d.detail) { g.fillText(l, box.x + ITEM_PAD_X, y + d.detailLH / 2); y += d.detailLH; }
+      for (const l of d.detail) { g.fillText(l, tx, y + d.detailLH / 2); y += d.detailLH; }
     }
     const right = box.x + box.w - ITEM_PAD_X - (pressable ? 20 : 0);
     if (d.trailing) {

@@ -95,7 +95,7 @@ EVERY ELEMENT ACCEPTS
 
 ELEMENTS AT A GLANCE
 - layout: column, row, grid, card, list, list-item, accordion, divider, spacer, each
-- content: text, image, code, badge, avatar, callout
+- content: text, image, code, badge, avatar, callout, icon
 - data: stat, rating, chart, table, table-column, map, pin
 - input: button, link, check, switch, radio, select, date-picker, stepper, slider, input
 - navigation: screen, tabs, tab, breadcrumb, pagination
@@ -156,10 +156,11 @@ ELEMENTS
     "<text>" (required)  The row's title.
     detail=<string>  A second, quieter line under the title.
     trailing=<string>  A short value on the right, like a price or a count.
+    icon=<string>  An icon before the text, by name from icon's list, e.g. icon=check-circle.
     on=<action>  Actions to run when the row is pressed, e.g. emit:changed. Separate several with ;
     only inside: list
     example:
-      list-item "Rain shell" detail="Packs into its pocket" trailing="$129" on=emit:open_shell
+      list-item "Rain shell" detail="Packs into its pocket" trailing="$129" icon=package on=emit:open_shell
 
   accordion "<text>"  — A heading that shows or hides the content under it when pressed. Stack several for an FAQ.
     "<text>" (required)  The heading.
@@ -202,11 +203,13 @@ ELEMENTS
     tone=<default|muted|accent|good|warn|bad>  Color role: default, muted, accent, good, warn or bad.
     align=<left|center|right>  left, center or right.
     strike=<boolean>  Draw a line through the text, e.g. for an old price.
+    icon=<string>  An icon before the text, by name from icon's list, e.g. icon=check-circle.
     example:
       state guests=2 nights=3
       text "Weekend in Yosemite" style=title
       text "{guests} guests, {nights} nights" tone=muted
       text "$160" tone=muted strike=true
+      text "Payment received" icon=check-circle tone=good
 
   image "<text>"  — A picture, such as a product photo. The quoted text says what it shows, and is displayed if the image can't load.
     "<text>" (required)  What the image shows, e.g. Blue trail runners from the side.
@@ -243,6 +246,14 @@ ELEMENTS
     icon=<boolean>  Show a small icon matching the tone: i, a tick, ! or ×.
     example:
       callout "Rock is 47% of revenue" detail="Up from 41% last year" icon=true
+
+  icon  — A small symbol on its own, like a status mark or a weather sign. To start a line of text or a list row with one, use icon= on text or list-item instead.
+    name=<string, required>  Which icon: check, check-circle, x, x-circle, warning, info, help, clock, arrow-up, arrow-down, arrow-left, arrow-right, trend-up, trend-down, plus, minus, refresh, sun, moon, cloud, rain, snow, storm, wind, thermometer, droplet, pin, globe, plane, car, truck, home, building, dollar, card, cart, package, bar-chart, pie-chart, percent, tag, briefcase, file, target, bolt, idea, lock, user, users, calendar, mail, phone, chat, star, heart, bell, search, filter, download, share, link, sliders.
+    tone=<default|muted|accent|good|warn|bad>  Color role: default, muted, accent, good, warn or bad.
+    size=<sm|md|lg>  sm, md or lg.
+    example:
+      icon name=sun tone=warn size=lg
+      icon name=check-circle tone=good
 
   stat  — A labelled number, for key figures like totals or counts. Add change= to show how it moved, and spark= for a small line of its recent values.
     label=<string, required>  Short caption above the value.

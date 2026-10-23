@@ -6,7 +6,8 @@ import { isList } from "../data";
 import { ellipsize, fitLines, wrapText } from "../text";
 import { fitText } from "./input";
 import { easeOut, paintGhost } from "../ghost";
-import { fillTint, TEXT_STYLES, textMetrics, textWidth, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
+import { fillTint, iconProblems, iconProp, TEXT_STYLES, textMetrics, textWidth, themeFont, toneColor, toneProp, TONES, WEIGHTS } from "./util";
+import { drawIcon, ICON_NAMES, isIconName, type IconName } from "../icons";
 
 const ALIGN = ["left", "center", "right"] as const;
 
@@ -21,17 +22,21 @@ export const text: ComponentDef = {
     tone: toneProp,
     align: { type: "enum", values: ALIGN, default: "left", description: "left, center or right." },
     strike: { type: "boolean", default: false, description: "Draw a line through the text, e.g. for an old price." },
+    icon: iconProp,
   },
   example: `state guests=2 nights=3
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
-text "$160" tone=muted strike=true`,
+text "$160" tone=muted strike=true
+text "Payment received" icon=check-circle tone=good`,
+  check: (props) => iconProblems(props.icon, "icon"),
   layout(box, ctx) {
     const p = ctx.props(box.node);
     const m = textMetrics(ctx.theme, p.oneOf("style", TEXT_STYLES, "body"), p.has("weight") ? p.oneOf("weight", WEIGHTS, "regular") : undefined);
     const f = `${m.weight} ${m.size}px ${ctx.theme.font.family}`;
-    const lines = wrapText(p.text(), box.w, f, ctx.measure);
-    box.data = { lines, font: f, lineHeight: m.lineHeight };
+    const icon = textIcon(p.str("icon"), m.size);
+    const lines = wrapText(p.text(), Math.max(0, box.w - (icon ? icon.indent : 0)), f, ctx.measure);
+    box.data = { lines, font: f, lineHeight: m.lineHeight, icon };
     box.h = lines.length * m.lineHeight;
   },
   minWidth(node, ctx) {
@@ -43,14 +48,18 @@ text "$160" tone=muted strike=true`,
   },
   paint(box, ctx) {
     const p = ctx.props(box.node);
-    const { lines, font, lineHeight } = box.data as { lines: string[]; font: string; lineHeight: number };
+    const { lines, font, lineHeight, icon } = box.data as { lines: string[]; font: string; lineHeight: number; icon: TextIcon | null };
     const align = p.oneOf("align", ALIGN, "left");
     const g = ctx.g;
+    const color = toneColor(ctx.theme, p.oneOf("tone", TONES, "default"));
+    // The icon sits on the first line; the words keep to its right.
+    const left = box.x + (icon ? icon.indent : 0);
+    if (icon) drawIcon(g, icon.name, box.x, box.y + (lineHeight - icon.size) / 2, icon.size, color);
     g.font = font;
-    g.fillStyle = toneColor(ctx.theme, p.oneOf("tone", TONES, "default"));
+    g.fillStyle = color;
     g.textAlign = align;
     g.textBaseline = "middle";
-    const x = align === "left" ? box.x : align === "center" ? box.x + box.w / 2 : box.x + box.w;
+    const x = align === "left" ? left : align === "center" ? (left + box.x + box.w) / 2 : box.x + box.w;
     lines.forEach((l, i) => g.fillText(l, x, box.y + lineHeight * i + lineHeight / 2 + 1));
     if (p.bool("strike")) {
       lines.forEach((l, i) => {
@@ -61,6 +70,15 @@ text "$160" tone=muted strike=true`,
     }
   },
 };
+
+interface TextIcon { name: IconName; size: number; indent: number }
+
+/** An icon a little larger than the text it starts, and the room it takes. */
+function textIcon(name: string, fontSize: number): TextIcon | null {
+  if (!isIconName(name)) return null;
+  const size = Math.round(Math.min(32, Math.max(16, fontSize * 1.2)));
+  return { name, size, indent: size + Math.round(size * 0.45) };
+}
 
 const TRENDS = ["up", "down", "flat"] as const;
 type Trend = (typeof TRENDS)[number];
@@ -465,6 +483,33 @@ export const badge: ComponentDef = {
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillText(fitText(g, label, w - 12), box.x + w / 2, box.y + box.h / 2 + 1);
+  },
+};
+
+const ICON_SIZES = { sm: 16, md: 20, lg: 28 } as const;
+const ICON_SIZE_NAMES = ["sm", "md", "lg"] as const;
+
+export const icon: ComponentDef = {
+  type: "icon",
+  category: "content",
+  description: "A small symbol on its own, like a status mark or a weather sign. To start a line of text or a list row with one, use icon= on text or list-item instead.",
+  props: {
+    name: { type: "string", required: true, description: `Which icon: ${ICON_NAMES.join(", ")}.` },
+    tone: toneProp,
+    size: { type: "enum", values: ICON_SIZE_NAMES, default: "md", description: "sm, md or lg." },
+  },
+  example: `icon name=sun tone=warn size=lg
+icon name=check-circle tone=good`,
+  check: (props) => iconProblems(props.name, "name"),
+  layout(box, ctx) {
+    box.h = ICON_SIZES[ctx.props(box.node).oneOf("size", ICON_SIZE_NAMES, "md")];
+  },
+  minWidth: (node, ctx) => ICON_SIZES[ctx.props(node).oneOf("size", ICON_SIZE_NAMES, "md")],
+  paint(box, ctx) {
+    const p = ctx.props(box.node);
+    const name = p.str("name");
+    if (!isIconName(name)) return;
+    drawIcon(ctx.g, name, box.x, box.y, box.h, toneColor(ctx.theme, p.oneOf("tone", TONES, "default")));
   },
 };
 
