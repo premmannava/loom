@@ -34,6 +34,23 @@ describe("timeline", () => {
     ui.destroy();
   });
 
+  it("shows a plan without statuses as neutral: nothing ticked, nothing muted, no accent line", () => {
+    const ui = render(`timeline\n  step "Day 1: Sedona"\n  step "Day 2: Flagstaff"\n  step "Day 3: Grand Canyon"\n`);
+    const ops = ui.drawOps;
+    expect(ops.some((o) => (o.fillStyle || o.strokeStyle) === lightTheme.colors.accent)).toBe(false);
+    for (const t of ["Day 1: Sedona", "Day 2: Flagstaff", "Day 3: Grand Canyon"]) {
+      expect(ops.find((o) => o.op === "fillText" && o.args[0] === t)!.fillStyle).toBe(lightTheme.colors.ink);
+    }
+    ui.destroy();
+  });
+
+  it("marks progress once statuses are given: ticks up to where the person is", () => {
+    const ui = render(`timeline\n  step "Day 1" status=done\n  step "Day 2" status=current\n  step "Day 3" status=upcoming\n`);
+    expect(ui.drawOps.filter((o) => o.op === "fill" && o.fillStyle === lightTheme.colors.accent).length).toBeGreaterThanOrEqual(2);
+    expect(ui.drawOps.find((o) => o.op === "fillText" && o.args[0] === "Day 3")!.fillStyle).toBe(lightTheme.colors.muted);
+    ui.destroy();
+  });
+
   it("warns about a bad status or icon", () => {
     expect(warnings(`timeline\n  step "A" status=finished\n`)[0]).toMatch(/status should be one of done, current, upcoming/);
     expect(warnings(`timeline\n  step "A" icon=lorry\n`)[0]).toMatch(/icon="lorry" isn't an icon/);

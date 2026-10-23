@@ -196,19 +196,23 @@ ELEMENTS
         each items=gear as=g index=i key={g.name}
           text "{i + 1}. {g.name}, {g.kg} kg"
 
-  timeline  — Steps in order with a line joining them, each done, current or upcoming: order tracking, itineraries, project history, how-to guides.
+  timeline  — Steps in order with a line joining them: itineraries, how-to guides, order tracking, project history. Give steps a status only to show progress, like where an order is or which step the person has reached.
     gap=<number>  Space between children in pixels (default 20).
     children: step
     example:
       timeline
-        step "Ordered" detail="Oct 18, 9:12 AM" status=done
-        step "Shipped" detail="Phoenix, AZ" status=done
+        step "Day 1: Sedona" detail="Cathedral Rock at sunrise"
+        step "Day 2: Flagstaff" detail="Lowell Observatory at night"
+        step "Day 3: Grand Canyon" detail="South Rim, Mather Point"
+      # Showing progress: a status on every step
+      timeline
+        step "Ordered" time="Oct 18" status=done
         step "Out for delivery" detail="Arrives by 8 PM" status=current
         step "Delivered" status=upcoming
 
   step "<text>"  — One step of a timeline: a title, an optional detail line and time, and whether it's done, current or upcoming.
     "<text>" (required)  The step's title, e.g. Shipped.
-    status=<done|current|upcoming>  done, current or upcoming. Upcoming steps are muted.
+    status=<done|current|upcoming>  Only to show progress: done for finished steps, current for where the person is now, upcoming for what's left (muted). Leave it out on every step for a plan, itinerary or how-to that hasn't started.
     detail=<string>  A quieter line under the title, like a place or a note.
     time=<string>  A short date or time on the right, e.g. Oct 18 or 9:12 AM.
     icon=<string>  An icon in the step's marker instead of the check or dot, by name from icon's list, e.g. icon=truck.
