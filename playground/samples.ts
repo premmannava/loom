@@ -337,6 +337,35 @@ card
   button "Check in now" on=emit:check_in
 `,
   },
+  choosePlan: {
+    label: "Choose a plan",
+    prompt: "Help me pick a storage plan, then show where my order is.",
+    spec: `state view="Compare" page=0
+state plans=[{name: "Basic", price: 9, storage: 50, support: "Email", backup: false}, {name: "Pro", price: 19, storage: 500, support: "Chat", backup: true}, {name: "Team", price: 49, storage: 2000, support: "Phone", backup: true}]
+card
+  text "Choose a storage plan" style=title
+  segmented bind=view options="Compare,Browse,Order"
+  if={view == 'Compare'}
+    compare items=plans pick="Pro"
+      compare-row "Price a month" field=price format=money best=low
+      compare-row "Storage (GB)" field=storage format=number best=high
+      compare-row "Support" field=support
+      compare-row "Daily backup" field=backup
+  if={view == 'Browse'}
+    carousel bind=page
+      each items=plans as=p
+        card
+          text "{p.name}" style=lead weight=semibold
+          text "{money(p.price)} a month" tone=muted
+          button "Choose {p.name}" on="emit:choose:{p.name}"
+  if={view == 'Order'}
+    timeline
+      step "Plan chosen" detail="Pro, billed monthly" time="Oct 18" status=done
+      step "Payment confirmed" time="Oct 18" status=done icon=card
+      step "Setting up your space" detail="Usually takes a few minutes" status=current
+      step "Ready to use" status=upcoming
+`,
+  },
   directory: {
     label: "Directory",
     prompt: "A team directory with a department picker that filters the people shown.",
