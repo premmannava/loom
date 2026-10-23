@@ -1,3 +1,4 @@
+import { ICON_NAMES, isIconName, nearestIcon } from "../icons";
 import type { LayoutContext, PressContext, PropDef } from "../component";
 import type { Theme } from "../theme";
 import type { Box, SayShapeNode } from "../types";
@@ -185,4 +186,15 @@ export function labelLines(ctx: LayoutContext, text: string, width: number, maxL
   const lh = Math.round(ctx.theme.text.body * 1.35);
   if (!text) return { lines: [], lh };
   return { lines: fitLines(text, Math.max(20, width), themeFont(ctx.theme, 400, ctx.theme.text.body), ctx.measure, maxLines), lh };
+}
+
+
+/** icon= on text and list-item: a symbol before the words, from the icon element's list. */
+export const iconProp: PropDef = { type: "string", description: "An icon before the text, by name from icon's list, e.g. icon=check-circle." };
+
+/** A warning for an icon name that doesn't exist, with the nearest one and the full list. */
+export function iconProblems(raw: string | undefined, prop: string): string[] {
+  if (raw === undefined || raw.includes("{") || isIconName(raw)) return [];
+  const near = nearestIcon(raw);
+  return [`${prop}="${raw}" isn't an icon.${near ? ` Did you mean ${prop}=${near}?` : ""} Icons: ${ICON_NAMES.join(", ")}`];
 }

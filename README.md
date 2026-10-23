@@ -20,7 +20,7 @@ card
 
 > **Name:** SayShape was called Loom while it was being built. The package (`loom-ui`), CSS variables (`--loom-*`) and the model guide still use that name; they'll be renamed before the first npm release.
 
-> **Status: 0.1, early foundation.** The engine, derived values, 41 components including text input, selects, a date picker, lists and data, charts (bar, horizontal bar and line with up to 6 series, pie and donut), stats with a change and sparkline, callouts, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
+> **Status: 0.1, early foundation.** The engine, derived values, 42 components including text input, selects, a date picker, lists and data, charts (bar, horizontal bar and line with up to 6 series, pie and donut), stats with a change and sparkline, callouts, its own icons, tables, a model connection, tests and debugging tools are in place. Accessibility, scrolling and the docs site come next. See [Limitations](#limitations) before using it for anything real.
 
 ---
 
@@ -440,7 +440,7 @@ L7   variant should be one of primary, secondary, danger; got "huge"
 | Category | Components |
 |---|---|
 | Layout | [`column`](#column), [`row`](#row), [`grid`](#grid), [`card`](#card), [`list`](#list), [`list-item`](#list-item), [`accordion`](#accordion), [`divider`](#divider), [`spacer`](#spacer), [`each`](#each) |
-| Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar), [`callout`](#callout) |
+| Content | [`text`](#text), [`image`](#image), [`code`](#code), [`badge`](#badge), [`avatar`](#avatar), [`callout`](#callout), [`icon`](#icon) |
 | Data | [`stat`](#stat), [`rating`](#rating), [`chart`](#chart), [`table`](#table), [`table-column`](#table-column), [`map`](#map), [`pin`](#pin) |
 | Input | [`button`](#button), [`link`](#link), [`check`](#check), [`switch`](#switch), [`radio`](#radio), [`select`](#select), [`date-picker`](#date-picker), [`stepper`](#stepper), [`slider`](#slider), [`input`](#input) |
 | Navigation | [`screen`](#screen), [`tabs`](#tabs), [`tab`](#tab), [`breadcrumb`](#breadcrumb), [`pagination`](#pagination) |
@@ -546,12 +546,13 @@ One row of a list: a title, an optional detail line and an optional value on the
 | `"text"` | text, required | The row's title. |
 | `detail` | string | A second, quieter line under the title. |
 | `trailing` | string | A short value on the right, like a price or a count. |
+| `icon` | string | An icon before the text, by name from icon's list, e.g. icon=check-circle. |
 | `on` | action | Actions to run when the row is pressed, e.g. emit:changed. Separate several with ; |
 
 Only inside: `list`.
 
 ```
-list-item "Rain shell" detail="Packs into its pocket" trailing="$129" on=emit:open_shell
+list-item "Rain shell" detail="Packs into its pocket" trailing="$129" icon=package on=emit:open_shell
 ```
 
 ### `accordion`
@@ -627,12 +628,14 @@ A paragraph or heading that wraps to the available width. Use {expressions} to s
 | `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
 | `align` | `left` / `center` / `right` | left, center or right. |
 | `strike` | boolean | Draw a line through the text, e.g. for an old price. |
+| `icon` | string | An icon before the text, by name from icon's list, e.g. icon=check-circle. |
 
 ```
 state guests=2 nights=3
 text "Weekend in Yosemite" style=title
 text "{guests} guests, {nights} nights" tone=muted
 text "$160" tone=muted strike=true
+text "Payment received" icon=check-circle tone=good
 ```
 
 ### `image`
@@ -704,6 +707,21 @@ The one thing to notice in an answer: a key finding, a warning or a next step.
 
 ```
 callout "Rock is 47% of revenue" detail="Up from 41% last year" icon=true
+```
+
+### `icon`
+
+A small symbol on its own, like a status mark or a weather sign. To start a line of text or a list row with one, use icon= on text or list-item instead.
+
+| Prop | Type | Description |
+|---|---|---|
+| `name` | string, required | Which icon: check, check-circle, x, x-circle, warning, info, help, clock, arrow-up, arrow-down, arrow-left, arrow-right, trend-up, trend-down, plus, minus, refresh, sun, moon, cloud, rain, snow, storm, wind, thermometer, droplet, pin, globe, plane, car, truck, home, building, dollar, card, cart, package, bar-chart, pie-chart, percent, tag, briefcase, file, target, bolt, idea, lock, user, users, calendar, mail, phone, chat, star, heart, bell, search, filter, download, share, link, sliders. |
+| `tone` | `default` / `muted` / `accent` / `good` / `warn` / `bad` | Color role: default, muted, accent, good, warn or bad. |
+| `size` | `sm` / `md` / `lg` | sm, md or lg. |
+
+```
+icon name=sun tone=warn size=lg
+icon name=check-circle tone=good
 ```
 
 ### `stat`
