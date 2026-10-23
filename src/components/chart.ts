@@ -33,7 +33,8 @@ import type { ComponentDef, LayoutContext } from "../component";
 import { fieldOf, isList, isRecord } from "../data";
 import { ellipsize, fitLines, wrapText, type TextMeasurer } from "../text";
 import { SERIES_COUNT, seriesColors, type Theme } from "../theme";
-import type { Value } from "../types";
+import type { Box, Value } from "../types";
+import { easeOut, paintGhost, staggered } from "../ghost";
 import { themeFont } from "./util";
 
 /** The most items one chart draws. Larger lists show a message instead. */
@@ -150,6 +151,8 @@ export type ChartGeometry = {
   /** Below the plot: series names (2 or more series), or slices with value and share. */
   legend: LegendItem[];
   legendFont: string;
+  /** Data still loading: draw a placeholder of this shape (series: how many, for the legend). */
+  loading?: { series: number };
   /** Pie and donut. */
   pie?: {
     cx: number;
@@ -641,6 +644,111 @@ function roundGeometry(box: { w: number }, d: PieData, kind: "pie" | "donut", fo
   };
 }
 
+/** Rows of legend a loading pie or donut keeps room for. */
+const GHOST_LEGEND_ROWS = 4;
+
+/** The shape of a chart whose data is on its way, at the size it will likely have, so little moves when it arrives. */
+function loadingGeometry(box: { w: number }, kind: Kind, series: number, title: string, ctx: Ctx): { g: ChartGeometry; h: number } {
+  const t = ctx.theme;
+  const { base, top } = header(box, kind, title, ctx);
+  const labelLH = Math.round(t.text.caption * 1.4);
+  const rowH = Math.round(t.text.caption * 1.4) + t.space.xs;
+  if (isRound(kind)) {
+    const size = pieSize(box.w);
+    const legendTop = top + size + t.space.md;
+    return { g: { ...base, plot: { x: box.w / 2 - size / 2, y: top, w: size, h: size }, labelY: legendTop, loading: { series } }, h: legendTop + GHOST_LEGEND_ROWS * rowH };
+  }
+  const axisW = 28;
+  const plot: Rect = { x: axisW, y: top + Math.ceil(labelLH / 2), w: Math.max(0, box.w - axisW), h: plotHeight(box.w) };
+  const labelY = plot.y + plot.h + t.space.xs;
+  const legend = series > 1 ? t.space.sm + rowH : 0;
+  return { g: { ...base, plot, labelY, loading: { series } }, h: labelY + labelLH + legend };
+}
+
+/** Heights of the placeholder bars and line, as shares of the plot: a gentle rise with some variety. */
+const GHOST_SHAPE = [0.42, 0.58, 0.5, 0.72, 0.62, 0.84, 0.7, 0.9, 0.78, 0.66, 0.8, 0.6];
+
+function paintChartLoading(box: Box, ctx: PaintCtx): void {
+  const { g, theme } = ctx;
+  const d = box.data as ChartGeometry | undefined;
+  if (!d?.loading) return;
+  const ox = box.x, oy = box.y;
+  const c = theme.colors;
+  g.textBaseline = "middle";
+  g.textAlign = "left";
+  g.font = d.titleFont;
+  g.fillStyle = c.ink;
+  d.title.forEach((l, i) => g.fillText(l, ox, oy + i * d.titleLH + d.titleLH / 2));
+  const pillH = 8;
+  const rowH = Math.round(theme.text.caption * 1.4) + theme.space.xs;
+  const bounds = { x: ox, y: oy + d.plot.y, w: box.w, h: box.h - d.plot.y };
+
+  if (isRound(d.kind)) {
+    const r = d.plot.w / 2, cx = ox + d.plot.x + r, cy = oy + d.plot.y + r;
+    paintGhost(ctx, bounds, (s) => {
+      if (d.kind === "donut") {
+        // A ring: the outer circle, then the hole the other way round.
+        s.g.moveTo(cx + r, cy);
+        s.g.arc(cx, cy, r, 0, Math.PI * 2);
+        s.g.moveTo(cx + r * 0.6, cy);
+        s.g.arc(cx, cy, r * 0.6, Math.PI * 2, 0, true);
+        s.g.closePath();
+      } else s.circle(cx, cy, r);
+      for (let i = 0; i < GHOST_LEGEND_ROWS; i++) {
+        const y = oy + d.labelY + i * rowH + rowH / 2;
+        s.circle(ox + 5, y, 5);
+        s.pill(ox + 18, y - pillH / 2, Math.min(box.w * 0.4, 70 + ((i * 37) % 60)), pillH);
+        s.pill(ox + box.w - 64, y - pillH / 2, 64, pillH);
+      }
+    });
+    return;
+  }
+
+  // The baseline, as the real chart will have; grid lines would show through the shapes.
+  const px = ox + d.plot.x, pw = d.plot.w, py = oy + d.plot.y, ph = d.plot.h;
+  g.lineWidth = 1;
+  g.strokeStyle = c.line;
+  g.beginPath();
+  g.moveTo(px, Math.round(py + ph) + 0.5);
+  g.lineTo(px + pw, Math.round(py + ph) + 0.5);
+  g.stroke();
+  const ns = Math.max(1, d.loading.series);
+  const n = Math.max(4, Math.min(GHOST_SHAPE.length, Math.floor(pw / (d.kind === "bar" ? 26 * ns + 14 : 40))));
+  const slotW = pw / n;
+  const bottom = py + ph;
+  paintGhost(ctx, bounds, (s) => {
+    for (let i = 0; i <= 3; i++) s.pill(ox, py + (ph * i) / 3 - pillH / 2, d.plot.x - 8, pillH);
+    if (d.kind === "bar") {
+      const group = Math.min(slotW * 0.7, ns * 40);
+      const bw = (group - (ns - 1) * BAR_GAP) / ns;
+      for (let i = 0; i < n; i++) {
+        for (let k = 0; k < ns; k++) {
+          const h = ph * GHOST_SHAPE[(i + k * 3) % GHOST_SHAPE.length]! * (k ? 0.8 : 1);
+          s.rect(px + slotW * (i + 0.5) - group / 2 + k * (bw + BAR_GAP), bottom - h, bw, h, Math.min(theme.radius.sm, bw / 2));
+        }
+      }
+    } else {
+      // The area under a line that rises gently: the shape a trend will take.
+      s.g.moveTo(px, bottom);
+      s.g.lineTo(px, bottom - ph * GHOST_SHAPE[0]! * 0.85);
+      for (let i = 0; i < n; i++) s.g.lineTo(px + slotW * (i + 0.5), bottom - ph * GHOST_SHAPE[i]! * 0.85);
+      s.g.lineTo(px + pw, bottom - ph * GHOST_SHAPE[n - 1]! * 0.85);
+      s.g.lineTo(px + pw, bottom);
+      s.g.closePath();
+    }
+    for (let i = 0; i < n; i += slotW < 44 ? 2 : 1) s.pill(px + slotW * (i + 0.5) - 14, oy + d.labelY + 3, 28, pillH);
+    if (ns > 1) {
+      const y = oy + d.labelY + Math.round(theme.text.caption * 1.4) + theme.space.sm + rowH / 2;
+      for (let k = 0; k < ns; k++) {
+        const x = ox + k * 96;
+        if (x + 80 > ox + box.w) break;
+        s.rect(x, y - 5, 10, 10, 2);
+        s.pill(x + 16, y - pillH / 2, 60, pillH);
+      }
+    }
+  });
+}
+
 /** Warnings about props that only make sense together, shown by the parser. */
 function check(props: Readonly<Record<string, string>>): string[] {
   const out: string[] = [];
@@ -698,6 +806,12 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
     const format = p.oneOf("format", FORMATS, "number");
     const x = p.str("x");
     const fields = fieldsOf(p.str("y"));
+    if (ctx.isLoading?.(box.node)) {
+      const out = loadingGeometry(box, kind, isRound(kind) ? 1 : Math.min(MAX_SERIES, Math.max(1, fields.length)), p.text(), ctx);
+      box.data = out.g;
+      box.h = out.h;
+      return;
+    }
     const items = p.expr("items");
     const line = box.node.line;
     if (p.has("items") && !isList(items)) ctx.warn?.(`chart on line ${line}: items is not a list, so there's nothing to chart. Use a list of records, like items=sales`);
@@ -718,11 +832,14 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
     box.data = out.g;
     box.h = out.h;
   },
+  paintLoading: paintChartLoading,
   paint(box, ctx) {
     const { g, theme } = ctx;
     const c = theme.colors;
     const d = box.data as ChartGeometry | undefined;
     if (!d) return;
+    // Laid out while loading but painted after the data came: wait for the next layout.
+    if (d.loading) return paintChartLoading(box, ctx);
     const ox = box.x, oy = box.y;
     const palette = seriesColors(theme);
     // One series draws in the accent, exactly as before series existed.
@@ -748,13 +865,21 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
       return;
     }
 
+    // Just after its data arrived: marks grow into place while the rest fades in.
+    const reveal = ctx.reveal(box.node);
+    const fade = easeOut(reveal * 2.5);
+    const base = g.globalAlpha;
+
     if (d.pie) {
-      paintRound(ctx, d, ox, oy, palette);
+      paintRound(ctx, d, ox, oy, palette, reveal);
+      g.globalAlpha = base * fade;
       paintLegend(ctx, d, ox, oy, (k) => palette[k % palette.length]!);
+      g.globalAlpha = base;
       return;
     }
 
     const px = ox + d.plot.x, pw = d.plot.w;
+    g.globalAlpha = base * fade;
     // Grid lines and value labels.
     g.lineWidth = 1;
     g.font = d.labelFont;
@@ -778,19 +903,34 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
       g.stroke();
     }
 
+    g.globalAlpha = base;
     g.fillStyle = c.accent;
     g.strokeStyle = c.accent;
     if (d.kind === "bar") {
-      for (const s of d.slots) {
-        (s.bars ?? []).forEach((b, k) => {
-          if (!b || b.h <= 0) return;
+      const zero = d.zeroY ?? d.plot.y + d.plot.h;
+      d.slots.forEach((s, i) => {
+        // A wave from left to right: each bar grows out of the zero line.
+        const grow = reveal < 1 ? staggered(reveal, i, d.slots.length) : 1;
+        (s.bars ?? []).forEach((full, k) => {
+          if (!full || full.h <= 0) return;
+          const up = full.y + full.h / 2 < zero;
+          const h = full.h * grow;
+          if (h <= 0.25) return;
+          const b = { x: full.x, y: up ? full.y + full.h - h : full.y, w: full.w, h };
           const r = Math.min(theme.radius.sm, b.w / 2, b.h / 2);
           ctx.roundRect(ox + b.x, oy + b.y, b.w, b.h, r);
           g.fillStyle = colorOf(k);
           g.fill();
         });
-      }
+      });
     } else {
+      // The lines run in from the left.
+      g.save();
+      if (reveal < 1) {
+        g.beginPath();
+        g.rect(px - 6, oy + d.plot.y - 6, (pw + 12) * easeOut(reveal), d.plot.h + 12);
+        g.clip();
+      }
       g.lineWidth = 2;
       g.lineJoin = "round";
       g.lineCap = "round";
@@ -819,8 +959,10 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
           }
         }
       });
+      g.restore();
     }
 
+    g.globalAlpha = base * fade;
     g.font = d.labelFont;
     g.fillStyle = c.muted;
     g.textAlign = "center";
@@ -833,21 +975,26 @@ chart "Revenue vs last year" kind=line items=sales x=month y=revenue,last_year l
 
 type PaintCtx = Parameters<NonNullable<ComponentDef["paint"]>>[1];
 
-function paintRound(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, palette: readonly string[]): void {
+function paintRound(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, palette: readonly string[], reveal = 1): void {
   const { g, theme } = ctx;
   const c = theme.colors;
   const pie = d.pie!;
   const cx = ox + pie.cx, cy = oy + pie.cy;
   // Angles are measured clockwise from the top; the canvas's 0 is at three o'clock.
   const at = (a: number) => a - Math.PI / 2;
+  // Just after the data arrived, the slices sweep round from the top.
+  const sweep = reveal < 1 ? Math.PI * 2 * easeOut(reveal) : Infinity;
+  const base = g.globalAlpha;
   for (const s of pie.slices) {
+    if (s.start >= sweep) break;
+    const end = Math.min(s.end, sweep);
     g.beginPath();
     if (pie.inner) {
-      g.arc(cx, cy, pie.r, at(s.start), at(s.end));
-      g.arc(cx, cy, pie.inner, at(s.end), at(s.start), true);
+      g.arc(cx, cy, pie.r, at(s.start), at(end));
+      g.arc(cx, cy, pie.inner, at(end), at(s.start), true);
     } else {
       g.moveTo(cx, cy);
-      g.arc(cx, cy, pie.r, at(s.start), at(s.end));
+      g.arc(cx, cy, pie.r, at(s.start), at(end));
     }
     g.closePath();
     g.fillStyle = palette[s.color % palette.length]!;
@@ -859,6 +1006,7 @@ function paintRound(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, pal
     g.lineCap = "butt";
     g.strokeStyle = c.surface;
     for (const s of pie.slices) {
+      if (s.start >= sweep) break;
       const a = at(s.start);
       g.beginPath();
       g.moveTo(cx + Math.cos(a) * pie.inner, cy + Math.sin(a) * pie.inner);
@@ -868,6 +1016,7 @@ function paintRound(ctx: PaintCtx, d: ChartGeometry, ox: number, oy: number, pal
   }
   if (pie.center) {
     const m = pie.center;
+    g.globalAlpha = base * easeOut((reveal - 0.4) / 0.6);
     const capLH = Math.round(theme.text.caption * 1.4);
     const shift = m.caption ? capLH / 2 : 0;
     g.textAlign = "center";

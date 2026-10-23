@@ -37,6 +37,26 @@ let pending: { spec: string; final: boolean } | null = null;
  */
 const hostData = new Map<string, Value>();
 let pendingData: Record<string, string> | null = null;
+/** Datasets still being fetched: elements that read them draw placeholders until they arrive. */
+const loadingData = new Set<string>();
+/** True while the spec is still streaming in, before the data argument is known. */
+let awaiting = false;
+
+/**
+ * What the view shows before the first line of a spec arrives (some chat apps
+ * only send the spec once it's complete): the outline of a card, shimmering.
+ */
+const INTRO = `card
+  skeleton lines=1
+  skeleton shape=block height=150
+  skeleton lines=2
+`;
+let introShowing = false;
+
+function syncLoading(): void {
+  loom?.setLoading(loadingData);
+  loom?.setAwaiting(awaiting);
+}
 
 const prefersDark = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 const SENTINEL = "rgb(1, 2, 3)";
@@ -105,6 +125,7 @@ async function applyTheme(ctx: McpUiHostContext | undefined): Promise<Theme> {
 
 function show(spec: string, final: boolean): void {
   if (!loom) { pending = { spec, final }; return; }
+  if (introShowing) { introShowing = false; loom.beginStream(); shown = ""; applyHostData(); }
   const next = nextChunk(shown, spec);
   if (next.restart) { loom.beginStream(); shown = ""; applyHostData(); }
   if (next.add) { loom.push(next.add); shown += next.add; }
@@ -126,6 +147,8 @@ function applyHostData(): void {
 async function loadData(wanted: Record<string, string>): Promise<void> {
   if (!loom) { pendingData = wanted; return; }
   if (!app.getHostCapabilities()?.serverTools) {
+    loadingData.clear();
+    syncLoading();
     loom.notify("This chat app doesn't let interfaces load data");
     return;
   }
@@ -135,9 +158,13 @@ async function loadData(wanted: Record<string, string>): Promise<void> {
       const rows = (r.structuredContent as { rows?: unknown } | undefined)?.rows;
       if (r.isError || !Array.isArray(rows)) throw new Error("no rows");
       hostData.set(name, rows as Value);
+      try { loom?.state.set(name, rows as Value); } catch { loom?.notify(`Couldn't show the data for ${name}`); }
     } catch {
       loom?.notify(`Couldn't load the data for ${name}`);
     }
+    // Each dataset draws in as soon as it's here, without waiting for the others.
+    loadingData.delete(name);
+    syncLoading();
   }));
   applyHostData();
 }
@@ -159,13 +186,26 @@ function specOf(args: Record<string, unknown> | undefined): string | null {
 // only complete lines are tidied and shown, so each step extends the last one.
 app.ontoolinputpartial = (p) => {
   const spec = specOf(p.arguments);
+  // Until the data argument arrives, a name with no value yet may be a dataset: wait for it.
+  if (!awaiting) { awaiting = true; syncLoading(); }
   if (spec !== null) show(tidySpec(spec.slice(0, spec.lastIndexOf("\n") + 1)), false);
 };
 app.ontoolinput = (p) => {
   const spec = specOf(p.arguments);
-  if (spec !== null) show(tidySpec(spec), true);
   const data = dataOf(p.arguments);
+  // The names are known now: only datasets still to fetch wait as placeholders.
+  for (const name of Object.keys(data ?? {})) loadingData.add(name);
+  awaiting = false;
+  syncLoading();
+  if (spec !== null) show(tidySpec(spec), true);
   if (data) void loadData(data);
+};
+// A refused call (an unknown dataset, say) never sends rows: stop waiting for them.
+app.ontoolresult = (r) => {
+  if (!r.isError) return;
+  loadingData.clear();
+  awaiting = false;
+  syncLoading();
 };
 app.onhostcontextchanged = () => {
   // getHostContext() holds the whole context with this change merged in.
@@ -213,7 +253,9 @@ async function start(): Promise<void> {
     if (!loom) return;
     void deliver(eventMessage(name, value, loom.state.snapshot()));
   });
+  syncLoading();
   if (pending) { const p = pending; pending = null; show(p.spec, p.final); }
+  else { loom.setSpec(INTRO); introShowing = true; }
   if (pendingData) { const d = pendingData; pendingData = null; void loadData(d); }
 }
 

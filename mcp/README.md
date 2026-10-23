@@ -44,7 +44,7 @@ Three more tools appear:
 | `query_data` | Runs one read-only `SELECT` and keeps the result (at most 500 rows) as a dataset. The model gets its id, columns and three sample rows, never the full result. |
 | `fetch_dataset` | Only the interface can call this one (MCP Apps `visibility: ["app"]`): it loads a dataset's rows. |
 
-The model then calls `show_interface` with `data={"sales": "d1"}` and writes `items=sales` in the spec. The interface fetches the rows itself and fills them in, so **the numbers on screen come straight from the database and never pass through the model**. That keeps them exact, and the model's token use stays the same however many rows there are.
+The model then calls `show_interface` with `data={"sales": "d1"}` and writes `items=sales` in the spec. While the rows load, the chart, table and figures show placeholders in their own shape, then draw in when the rows arrive (and before the first line of a spec arrives, a placeholder card). The interface fetches the rows itself and fills them in, so **the numbers on screen come straight from the database and never pass through the model**. That keeps them exact, and the model's token use stays the same however many rows there are.
 
 Safety: the file is opened read-only, so SQLite refuses any write. Only a single `SELECT` (or `WITH … SELECT`) is accepted, with no `ATTACH` or `PRAGMA`, and results are capped. Reading a database needs Node.js 22.13 or later, which has SQLite built in, so there's nothing else to install.
 

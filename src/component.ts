@@ -53,6 +53,12 @@ export interface LayoutContext {
    * field). The engine shows each message once per spec, not every frame.
    */
   warn?(message: string): void;
+  /**
+   * Whether this element reads data the host is still loading (SayShape.setLoading).
+   * Lay it out at its usual size, without warning about the missing data:
+   * paintLoading draws a placeholder there until the data arrives.
+   */
+  isLoading?(node: SayShapeNode): boolean;
 }
 
 export interface PaintContext {
@@ -92,6 +98,14 @@ export interface PaintContext {
   appear(node: SayShapeNode): number;
   /** Ask for another frame (for animation). */
   requestFrame(): void;
+  /** Whether this element reads data that's still loading; paintLoading is drawing it. */
+  isLoading(node: SayShapeNode): boolean;
+  /**
+   * 0..1: how far this element has drawn in since its data arrived (bars
+   * growing, a line running). 1 when nothing is animating or motion is off.
+   * Asks for the next frame itself while below 1.
+   */
+  reveal(node: SayShapeNode): number;
   /**
    * An image by its spec src: loading, ready (with the image), error, or
    * blocked by the image policy. The engine repaints when a load settles.
@@ -184,6 +198,13 @@ export interface ComponentDef {
   paint?(box: Box, ctx: PaintContext): void;
   /** Paint after children (overlays, pins on a map...). */
   paintOver?(box: Box, ctx: PaintContext): void;
+  /**
+   * Paint a placeholder shaped like this element while the data it reads is
+   * loading (ctx.isLoading), instead of paint. Use paintGhost from src/ghost.ts.
+   * Elements without it are drawn as a plain shimmering block when they have
+   * no children, and normally otherwise.
+   */
+  paintLoading?(box: Box, ctx: PaintContext): void;
   /** Refine a hit inside a registered region. Return null to fall through. */
   hitTest?(box: Box, x: number, y: number): { detail?: unknown } | null;
   /** Default: run the `on` prop. */

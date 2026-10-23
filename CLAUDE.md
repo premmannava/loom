@@ -42,6 +42,7 @@ spec text → parse → tree → layout → boxes → paint → canvas pixels
 | Engine | `src/engine.ts` | `SayShape` class: dirty-stage pipeline, canvas sizing, paint, hit testing, pointer and keyboard. |
 | Components | `src/components/` | One `ComponentDef` per component. `map/` is a separate entry point. |
 | Contract | `src/component.ts` | `ComponentDef`, `PropDef`, contexts, and `PropReader` for typed prop access. |
+| Loading | `src/loading.ts`, `src/ghost.ts` | `setLoading(names)` / `setAwaiting(on)`: elements reading data on its way (directly or through derive) draw `paintLoading` placeholders (`paintGhost`: theme `line` tint with a sweep), or a generic one for leaves; `ctx.reveal(node)` drives the draw-in once it arrives. |
 | Popups | `src/popup.ts` | One popup at a time (a select's list, a date picker's calendar): `ComponentDef.popup` measures and paints it; the engine places it in the visible area, paints it last, hit-tests it first, swallows outside presses, routes keys to it and closes it when its owner goes. Its highlight and scroll live in engine-held `PopupState`, never app state. |
 | Debugging | `src/inspector.ts` | Layout/hit overlays, inspect mode, frame capture. |
 | Model guide | `src/prompt.ts` | `languageGuide(registry, opts)` builds the system prompt from component definitions: `mode: "full"` (default) or `"compact"`, and a `profile`. Full mode with no profile must stay byte-identical to `test/fixtures/guide-full.txt` unless a change is meant (then update the fixture). |

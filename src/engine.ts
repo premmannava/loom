@@ -17,6 +17,8 @@ import { noEditor, type EditorHost, type EditorSpec } from "./editor";
 import { isList, makeList } from "./data";
 import { getIn, placeOf, setIn } from "./paths";
 import { createLayoutContext, isVisible } from "./layout";
+import { Loading, type LoadingView } from "./loading";
+import { easeOut, paintGenericGhost } from "./ghost";
 import { placePopup, POPUP_MARGIN, type PopupState, type Viewport } from "./popup";
 import { localToday, parseDate } from "./dates";
 import { parse, type ParseResult } from "./parser";
@@ -116,6 +118,7 @@ export class SayShape {
   private rootBox: Box | null = null;
   private hits: HitRegion[] = [];
   private seen = new Map<string, number>();
+  private loading: Loading;
   /** Screens visited before the current one, for back. */
   private history: string[] = [];
   private toast: { text: string; shownAt: number } | null = null;
@@ -154,6 +157,7 @@ export class SayShape {
     this.canvas = canvas;
     this.opts = opts;
     this.registry = new Registry(opts.components);
+    this.loading = new Loading(this.registry);
     const g = canvas.getContext("2d");
     if (!g) throw new Error("SayShape needs a 2D canvas context");
     this.g = g;
@@ -172,7 +176,7 @@ export class SayShape {
     if (!canvas.getAttribute("aria-label")) canvas.setAttribute("aria-label", "Generated interface");
 
     // A derived value that can't be worked out shows as nothing; say why, once per spec.
-    this.state.onDerivedError = (d, error) => this.warnOnce(`derive ${d.name} on line ${d.line} couldn't be worked out, so it shows as nothing: ${error}`);
+    this.state.onDerivedError = (d, error) => this.loadingView().waitsFor(d.name) || this.warnOnce(`derive ${d.name} on line ${d.line} couldn't be worked out, so it shows as nothing: ${error}`);
     this.state.subscribe((key, value) => {
       this.events.emit("change", { key, value });
       this.invalidate("layout");
@@ -252,6 +256,36 @@ export class SayShape {
     this.invalidate("layout");
   }
 
+  // ---------------------------------------------------------------- loading
+
+  /**
+   * Name the state the host is still fetching (rows from a database, say).
+   * Elements that read it, directly or through derive lines, draw a
+   * placeholder shaped like themselves until it arrives, then draw in.
+   * Call again with the names still loading, or [] when everything is here.
+   */
+  setLoading(names: Iterable<string>): void {
+    if (this.loading.set(names, now())) this.invalidate("layout");
+  }
+
+  /**
+   * While on, any name an element reads that has no value yet counts as
+   * loading. For a spec still streaming in, before the host knows which
+   * names it will fill: elements wait as placeholders rather than "No data".
+   */
+  setAwaiting(on: boolean): void {
+    if (this.loading.setAwaiting(on)) this.invalidate("layout");
+  }
+
+  /** The names setLoading last named. */
+  get loadingNames(): readonly string[] {
+    return this.loading.loadingNames;
+  }
+
+  private loadingView(): LoadingView {
+    return this.loading.view(this.parsed?.derived ?? []);
+  }
+
   // ---------------------------------------------------------------- pipeline
 
   /** Mark a stage (and everything after it) dirty and schedule a frame. */
@@ -296,7 +330,9 @@ export class SayShape {
     const t = now();
     const width = this.opts.width ?? (this.canvas.parentElement?.clientWidth || 600);
     this.width = width;
-    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, this.state.scope, (m) => this.warnOnce(m), this.today);
+    const lv = this.loadingView();
+    const scope = this.state.scope;
+    const ctx = createLayoutContext(this.registry, this.theme, this.measurer, scope, (m) => this.warnOnce(m), this.today, (n) => lv.isLoading(n, scopeOf(n, scope)));
     this.rootBox = ctx.layout(this.parsed.root, 0, 0, width);
     let height = Math.max(this.rootBox.h, this.opts.minHeight ?? 0);
     // A popup that needs more room than the screen has makes the canvas taller while it's open.
@@ -368,6 +404,7 @@ export class SayShape {
     const scope = this.state.scope;
     const animate = this.opts.animate ?? !(typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
     const t = now();
+    const lv = this.loadingView();
     const same = (a: HitTarget | null, n: SayShapeNode, detail?: unknown) =>
       !!a && a.node.id === n.id && (detail === undefined || a.detail === detail);
     return {
@@ -403,19 +440,32 @@ export class SayShape {
         return a;
       },
       requestFrame: () => this.invalidate("paint"),
+      isLoading: (n) => lv.isLoading(n, scopeOf(n, scope)),
+      reveal: (n) => {
+        if (!animate) return 1;
+        const r = lv.reveal(n, t);
+        if (r < 1) this.invalidate("paint");
+        return r;
+      },
       image: (src) => this.images.get(src),
     };
   }
 
   private paintBox(box: Box, ctx: PaintContext, parentAlpha: number): void {
     const def = this.registry.get(box.node.type);
-    const alpha = parentAlpha * ctx.appear(box.node);
+    // A leaf without its own draw-in fades in when its data arrives; containers leave it to their children.
+    const own = !def?.paintLoading && !box.children.length;
+    const alpha = parentAlpha * ctx.appear(box.node) * (own ? easeOut(ctx.reveal(box.node) * 2) : 1);
     ctx.g.save();
     ctx.g.globalAlpha = alpha;
-    def?.paint?.(box, ctx);
+    const loading = !!def && ctx.isLoading(box.node);
+    // Data on its way: the element's own placeholder, or a plain one for a leaf.
+    if (loading && def.paintLoading) def.paintLoading(box, ctx);
+    else if (loading && !box.children.length) paintGenericGhost(ctx, box);
+    else def?.paint?.(box, ctx);
     ctx.g.restore();
     for (const k of box.children) this.paintBox(k, ctx, alpha);
-    if (def?.paintOver) {
+    if (def?.paintOver && !(loading && (def.paintLoading || !box.children.length))) {
       ctx.g.save();
       ctx.g.globalAlpha = alpha;
       def.paintOver(box, ctx);
